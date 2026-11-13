@@ -93,14 +93,14 @@ def place(source, page_id):
         (
             index
             for index, (href, _) in enumerate(crumbs)
-            if re.search(r"/?pages/1\.html$", page_path(href), re.I)
+            if re.search(r"pages/1\.html$", page_path(href), re.I)
         ),
         None,
     )
     rest = crumbs[first_page + 1 :] if first_page is not None else crumbs[4:]
 
     if rest and re.search(
-        rf"/?pages/{page_id}\.html$", page_path(rest[-1][0]), re.I
+        rf"pages/{page_id}\.html$", page_path(rest[-1][0]), re.I
     ):
         title, rest = rest[-1][1], rest[:-1]
     else:

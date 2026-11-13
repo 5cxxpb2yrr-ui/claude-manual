@@ -32,10 +32,8 @@ DEFAULT = [
 ]
 CFG = json.loads(os.environ["CRAWL_CONFIG"]) if os.environ.get("CRAWL_CONFIG") else DEFAULT
 TAG = re.compile(r"<[^>]+>")
-CR = re.compile(
-    r'<a[^>]*class="breadcrumb-part"[^>]*href="([^"]*)"[^>]*>(.*?)</a>',
-    re.S,
-)
+ANCHOR = re.compile(r"<a\\b([^>]*)>(.*?)</a\\s*>", re.I | re.S)
+ATTRIBUTE = re.compile(r"""([\\w:-]+)\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))""", re.S)
 
 
 def txt(value):
@@ -58,7 +56,7 @@ def fetch(url):
                 url, headers={"User-Agent": "LifeOS-Indexer/1.0"}
             )
             with urllib.request.urlopen(request, timeout=30) as response:
-                return response.read(8192).decode("utf-8", "ignore")
+                return response.read(16384).decode("utf-8", "ignore")
         except urllib.error.HTTPError as error:
             if error.code == 404:
                 return None
@@ -69,27 +67,47 @@ def fetch(url):
     return ""
 
 
+def breadcrumbs(source):
+    """Read breadcrumb anchors regardless of HTML attribute order or quote style."""
+    found = []
+    for attributes, label in ANCHOR.findall(source):
+        values = {}
+        for match in ATTRIBUTE.finditer(attributes):
+            values[match.group(1).lower()] = next(
+                (value for value in match.groups()[1:] if value is not None), ""
+            )
+        if "breadcrumb-part" in values.get("class", "").split() and values.get("href"):
+            found.append((values["href"], txt(label)))
+    return found
+
+
 def place(source, page_id):
-    crumbs = [(href, txt(label)) for href, label in CR.findall(source)]
-    heading = re.search(r"<h1>(.*?)</h1>", source, re.S)
+    crumbs = breadcrumbs(source)
+    heading = re.search(r"<h1\\b[^>]*>(.*?)</h1\\s*>", source, re.I | re.S)
     h1 = txt(heading.group(1)) if heading else ""
+
+    def page_path(href):
+        return urllib.parse.urlsplit(html.unescape(href)).path.rstrip("/")
 
     first_page = next(
         (
             index
             for index, (href, _) in enumerate(crumbs)
-            if re.search(r"pages/1\.html$", href)
+            if re.search(r"/?pages/1\\.html$", page_path(href), re.I)
         ),
         None,
     )
     rest = crumbs[first_page + 1 :] if first_page is not None else crumbs[4:]
 
-    if rest and re.search(rf"pages/{page_id}\.html$", rest[-1][0]):
+    if rest and re.search(
+        rf"/?pages/{page_id}\\.html$", page_path(rest[-1][0]), re.I
+    ):
         title, rest = rest[-1][1], rest[:-1]
     else:
         title = h1 or f"Page {page_id}"
 
-    return [name for _, name in rest if name], title
+    path = [name for _, name in rest if name]
+    return path, title
 
 
 def add(root, path, page_id, title):
@@ -198,6 +216,8 @@ def main():
 
         root = {"title": "Additional Pages", "c": []}
         indexed = 0
+        nested = 0
+        pages_with_breadcrumbs = 0
         failures = 0
 
         for page_id, source in zip(page_ids, results):
@@ -207,9 +227,18 @@ def main():
                 failures += 1
                 continue
             path, title = place(source, page_id)
+            if breadcrumbs(source):
+                pages_with_breadcrumbs += 1
+            if path:
+                nested += 1
             add(root, path, page_id, title)
             indexed += 1
 
+        if indexed and nested / indexed < 0.20:
+            raise RuntimeError(
+                f'{config["manual"]}: only {nested}/{indexed} pages have a '
+                "breadcrumb-derived parent path; refusing to write a flat index"
+            )
         merge(root)
         validate_tree(root, config["out"])
         pending.append((config, vehicle, root))
@@ -217,7 +246,8 @@ def main():
         total_failures += failures
         print(
             f"  indexed {indexed} pages; {failures} fetch failures; "
-            f"{len(root['c'])} top-level folders",
+            f"{pages_with_breadcrumbs} pages with breadcrumbs; "
+            f"{nested} nested pages; {len(root['c'])} top-level folders",
             flush=True,
         )
 

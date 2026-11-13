@@ -214,6 +214,14 @@ def main():
                 )
             )
 
+        sample = next((source for source in results if source), None)
+        if sample:
+            print("  HTML diagnostic: " + repr(sample[:2400]), flush=True)
+            print(
+                "  HTML tags: " + repr(re.findall(r"<[^>]{1,240}>", sample)[:35]),
+                flush=True,
+            )
+
         root = {"title": "Additional Pages", "c": []}
         indexed = 0
         nested = 0

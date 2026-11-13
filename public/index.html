@@ -78,7 +78,7 @@ const hdr=(t,s,o={})=>`<div class="hd">${o.back?`<a class="ib" href="${o.back}" 
 const vimg=(v,c="")=>`<div class="vi ${c}">${v.image?`<img src="${esc(v.image)}" alt="" loading="lazy">`:I("car")}</div>`;
 function route(){if(!M)return;chrome();const [,a,b,c,d]=decodeURIComponent(location.hash||"#/").split("/"),m=$("main");
  const vw=a==="v";m.className=vw?"vw":"";document.body.classList.toggle("vw",vw);m.scrollTop=0;
- ({"":home,vehicles:vlist,veh:()=>vehicle(m,+b,c||"man"),t:()=>tview(m,+b,+c,d),v:()=>viewer(m,+b,+c,+d),favs:()=>plist(m,"Favorites",favs),recent:()=>plist(m,"Recent Pages",rec),search:searchv,more:more}[a||""]||home)(m);paintST()}
+ ({"":home,vehicles:vlist,veh:()=>vehicle(m,+b,c||"man"),t:()=>tview(m,+b,+c,d),v:()=>viewer(m,+b,+c,+d),favs:()=>plist(m,"Favorites",favs),recent:()=>plist(m,"Recent Pages",rec),search:()=>{if(b)SQ=b;searchv(m)},more:more}[a||""]||home)(m);paintST()}
 const fk=(vi,gi,p)=>vi+"/"+gi+"/"+p,isF=k=>favs.includes(k);
 function leaf(vi,gi,l,q,sub){const k=fk(vi,gi,l.p);return`<a class="row" href="#/v/${vi}/${gi}/${l.p}"><span class="doc">${I("doc")}</span><div class="g"><div class="t"><span class="pid">#${l.p}</span> ${hl(l.n,q)}</div><div class="d">${esc(sub||"Service page")}</div></div><button class="star ${isF(k)?"on":""}" data-fav="${k}" aria-label="Favorite">${I("star")}</button></a>`}
 function look(k){const [vi,gi,p]=k.split("/").map(Number),i=IX[K(vi,gi)]?.get(p);return i===undefined?null:{vi,gi,l:FL[K(vi,gi)][i]}}

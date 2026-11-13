@@ -1,0 +1,26 @@
+name: Build page trees
+on:
+  workflow_dispatch:
+  push:
+    branches: [look-update]
+    paths:
+      - tools/crawl_pages.py
+      - .github/workflows/build-trees.yml
+permissions:
+  contents: write
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Crawl unindexed pages
+        run: python3 tools/crawl_pages.py
+        env:
+          BASE: https://claude-manual.phillipstg.workers.dev
+      - name: Commit generated trees
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/data
+          if git diff --staged --quiet; then echo "No changes"; else git commit -m "Add trees for unindexed pages" && git push; fi

@@ -32,8 +32,8 @@ DEFAULT = [
 ]
 CFG = json.loads(os.environ["CRAWL_CONFIG"]) if os.environ.get("CRAWL_CONFIG") else DEFAULT
 TAG = re.compile(r"<[^>]+>")
-ANCHOR = re.compile(r"<a\\b([^>]*)>(.*?)</a\\s*>", re.I | re.S)
-ATTRIBUTE = re.compile(r"""([\\w:-]+)\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>]+))""", re.S)
+ANCHOR = re.compile(r"<a\b([^>]*)>(.*?)</a\s*>", re.I | re.S)
+ATTRIBUTE = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.S)
 
 
 def txt(value):
@@ -83,7 +83,7 @@ def breadcrumbs(source):
 
 def place(source, page_id):
     crumbs = breadcrumbs(source)
-    heading = re.search(r"<h1\\b[^>]*>(.*?)</h1\\s*>", source, re.I | re.S)
+    heading = re.search(r"<h1\b[^>]*>(.*?)</h1\s*>", source, re.I | re.S)
     h1 = txt(heading.group(1)) if heading else ""
 
     def page_path(href):
@@ -93,14 +93,14 @@ def place(source, page_id):
         (
             index
             for index, (href, _) in enumerate(crumbs)
-            if re.search(r"/?pages/1\\.html$", page_path(href), re.I)
+            if re.search(r"/?pages/1\.html$", page_path(href), re.I)
         ),
         None,
     )
     rest = crumbs[first_page + 1 :] if first_page is not None else crumbs[4:]
 
     if rest and re.search(
-        rf"/?pages/{page_id}\\.html$", page_path(rest[-1][0]), re.I
+        rf"/?pages/{page_id}\.html$", page_path(rest[-1][0]), re.I
     ):
         title, rest = rest[-1][1], rest[:-1]
     else:

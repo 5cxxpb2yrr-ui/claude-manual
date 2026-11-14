@@ -2967,12 +2967,12 @@
 					},
 
 					manualLink(hash) {
-						return this.manualLibrary.base + '/' + this.manualBackParam() + '#' + hash;
+						return this.manualLibrary.base + '/manuals.html' + this.manualBackParam() + '#' + hash;
 					},
 
 					openManualSearch(q) {
 						const t = String(q || '').trim();
-						window.open(this.manualLibrary.base + '/' + this.manualBackParam() + '#/search' + (t ? '/' + encodeURIComponent(t) : ''), '_blank', 'noopener');
+						window.open(this.manualLibrary.base + '/manuals.html' + this.manualBackParam() + '#/search' + (t ? '/' + encodeURIComponent(t) : ''), '_blank', 'noopener');
 					},
 
 					get vehicleLogs() {

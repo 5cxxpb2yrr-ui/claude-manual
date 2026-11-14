@@ -203,6 +203,15 @@
 			<span class="hidden sm:inline">AI Advisor</span>
 		</button>
 
+		<a
+			:href="dockUrl"
+			class="p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-amber-500/40 transition active:scale-95"
+			title="System Deck"
+			aria-label="Back to System Deck"
+		>
+			<span class="text-sm leading-none">&#8962;</span>
+		</a>
+
 		<button
 			@click="modals.importExport = true"
 			class="p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-amber-500/40 transition active:scale-95"
@@ -297,6 +306,13 @@
 				<span x-text="tab.label"></span>
 			</button>
 		</template>
+		<a
+			:href="dockUrl"
+			class="text-left px-3 py-3 rounded-xl text-xs font-bold transition flex items-center space-x-2.5 bg-zinc-950/60 text-zinc-300 hover:bg-zinc-800/70"
+		>
+			<span class="text-base">&#8962;</span>
+			<span>System Deck</span>
+		</a>
 	</div>
 </div>
 
@@ -2964,6 +2980,10 @@
 					manualBackParam() {
 						// tells the Manual Explorer where this app lives so its More menu can link back
 						return /^https?:$/.test(location.protocol) ? '?back=' + encodeURIComponent(location.origin + location.pathname) : '';
+					},
+
+					get dockUrl() {
+						return /^https?:$/.test(location.protocol) ? '/' : this.manualLibrary.base + '/';
 					},
 
 					manualLink(hash) {

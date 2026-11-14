@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+		<meta name="theme-color" content="#020617" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<title>System Deck | Launcher</title>
+		<script src="https://cdn.tailwindcss.com"></script>
+		<script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+		<script>
+			tailwind.config = {
+				theme: {
+					extend: {
+						colors: {
+							amber: { 400: "#fbbf24", 500: "#f59e0b" },
+							emerald: { 400: "#34d399", 500: "#10b981" },
+						},
+						boxShadow: {
+							"glow-amber": "0 0 20px -3px rgba(245, 158, 11, 0.35)",
+							"glow-emerald": "0 0 20px -3px rgba(16, 185, 129, 0.35)",
+							glass: "0 8px 32px 0 rgba(0, 0, 0, 0.37)",
+						},
+					},
+				},
+			};
+		</script>
+		<style>
+			[x-cloak] { display: none !important; }
+			.scanline-bg {
+				background: linear-gradient(rgba(15, 23, 42, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
+					linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+				background-size: 100% 4px, 6px 100%;
+			}
+		</style>
+		<script>
+			// ---- EDIT THESE DEFAULTS (or use EDIT mode on the page; changes are saved in this browser) ----
+			// Relative links ("/garage.html") work when this page is hosted next to those apps.
+			const HOME = "https://claude-manual.phillipstg.workers.dev"; // used for "/..." links when opened as a local file
+			const DEFAULTS = [
+				{ id: "cockpit", name: "MAINTENANCE COCKPIT", sub: "LOGS • DIAGNOSTICS • SCHEDULES", url: "/garage.html", icon: "cog", newTab: false },
+				{ id: "manuals", name: "SERVICE MANUALS", sub: "REPAIR • DIAGNOSIS • LABOR TIMES", url: "/", icon: "book", newTab: false },
+				{ id: "shifts", name: "TIMECARD & LOGISTICS", sub: "SHIFTS • OVERTIME • LEAVE POOL", url: "", icon: "clock", newTab: false },
+				{ id: "inventory", name: "PARTS & INVENTORY", sub: "STOCK • ELEMENTS • WORK ORDERS", url: "", icon: "box", newTab: false },
+				{ id: "storage", name: "LOCAL STORAGE", sub: "JSON BACKUP • SYNC SCHEMA", url: "", icon: "db", newTab: false },
+			];
+			const ICONS = {
+				cog: ["M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z", "M15 12a3 3 0 11-6 0 3 3 0 016 0z"],
+				clock: ["M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"],
+				box: ["M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"],
+				db: ["M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"],
+				book: ["M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"],
+				app: ["M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"],
+			};
+			function dock() {
+				return {
+					systemTime: "", editing: false, tiles: [], draft: null, draftIndex: -1, toast: "", icons: Object.keys(ICONS),
+					init() {
+						this.tiles = this.load();
+						this.updateTime();
+						setInterval(() => this.updateTime(), 1000);
+					},
+					updateTime() { this.systemTime = new Date().toTimeString().split(" ")[0]; },
+					load() {
+						try {
+							const s = JSON.parse(localStorage.getItem("dock.tiles.v1"));
+							if (Array.isArray(s) && s.length) return s;
+						} catch {}
+						return JSON.parse(JSON.stringify(DEFAULTS));
+					},
+					save() { try { localStorage.setItem("dock.tiles.v1", JSON.stringify(this.tiles)); } catch {} },
+					get linked() { return this.tiles.filter((t) => t.url).length; },
+					paths(k) {
+						return (ICONS[k] || ICONS.app).map((d) => `<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${d}"></path>`).join("");
+					},
+					flash(m) { this.toast = m; clearTimeout(this._t); this._t = setTimeout(() => (this.toast = ""), 2200); },
+					resolve(u) { return u.startsWith("/") && location.protocol === "file:" ? HOME + u : u; },
+					launch(t) {
+						if (this.editing) return this.edit(t);
+						if (!t.url) { this.flash("No link yet - add one"); return this.edit(t); }
+						const u = this.resolve(t.url);
+						if (t.newTab) window.open(u, "_blank", "noopener"); else location.href = u;
+					},
+					edit(t) { this.draftIndex = this.tiles.indexOf(t); this.draft = { ...t }; },
+					add() { this.draftIndex = -1; this.draft = { id: "t" + Date.now(), name: "", sub: "", url: "", icon: "app", newTab: false }; },
+					cleanUrl(u) { u = (u || "").trim(); return /^(javascript|data|vbscript):/i.test(u) ? null : u; },
+					commit() {
+						const d = this.draft, url = this.cleanUrl(d.url);
+						if (!d.name.trim()) return this.flash("Give it a name");
+						if (url === null) return this.flash("That link type isn't allowed");
+						d.name = d.name.trim().toUpperCase(); d.sub = (d.sub || "").trim().toUpperCase(); d.url = url;
+						if (this.draftIndex < 0) this.tiles.push(d); else this.tiles[this.draftIndex] = d;
+						this.save(); this.draft = null;
+					},
+					remove() {
+						if (this.draftIndex >= 0 && confirm("Remove this app from the dock?")) { this.tiles.splice(this.draftIndex, 1); this.save(); }
+						this.draft = null;
+					},
+					move(i, d) {
+						const j = i + d; if (j < 0 || j >= this.tiles.length) return;
+						[this.tiles[i], this.tiles[j]] = [this.tiles[j], this.tiles[i]]; this.save();
+					},
+					reset() { if (confirm("Reset the dock to its default apps and links?")) { this.tiles = JSON.parse(JSON.stringify(DEFAULTS)); this.save(); } },
+				};
+			}
+		</script>
+	</head>
+
+	<body
+		class="h-full w-full scanline-bg flex flex-col p-4 sm:p-6 overflow-hidden select-none"
+		style="padding-top: max(1rem, env(safe-area-inset-top)); padding-bottom: max(1rem, env(safe-area-inset-bottom))"
+		x-data="dock()"
+	>
+		<!-- Status header -->
+		<header class="w-full max-w-md mx-auto backdrop-blur-md bg-slate-900/60 border border-slate-800 rounded-2xl p-4 flex items-center justify-between shadow-glass">
+			<div class="flex items-center space-x-3">
+				<div class="relative flex h-3 w-3">
+					<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+					<span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+				</div>
+				<span class="text-xs font-mono tracking-widest text-slate-400 uppercase" x-text="editing ? 'SYS // EDIT MODE' : 'SYS // ONLINE'">SYS // ONLINE</span>
+			</div>
+			<div class="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2.5 py-1 rounded-md tracking-wider" x-text="systemTime">00:00:00</div>
+		</header>
+
+		<!-- App tiles -->
+		<main class="w-full max-w-md mx-auto flex-1 min-h-0 overflow-y-auto py-6 space-y-4">
+			<template x-for="(t, i) in tiles" :key="t.id">
+				<div
+					role="button"
+					tabindex="0"
+					@click="launch(t)"
+					@keydown.enter="launch(t)"
+					:aria-label="t.name"
+					:class="i % 2 === 0 ? 'hover:border-amber-500/60 hover:shadow-glow-amber' : 'hover:border-emerald-500/60 hover:shadow-glow-emerald'"
+					class="group relative w-full h-20 rounded-2xl backdrop-blur-xl bg-slate-900/50 border border-slate-700/60 p-4 flex items-center justify-between transition-all duration-200 active:scale-[0.98] overflow-hidden cursor-pointer focus:outline-none focus-visible:border-amber-500"
+				>
+					<div class="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl" :class="i % 2 === 0 ? 'bg-amber-500' : 'bg-emerald-500'"></div>
+					<div class="flex items-center space-x-4 pl-3 min-w-0">
+						<div
+							class="p-3 rounded-xl border shrink-0 group-hover:scale-105 transition-transform"
+							:class="i % 2 === 0 ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'"
+						>
+							<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24" x-html="paths(t.icon)"></svg>
+						</div>
+						<div class="text-left min-w-0">
+							<div class="text-base font-bold text-slate-100 tracking-wide truncate" x-text="t.name"></div>
+							<div class="text-xs font-mono text-slate-400 truncate" x-text="t.sub"></div>
+						</div>
+					</div>
+
+					<!-- right side: normal / unlinked / edit controls -->
+					<div class="flex items-center shrink-0 ml-2">
+						<template x-if="editing">
+							<div class="flex items-center space-x-1" @click.stop>
+								<button @click="move(i, -1)" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 text-sm" aria-label="Move up">&uarr;</button>
+								<button @click="move(i, 1)" class="w-8 h-8 rounded-lg bg-slate-800 text-slate-300 text-sm" aria-label="Move down">&darr;</button>
+							</div>
+						</template>
+						<template x-if="!editing && !t.url">
+							<span class="text-[10px] font-mono tracking-wider text-amber-400 border border-amber-500/30 bg-amber-500/10 rounded px-1.5 py-0.5">NOT LINKED</span>
+						</template>
+						<template x-if="!editing && t.url">
+							<svg class="w-5 h-5 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-1 transition-all mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+						</template>
+					</div>
+				</div>
+			</template>
+
+			<div x-show="editing" x-cloak class="flex space-x-3 pt-2">
+				<button @click="add()" class="flex-1 h-12 rounded-2xl border border-dashed border-emerald-500/50 text-emerald-400 font-mono text-xs tracking-widest hover:bg-emerald-500/10">+ ADD APP</button>
+				<button @click="reset()" class="h-12 px-5 rounded-2xl border border-slate-700 text-slate-400 font-mono text-xs tracking-widest hover:bg-slate-800">RESET</button>
+			</div>
+		</main>
+
+		<!-- Footer -->
+		<footer class="w-full max-w-md mx-auto backdrop-blur-md bg-slate-900/60 border border-slate-800 rounded-2xl p-3 flex items-center justify-between text-xs font-mono text-slate-400 shadow-glass">
+			<div class="flex items-center space-x-2">
+				<span class="inline-block w-2 h-2 rounded-full bg-amber-400"></span>
+				<span>STORAGE: LOCAL • <span x-text="linked + '/' + tiles.length"></span> LINKED</span>
+			</div>
+			<button
+				@click="editing = !editing"
+				class="px-3 py-1 rounded-md border font-bold tracking-wider"
+				:class="editing ? 'border-emerald-500/50 text-emerald-400 bg-emerald-500/10' : 'border-slate-700 text-slate-300'"
+				x-text="editing ? 'DONE' : 'EDIT'"
+			>EDIT</button>
+		</footer>
+
+		<!-- Edit / add sheet -->
+		<div x-show="draft" x-cloak class="fixed inset-0 z-20 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4" @click.self="draft = null" @keydown.escape.window="draft = null">
+			<div class="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-700 p-5 space-y-3 shadow-glass select-text" x-show="draft">
+				<div class="text-xs font-mono tracking-widest text-amber-400" x-text="draftIndex < 0 ? 'ADD APP' : 'EDIT APP'"></div>
+				<template x-if="draft">
+					<div class="space-y-3">
+						<label class="block text-[11px] font-mono text-slate-400 tracking-wider">NAME
+							<input x-model="draft.name" type="text" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500" />
+						</label>
+						<label class="block text-[11px] font-mono text-slate-400 tracking-wider">SUBTITLE
+							<input x-model="draft.sub" type="text" placeholder="LOGS • TASKS • NOTES" class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500" />
+						</label>
+						<label class="block text-[11px] font-mono text-slate-400 tracking-wider">LINK (web address or /page.html)
+							<input x-model="draft.url" type="text" inputmode="url" autocapitalize="off" autocorrect="off" placeholder="https://..." class="mt-1 w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-slate-100 focus:outline-none focus:border-amber-500" />
+						</label>
+						<div class="flex items-center justify-between">
+							<label class="text-[11px] font-mono text-slate-400 tracking-wider">ICON
+								<select x-model="draft.icon" class="ml-2 bg-slate-950 border border-slate-700 rounded-lg px-2 py-1.5 text-sm text-slate-100">
+									<template x-for="k in icons" :key="k"><option :value="k" x-text="k.toUpperCase()"></option></template>
+								</select>
+							</label>
+							<label class="flex items-center space-x-2 text-[11px] font-mono text-slate-400 tracking-wider">
+								<input type="checkbox" x-model="draft.newTab" class="accent-amber-500 w-4 h-4" /><span>OPEN IN NEW TAB</span>
+							</label>
+						</div>
+					</div>
+				</template>
+				<div class="flex space-x-2 pt-1">
+					<button @click="commit()" class="flex-1 h-11 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm tracking-wide">SAVE</button>
+					<button x-show="draftIndex >= 0" @click="remove()" class="h-11 px-4 rounded-xl border border-red-500/50 text-red-400 text-sm font-bold">DELETE</button>
+					<button @click="draft = null" class="h-11 px-4 rounded-xl border border-slate-700 text-slate-300 text-sm">CANCEL</button>
+				</div>
+			</div>
+		</div>
+
+		<!-- Toast -->
+		<div x-show="toast" x-cloak x-transition class="fixed bottom-24 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-xl bg-slate-800 border border-slate-600 text-xs font-mono text-slate-100 shadow-glass" x-text="toast"></div>
+	</body>
+</html>

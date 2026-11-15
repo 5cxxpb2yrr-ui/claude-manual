@@ -7,7 +7,7 @@
       "make": "Subaru",
       "model": "Crosstrek Limited",
       "engine": "2.0L FB20",
-      "image": "img/crosstrek.jpg",
+      "image": "img/crosstrek.jpg.png",
       "manual": "subaru-service-manual",
       "folder": "2019 Subaru Crosstrek Limited",
       "guides": [
@@ -30,7 +30,7 @@
       "model": "xB",
       "engine": "1NZ-FE 1.5L",
       "platform": "NCP31",
-      "image": "img/scion-xb.jpg",
+      "image": "img/scion-xb.jpg.png",
       "manual": "scion-service-manual",
       "folder": "2006 Scion xB L4-1.5L (1NZ-FE)",
       "guides": [

@@ -1,5 +1,7 @@
 # LifeOS Manual Explorer (B) — Worker + R2
 
+ad-hoc
+
 Reads the manuals already in R2 bucket `motornote-manual-site` at `manuals/<manual-id>/<vehicle folder>/pages/N.html`.
 Page indexes (drill-down trees) ship with the app in `public/data/`, so no catalog file is needed.yay. 
 

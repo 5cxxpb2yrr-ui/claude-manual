@@ -68,14 +68,18 @@ function hl(t,q){t=esc(t);return q?t.replace(new RegExp("("+q.replace(/[.*+?^${}
 const clean=s=>s.replace(/^Relays and Modules - /,"");
 const MS={merged:0,skipped:0},nk=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
 function mergeAdditional(){M.vehicles.forEach((v,vi)=>{const ai=v.guides.findIndex(g=>/^additional pages$/i.test(g.title));if(ai<1||ai!==v.guides.length-1)return;
- const base=TR[K(vi,0)],extra=TR[K(vi,ai)],ids=new Set(FL[K(vi,0)].map(l=>l.p));
- (function m(b,e){for(const c of e.c||[]){if(c.p!==undefined){if(ids.has(c.p))continue;if(b.c.some(x=>x.p!==undefined&&nk(x.n)===nk(c.n))){MS.skipped++;continue}b.c.push(c);ids.add(c.p);MS.merged++}else{let t=b.c.find(x=>x.c&&nk(x.n)===nk(c.n));if(!t){t={n:c.n,c:[]};b.c.push(t)}m(t,c)}}})(base,extra);
+ const base=TR[K(vi,0)],extra=TR[K(vi,ai)],ids=new Set(FL[K(vi,0)].map(l=>l.p)),cache=new Map();
+ // one pass, constant-time lookups: each folder gets a title index the first time it is touched
+ (function m(b,e){let ix=cache.get(b);if(!ix){ix={leaf:new Set(),fold:new Map()};for(const x of b.c){if(x.p!==undefined)ix.leaf.add(nk(x.n));else ix.fold.set(nk(x.n),x)}cache.set(b,ix)}
+  for(const c of e.c||[]){const k=nk(c.n);
+   if(c.p!==undefined){if(ids.has(c.p))continue;if(ix.leaf.has(k)){MS.skipped++;continue}b.c.push(c);ix.leaf.add(k);ids.add(c.p);MS.merged++}
+   else{let t=ix.fold.get(k);if(!t){t={n:c.n,c:[]};b.c.push(t);ix.fold.set(k,t)}m(t,c)}}})(base,extra);
  (function pr(n){n.c=n.c.filter(c=>{if(c.c){pr(c);return c.c.length>0}return true})})(base);
  const f=flat(base);FL[K(vi,0)]=f;IX[K(vi,0)]=new Map(f.map((x,i)=>[x.p,i]));
  v.guides.pop();delete TR[K(vi,ai)];delete FL[K(vi,ai)];delete IX[K(vi,ai)]})}
 async function boot(){document.documentElement.dataset.theme=LS("mx.t","dark");
  try{const b=new URLSearchParams(location.search).get("back");if(/^https?:\/\//i.test(b||""))SV("mx.back",b)}catch{}
- try{M=await(await fetch("data/manifest.json")).json();await Promise.all(M.vehicles.flatMap((v,vi)=>v.guides.map(async(g,gi)=>{const t=await(await fetch(g.tree)).json(),k=K(vi,gi),f=flat(t);TR[k]=t;FL[k]=f;IX[k]=new Map(f.map((x,i)=>[x.p,i]))})));mergeAdditional()}
+ try{M=await(await fetch("data/manifest.json")).json();await Promise.all(M.vehicles.flatMap((v,vi)=>v.guides.map(async(g,gi)=>{const t=await(await fetch(g.tree)).json(),k=K(vi,gi),f=flat(t);TR[k]=t;FL[k]=f;IX[k]=new Map(f.map((x,i)=>[x.p,i]))})));$("main").innerHTML='<div class="empty">Indexing manuals…</div>';await new Promise(r=>setTimeout(r,30));try{mergeAdditional()}catch(e){console.error("merge skipped",e)}}
  catch{$("main").innerHTML='<div class="empty">Could not load the page indexes.</div>';return}
  probe();route()}
 async function probe(){try{const r=await fetch(url(M.vehicles[0],FL[K(0,0)][0].p),{method:"HEAD"});ST={ok:r.ok,t:new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}),c:r.status}}catch{ST={ok:false,t:"",c:0}}paintST()}

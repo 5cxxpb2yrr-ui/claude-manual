@@ -1716,61 +1716,75 @@
 					</div>
 				</div>
 
-				<!-- 11. KNOWLEDGE BASE TAB -->
+				<!-- 11. MAINTENANCE KNOWLEDGE BASE TAB -->
 				<div
 					x-show="currentTab === 'kb'"
 					x-transition.opacity
 					class="space-y-4"
 				>
 					<div class="mb-2">
-						<h2 class="text-lg font-bold text-white mb-1">
-							Maintenance Knowledge Base
-						</h2>
-						<p class="text-xs text-zinc-400">
-							DIY procedures, step-by-step guides, torque specs,
-							and fluid capacities
-						</p>
+						<div class="flex items-center justify-between gap-3">
+							<div>
+								<h2 class="text-lg font-bold text-white mb-1">Maintenance Knowledge Base</h2>
+								<p class="text-xs text-zinc-400">Vehicle-specific DIY procedures, factory steps, torque specs, and fluid capacities</p>
+							</div>
+							<span class="kb-badge" x-text="knowledgeBase.length + ' PROCEDURES'"></span>
+						</div>
 					</div>
 
 					<input
-						type="text"
+						type="search"
 						x-model="kbSearchQuery"
-						placeholder="Search procedures, torque specs, or models..."
-						class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-500 transition"
+						placeholder="Search by vehicle, procedure, fluid, or torque..."
+						aria-label="Search maintenance procedures"
+						class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-base text-white focus:outline-none focus:border-amber-500 transition"
 					/>
 
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<template
-							x-for="item in filteredKnowledgeBase"
-							:key="item.id"
-						>
-							<div class="glass-panel p-5 space-y-3">
-								<span
-									class="kb-badge"
-									x-text="item.vehicle"
-								></span>
-								<h4
-									class="text-base font-bold text-white"
-									x-text="item.title"
-								></h4>
-								<p
-									class="text-xs text-amber-400 font-semibold"
-									x-text="'Interval: ' + item.interval"
-								></p>
-								<ol
-									class="list-decimal list-inside space-y-1.5 text-xs text-zinc-300"
-								>
-									<template x-for="step in item.steps">
-										<li x-text="step"></li>
-									</template>
-								</ol>
-								<button
-									class="btn-primary w-full py-2.5 text-xs font-bold"
-									@click="initServiceFromKB(item.id)"
-								>
-									Log Service Record
-								</button>
-							</div>
+					<template x-if="filteredKnowledgeBase.length === 0">
+						<div class="glass-panel p-5 text-sm text-zinc-400">No procedures match that search.</div>
+					</template>
+
+					<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+						<template x-for="item in filteredKnowledgeBase" :key="item.id">
+							<article class="glass-panel p-4 sm:p-5 space-y-4">
+								<div class="flex flex-wrap items-center justify-between gap-2">
+									<span class="kb-badge" x-text="item.vehicle"></span>
+									<span class="text-[10px] uppercase tracking-widest text-zinc-500" x-text="item.category"></span>
+								</div>
+								<div>
+									<h3 class="text-base sm:text-lg font-bold text-white" x-text="item.title"></h3>
+									<p class="text-xs text-zinc-400 mt-1" x-text="item.engine"></p>
+									<p class="text-xs text-amber-400 font-semibold mt-2" x-text="'Service interval: ' + item.interval"></p>
+								</div>
+
+								<div class="rounded-xl bg-zinc-950/80 border border-zinc-800 p-3 space-y-2">
+									<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400">Specifications</h4>
+									<ul class="space-y-1.5 text-xs text-zinc-200">
+										<template x-for="(spec, index) in item.specs" :key="item.id + '-spec-' + index">
+											<li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li>
+										</template>
+									</ul>
+								</div>
+
+								<div>
+									<h4 class="text-[10px] uppercase tracking-widest font-bold text-zinc-400 mb-2">Step-by-step procedure</h4>
+									<ol class="list-decimal list-outside ml-5 space-y-2 text-xs sm:text-sm text-zinc-200">
+										<template x-for="(step, index) in item.steps" :key="item.id + '-step-' + index">
+											<li class="pl-1 leading-relaxed" x-text="step"></li>
+										</template>
+									</ol>
+								</div>
+
+								<div class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+									<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Safety & verification</h4>
+									<p class="text-xs leading-relaxed text-zinc-300" x-text="item.caution"></p>
+								</div>
+
+								<div class="flex flex-col sm:flex-row gap-2 pt-1">
+									<a :href="item.sourcePath" target="_blank" rel="noopener" class="flex-1 text-center rounded-xl border border-zinc-700 bg-zinc-900 hover:border-amber-500/50 text-zinc-200 py-3 text-xs font-semibold transition" x-text="'Factory manual: ' + item.sourceLabel"></a>
+									<button class="btn-primary flex-1 py-3 text-xs font-bold" @click="initServiceFromKB(item.id)">Log Service Record</button>
+								</div>
+							</article>
 						</template>
 					</div>
 				</div>
@@ -2943,8 +2957,24 @@
 					],
 
 					knowledgeBase: [
-						{ id: 'kb-1', vehicle: '2006 Scion xB', title: 'Synthetic Oil & Filter Replacement', interval: ' Every 5,000 miles / 6 months', steps: ['Warm engine to operating temperature', 'Locate 14mm drain plug under oil pan', 'Drain oil completely into catch pan', 'Replace crush washer and torque drain plug to 28 ft-lbs', 'Replace oil filter and lubricate rubber gasket', 'Refill with 3.9 qts 5W-30 oil'] },
-						{ id: 'kb-2', vehicle: '2019 Subaru Crosstrek', title: 'Front Brake Pad & Rotor Service', interval: 'Every 30,000 miles', steps: ['Jack up front end and secure on jack stands', 'Remove 14mm caliper guide pin bolts', 'Compress piston with caliper tool', 'Torque caliper brackets to 59 ft-lbs'] }
+						{
+							id: 'kb-scion-oil-filter', vehicle: '2006 Scion xB', category: 'Engine & Lubrication',
+							engine: '1.5L 1NZ-FE I4', title: 'Engine Oil & Filter Replacement',
+							interval: 'Follow the factory maintenance schedule; shorten the interval for severe service.',
+							specs: ['Vehicle profile oil: 5W-30 synthetic', 'Vehicle profile capacity: 3.9 US qt — treat as a starting reference and verify on the dipstick', 'Drain plug: 37.5 N·m (28 ft-lb), new gasket', 'Oil filter: 17.2 N·m (13 ft-lb), or 3/4 turn after gasket contact when a torque wrench cannot be used', 'Filter tool: Toyota SST 09228-06501'],
+							steps: ['Park on level ground, apply the parking brake, and warm the engine.', 'Remove the oil filler cap and position a suitable drain pan beneath the oil pan.', 'Remove the drain plug and allow the used oil to drain completely.', 'Remove the oil filter using SST 09228-06501.', 'Clean the filter mounting surface. Apply clean engine oil to the new filter gasket.', 'Install the filter. Tighten to 17.2 N·m (13 ft-lb) when using a torque wrench; otherwise tighten 3/4 turn after gasket contact.', 'Install the drain plug with a new gasket and tighten to 37.5 N·m (28 ft-lb).', 'Add the specified engine oil gradually. Start the engine briefly, check for leaks, shut it off, wait, and verify the dipstick level. Top up as needed.'],
+							caution: 'Wear gloves and avoid prolonged skin contact with used oil. Dispose of used oil and the filter at an approved collection facility. The indexed capacity is presented in an image; verify the final fill level with the dipstick.',
+							sourceLabel: 'Scion Service Manual · Oil Filter: Service and Repair · page 6674', sourcePath: '/v/1/0/6674'
+						},
+						{
+							id: 'kb-subaru-oil-filter', vehicle: '2019 Subaru Crosstrek Limited', category: 'Engine & Lubrication',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Engine Oil & Filter Replacement',
+							interval: 'Follow the factory maintenance schedule; check the schedule for severe-use conditions.',
+							specs: ['Oil-and-filter replacement capacity: 4.4 L (4.7 US qt)', 'Oil drain plug: 41.7 N·m (30.8 ft-lb), new gasket', 'Engine oil: use the API / ILSAC specification and SAE viscosity shown in the factory lubricant chart', 'Oil filter: 68 mm black = 14 N·m (10.3 ft-lb); 67.4 mm blue = 12 N·m (8.9 ft-lb)'],
+							steps: ['Park on level ground, apply the parking brake, and warm the engine.', 'Remove the oil filler cap and place a drain pan beneath the engine.', 'Loosen the drain plug and drain the engine oil completely.', 'Install the drain plug with a new gasket and tighten to 41.7 N·m (30.8 ft-lb).', 'Clean the oil filter mounting surface.', 'Apply a thin coat of clean engine oil to the new filter seal.', 'Install the filter by hand. For the 68 mm black filter, tighten approximately one turn after seal contact or to 14 N·m (10.3 ft-lb) with a torque wrench. For the 67.4 mm blue filter, tighten approximately 7/8 turn after seal contact or to 12 N·m (8.9 ft-lb). Confirm which filter is fitted before tightening.', 'Add oil gradually, staying below the F mark until the level is checked.', 'Start the engine briefly and inspect for leaks. Shut it off, wait, check the dipstick, and top up to the F mark as required.'],
+							caution: 'Do not overtighten the oil filter. Filter torque depends on the filter diameter / color. The factory lubricant chart uses an image for the SAE viscosity range; confirm the correct viscosity for ambient temperature and oil specification before service.',
+							sourceLabel: 'Subaru Service Manual · Engine Oil: Replacement · page 22980', sourcePath: '/v/0/0/22980'
+						}
 					],
 
 					advisorChat: [
@@ -3350,9 +3380,12 @@
 					},
 
 					get filteredKnowledgeBase() {
-						if (!this.kbSearchQuery.trim()) return this.knowledgeBase;
-						const q = this.kbSearchQuery.toLowerCase();
-						return this.knowledgeBase.filter(k => k.title.toLowerCase().includes(q) || k.vehicle.toLowerCase().includes(q));
+						const q = String(this.kbSearchQuery || '').trim().toLowerCase();
+						if (!q) return this.knowledgeBase;
+						return this.knowledgeBase.filter(k => [
+							k.title, k.vehicle, k.engine, k.category, k.interval, k.sourceLabel,
+							...(k.steps || []), ...(k.specs || []), k.caution
+						].filter(Boolean).join(' ').toLowerCase().includes(q));
 					},
 
 					get smartSearchResults() {

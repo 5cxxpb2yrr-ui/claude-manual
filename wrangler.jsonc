@@ -12,7 +12,11 @@
   "r2_buckets": [
     { "binding": "MANUALS", "bucket_name": "motornote-manual-site" }
   ],
-  // Preview URLs for branch builds (on by default; explicit here)
+  "previews": {
+    "r2_buckets": [
+      { "binding": "MANUALS", "bucket_name": "motornote-manual-site" }
+    ]
+  },
   "workers_dev": true,
   "preview_urls": true
 }

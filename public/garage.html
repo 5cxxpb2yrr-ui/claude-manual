@@ -2580,6 +2580,11 @@
 								</select>
 							</div>
 						</div>
+						<div class="grid grid-cols-2 gap-3">
+							<label class="block text-zinc-400">Category<input x-model="newProjectForm.category" placeholder="Suspension, engine…" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></label>
+							<label class="block text-zinc-400">Target date<input type="date" x-model="newProjectForm.dueDate" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></label>
+						</div>
+						<label class="block text-zinc-400">Objective / notes<textarea rows="2" x-model="newProjectForm.description" placeholder="What needs to be accomplished?" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></textarea></label>
 						<button
 							@click="saveNewProject()"
 							class="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-xl shadow-lg shadow-purple-600/20"
@@ -4022,24 +4027,30 @@
 					async removeProjectMilestone(project,index) { if(!project?.milestones?.[index])return; project.milestones.splice(index,1); await this.saveToStorage(); },
 					async saveProjectWorkspace(project) { if(!project)return; project.completion=this.projectCompletion(project); project.updatedAt=new Date().toISOString(); project.budget=Math.max(0,Number(project.budget)||0); await this.saveToStorage(); this.modals.projectDetail=false; },
 
-					saveNewProject() {
-						const p = {
-							id: Date.now(),
-							vehicleId: this.activeVehicleId,
-							title: this.newProjectForm.title || 'General Maintenance Project',
-							category: 'General',
-							budget: Number(this.newProjectForm.budget) || 100,
-							actualCost: 0,
-							status: 'Planned',
-							priority: this.newProjectForm.priority || 'Medium',
-							dueDate: '2026-11-01',
-							completion: 0,
-							tasks: []
-						};
-						this.projects.push(p);
-						this.saveToStorage();
-						this.modals.newProject = false;
-					},
+						saveNewProject() {
+							const p = {
+								id: 'project-' + Date.now(),
+								vehicleId: this.activeVehicleId,
+								title: (this.newProjectForm.title || '').trim() || 'General Maintenance Project',
+								category: this.newProjectForm.category || 'General',
+								description: this.newProjectForm.description || '',
+								budget: Math.max(0, Number(this.newProjectForm.budget) || 0),
+								actualCost: 0,
+								status: 'Planned',
+								priority: this.newProjectForm.priority || 'Medium',
+								dueDate: this.newProjectForm.dueDate || '',
+								completion: 0,
+								tasks: [],
+								milestones: [],
+								procedures: [],
+								createdAt: new Date().toISOString(),
+								updatedAt: new Date().toISOString()
+							};
+							this.projects.push(p);
+							this.saveToStorage();
+							this.newProjectForm = { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' };
+							this.modals.newProject = false;
+						},
 
 					deleteProjectRecord(id) {
 						this.projects = this.projects.filter(p => p.id !== id);

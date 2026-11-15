@@ -2799,6 +2799,7 @@
 							<span x-text="selectedProject.status"></span>
 						</div>
 						<div x-show="selectedProject.maintenancePlanId" class="text-amber-400"><strong>Maintenance:</strong> Linked</div>
+						<button x-show="!selectedProject.maintenancePlanId" @click="linkProjectToMaintenance(selectedProject)" class="w-full py-2 bg-amber-500/10 text-amber-400 font-bold rounded-xl border border-amber-500/30">🔧 Link to Maintenance Workflow</button>
 						<div x-show="selectedProject.partRequirements && selectedProject.partRequirements.length" class="pt-2">
 							<strong class="text-zinc-400">Parts:</strong>
 							<template x-for="part in (selectedProject.partRequirements || [])" :key="part.inventoryId">
@@ -4062,6 +4063,48 @@
 						this.projectPartDraft = { inventoryId: '', quantity: 1 };
 						this.projectCostDraft = { description: '', category: 'Labor', amount: 0, date: new Date().toISOString().split('T')[0] };
 						this.modals.projectDetail = true;
+					},
+					async linkProjectToMaintenance(project) {
+						if (!project) return;
+						const vehicle = this.vehicles.find(v => String(v.id) === String(project.vehicleId));
+						if (!vehicle) { alert('This project is not linked to a vehicle. Edit the project vehicle before creating a maintenance workflow.'); return; }
+						const existing = this.maintenancePlans.find(plan =>
+							(String(plan.projectId) === String(project.id) || String(plan.id) === String(project.maintenancePlanId)) &&
+							plan.status !== 'Cancelled'
+						);
+						if (existing) {
+							project.maintenancePlanId = existing.id;
+							await this.saveToStorage();
+							return;
+						}
+						const tasks = Array.isArray(project.tasks) && project.tasks.length
+							? project.tasks.map(task => ({ name: task.name || 'Project task', done: !!task.done, projectTaskId: task.id || null }))
+							: [{ name: 'Acquire required parts', done: false }, { name: 'Perform project work', done: false }, { name: 'Verify work', done: false }];
+						const estimate = this.projectPartsEstimate(project) + this.projectLaborEstimate(project);
+						const plan = {
+							id: `maint-project-${project.id}-${Date.now()}`,
+							projectId: project.id,
+							vehicleId: vehicle.id,
+							scheduleId: `project-${project.id}`,
+							title: project.title || 'Vehicle maintenance project',
+							priority: project.priority || 'Medium',
+							targetMileage: Number(vehicle.odometer || 0),
+							targetDate: project.dueDate || '',
+							estimatedMin: estimate || Number(project.budget || 0),
+							estimatedMax: estimate || Number(project.budget || 0),
+							actualCost: this.projectActualCost(project),
+							status: 'Planned',
+							notes: `Linked from active project: ${project.title || 'Vehicle maintenance project'}`,
+							createdAt: new Date().toISOString(),
+							startedAt: null,
+							completedAt: null,
+							tasks,
+							parts: []
+						};
+						this.maintenancePlans.unshift(plan);
+						project.maintenancePlanId = plan.id;
+						project.actualCost = this.projectActualCost(project);
+						await this.saveToStorage();
 					},
 					projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length ? Math.round(tasks.filter(t=>t.done).length/tasks.length*100) : Number(project?.completion||0); },
 					knowledgeBaseForProject(project) { const v=this.vehicles.find(x=>String(x.id)===String(project?.vehicleId)); return v ? this.knowledgeBase.filter(k=>k.vehicle===v.name || (v.id==='subaru-crosstrek' && k.vehicle==='2019 Subaru Crosstrek Limited')) : []; },

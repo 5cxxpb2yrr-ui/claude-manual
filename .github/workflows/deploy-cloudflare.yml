@@ -1,0 +1,35 @@
+name: Deploy Claude Manual to Cloudflare
+
+on:
+  push:
+    branches:
+      - look-update
+    paths:
+      - "public/**"
+      - "worker.js"
+      - "wrangler.jsonc"
+      - ".github/workflows/deploy-cloudflare.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: claude-manual-cloudflare-look-update
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out look-update
+        uses: actions/checkout@v4
+        with:
+          ref: look-update
+
+      - name: Deploy static assets and Worker
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy --config wrangler.jsonc

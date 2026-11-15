@@ -484,6 +484,23 @@
 						<ul class="space-y-1 text-[11px] text-zinc-300"><template x-for="reason in dynamicHealth.reasons" :key="reason"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="reason"></span></li></template></ul>
 					</div>
 
+					<!-- Next Scheduled Maintenance -->
+					<div class="glass-panel p-4 mb-4 border border-amber-500/30">
+						<div class="flex items-center justify-between gap-3 mb-3">
+							<div><h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">Next Scheduled Maintenance</h3><p class="text-[10px] text-zinc-500 mt-1">Next non-overdue item not in the history-reconciliation archive</p></div>
+							<button @click="currentTab = 'predictive'" class="text-xs font-bold text-amber-400">View Schedule →</button>
+						</div>
+						<template x-if="nextScheduledMaintenance">
+							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+								<div class="min-w-0"><span class="inline-flex text-[9px] font-bold uppercase px-2 py-1 rounded border" :class="getStatusBadgeClass(nextScheduledMaintenance.status)" x-text="nextScheduledMaintenance.status"></span><h4 class="text-base font-bold text-white mt-2" x-text="nextScheduledMaintenance.serviceName"></h4><p class="text-xs text-zinc-400 mt-1" x-text="nextScheduledMaintenance.remainingMiles.toLocaleString() + ' miles remaining • estimated ' + nextScheduledMaintenance.nextDueDate"></p><p class="text-[10px] text-zinc-500 mt-1" x-text="nextScheduledMaintenance.confidence + ' confidence · ' + (nextScheduledMaintenance.basis === 'mileage' ? 'mileage-based' : 'time-based')"></p></div>
+								<div class="text-right"><div class="text-xl font-black font-mono text-amber-300" x-text="nextScheduledMaintenance.nextDueMileage.toLocaleString()"></div><div class="text-[9px] uppercase text-zinc-500">Due at miles</div></div>
+							</div>
+						</template>
+						<template x-if="!nextScheduledMaintenance">
+							<div class="rounded-xl bg-zinc-950/70 border border-zinc-800 p-3"><p class="text-sm font-semibold text-white">No upcoming item can be calculated yet.</p><p class="text-xs text-zinc-400 mt-1">Past-due items remain archived while you reconcile service history. Restore an item or add a matching service record to establish its next due point.</p><button @click="currentTab = 'maintenance'" class="mt-3 px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300 text-xs font-bold">Review Archived Maintenance</button></div>
+						</template>
+					</div>
+
 					<!-- Predictive Maintenance Deck -->
 					<div>
 						<div class="flex items-center justify-between mb-3">
@@ -3127,14 +3144,44 @@
 							sourcePath: 'https://contactus.subaru.com/knowledgebase/article/1001832/en-us'
 						},
 						{
-							id: 'kb-subaru-cvt-differential-inspection', vehicle: '2019 Subaru Crosstrek Limited', category: 'Drivetrain',
-							engine: '2.0L FB20D H4 · TR580 CVT', title: 'CVT & Front/Rear Differential Fluid Inspection',
-							interval: 'Every 48 months or 60,000 miles (96,000 km), whichever comes first, per Subaru of America’s 2019 maintenance recommendations.',
-							specs: ['Inspect CVT fluid and front and rear differential gear oil; the normal 2019 schedule specifies inspection, not automatic replacement', 'Do not confuse the CVT fluid with the separate front differential gear oil in the TR580', 'Exact 2019 fluid grades, inspection measurements, fill quantities, plug/gasket details and torque values are not verified here'],
-							steps: ['Inspect the transmission case, cooler lines and connections for signs of CVT-fluid leakage or damage.', 'Inspect accessible front and rear differential housings, seals and plugs for leakage or damage.', 'Have fluid condition and levels checked using the VIN-specific Subaru procedure; CVT level checking may require a specified fluid-temperature window and Subaru diagnostic equipment.', 'Record findings. Replace fluid only when required by the applicable severe-service schedule, diagnosis or Subaru service instruction, using the exact specified fluid and procedure.'],
-							caution: 'Do not perform a generic CVT drain-and-fill. The mirrored TR580 procedure requires temperature-controlled level setting and Subaru Select Monitor; its exact 2019 GT revision and fluid designation were not confirmed. Front- and rear-differential procedures are distinct. No guessed capacities, fluid grades or plug torques are included.',
-							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations (48 months / 60,000 miles); Crosstrek Service Manual mirror · TR580 CVTF and Differential sections',
-							sourcePath: 'https://contactus.subaru.com/knowledgebase/article/1001832/en-us'
+							id: 'kb-subaru-spark-plugs', vehicle: '2019 Subaru Crosstrek Limited', category: 'Engine & Ignition',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Spark Plug Replacement',
+							interval: 'Schedule discrepancy: Subaru of America’s 2019 recommendations list 72 months (approximately 70,000–90,000 miles); the US service-manual periodic schedule table marks replacement at 60 months / 60,000 miles. Confirm the current VIN-specific schedule before setting the due date.',
+							specs: ['Factory plug: NGK SILZKAR7B11', 'Spark plug gap: 1.0–1.1 mm (0.039–0.043 in); replace the plug if outside specification', 'Spark plug tightening torque: 17.5 N·m (12.9 ft-lb)', 'Ignition coil tightening torque: 8.5 N·m (6.3 ft-lb)', 'Four spark plugs are required'],
+							steps: ['Allow the engine to cool completely and switch the ignition off.', 'Disconnect the battery ground cable before accessing the ignition coils.', 'RH side: remove the air cleaner case. LH side: access the coil after disconnecting the battery ground cable; follow the factory side-specific access instructions.', 'Disconnect each ignition-coil connector. The factory procedure releases the connector lock by pressing its spring and sliding it with a clip remover.', 'Remove the ignition coil, then remove the spark plug with a spark-plug socket.', 'Inspect the plug terminal, insulator, gasket and electrodes. Look for cracks, damage, abnormal deposits or overheating.', 'If cleaning is appropriate, use a nylon brush only. Subaru says not to use a plug cleaner or metal brush. Check the gap with a gap gauge; replace the plug if the gap is outside 1.0–1.1 mm.', 'Install the specified NGK SILZKAR7B11 plug and tighten to 17.5 N·m (12.9 ft-lb).', 'Reinstall each ignition coil and tighten its mounting fastener to 8.5 N·m (6.3 ft-lb). Reconnect the coil connectors and reinstall the RH air cleaner case.'],
+							caution: 'The 60,000-mile / 60-month service-manual table conflicts with Subaru of America’s 2019 owner-facing recommendation of 72 months (about 70,000–90,000 miles). Do not silently choose one interval; confirm the applicable schedule for this vehicle. Work only on a cool engine. Do not force plugs into the aluminum cylinder head or adjust a fine-wire electrode by prying on the center electrode.',
+							sourceLabel: 'Subaru Service Manual · IGNITION(H4DO) Spark Plug · Specification 2695, Inspection 2702, Removal 2703, Installation 2704; Schedule 3417; Subaru of America 2019 schedule',
+							sourcePath: 'https://www.sucross.com/ignition_h4do_-2692.html'
+						},
+						{
+							id: 'kb-subaru-cvt-fluid', vehicle: '2019 Subaru Crosstrek Limited', category: 'Drivetrain',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: 'TR580 CVT Fluid Inspection & Service',
+							interval: 'Normal schedule: inspect every 48 months or 60,000 miles (96,000 km). Severe service: replace every 40,000 km (24,855 miles).',
+							specs: ['Specified fluid: SUBARU CVT FLUID LINEARTRONIC II; Subaru warns that using another fluid can cause malfunction', 'Total system capacity: 11.68–12.18 L (12.3–12.9 US qt); this is not the drain-and-refill quantity', 'CVTF level-setting temperature: 35–45°C (95–113°F), read with Subaru Select Monitor', 'Drain plug: 31 N·m (22.9 ft-lb), new gasket', 'Filler plug: 50 N·m (36.9 ft-lb), new gasket'],
+							steps: ['At each scheduled inspection, check the transmission case, cooler connections and lines for CVTF leakage.', 'If replacement is required by severe-use conditions or diagnosis, raise the vehicle level and remove the CVTF drain plug. Inspect the drained fluid for metal particles, burnt/thick varnish appearance, cloudiness or bubbles.', 'Install the drain plug with a new gasket and tighten to 31 N·m (22.9 ft-lb).', 'Remove the filler plug and add only SUBARU CVT FLUID LINEARTRONIC II to the lower section of the filler opening. Temporarily install the filler plug.', 'With the engine idling, use Subaru Select Monitor to bring CVTF temperature to 35–45°C (95–113°F).', 'With the engine idling, move the select lever P → R → N → D, then D → N → R → P to circulate fluid.', 'With the engine still running and the select lever in P, follow the factory level-adjustment procedure. The correct level is at the lower section of the filler opening; check for leakage.', 'Install the filler plug with a new gasket and tighten to 50 N·m (36.9 ft-lb).'],
+							caution: 'This is not a conventional dipstick check or a generic drain-and-fill. Correct level setting requires the specified temperature window, Subaru Select Monitor and the engine idling while the vehicle is raised. CVTF is hot after operation; avoid burns and keep spilled fluid off the exhaust. Use a Subaru-capable shop if the correct scan tool and safe lifting equipment are unavailable.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations; Crosstrek Service Manual · TR580 CVTF Specification 1366, Adjustment 1306, Condition Check 1307, Inspection 1308, Replacement 1309',
+							sourcePath: 'https://www.sucross.com/continuously_variable_transmission_tr580_-1284.html'
+						},
+						{
+							id: 'kb-subaru-front-differential', vehicle: '2019 Subaru Crosstrek Limited', category: 'Drivetrain',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: 'Front Differential Gear Oil Inspection & Service',
+							interval: 'Normal schedule: inspect every 48 months or 60,000 miles (96,000 km). Severe service: replace every 15 months or 24,000 km (15,000 miles).',
+							specs: ['Specified lubricant: SUBARU GEAR OIL EXTRA MT or equivalent; the owner manual also lists API GL-5 75W-90 as an alternative', 'Front differential capacity: 1.14–1.24 L (1.2–1.3 US qt)', 'Front differential is separate from the TR580 CVT fluid circuit', 'Drain plug: T70 Torx, 70 N·m (51.6 ft-lb), new gasket', 'Overflow/check plug and filler plug: each 50 N·m (36.9 ft-lb), new gaskets'],
+							steps: ['Inspect the front differential housing and seals for leakage or damage at the scheduled interval.', 'If service is required, let the gear oil cool and raise the vehicle level using approved lifting points and supports.', 'Remove the T70 drain plug and drain the differential gear oil. Install the drain plug with a new gasket and tighten to 70 N·m (51.6 ft-lb).', 'Remove the filler plug and overflow drain plug. Fill through the filler opening with the specified gear oil until oil flows from the overflow opening.', 'When the flow narrows to a thin stream, install the overflow plug with a new gasket and tighten to 50 N·m (36.9 ft-lb).', 'Install the filler plug with a new gasket and tighten to 50 N·m (36.9 ft-lb). Check for leakage.'],
+							caution: 'Do not confuse the front differential gear oil with the CVTF; they are separate fluids and use different service points. Keep the vehicle level during the overflow-level procedure. Differential oil is hot after driving, and spilled oil on the exhaust can smoke or ignite.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations; Crosstrek Service Manual · TR580 Differential Gear Oil Specification 1366, Adjustment 1321, Replacement 1322, Inspection 1323',
+							sourcePath: 'https://www.sucross.com/replacement-1322.html'
+						},
+						{
+							id: 'kb-subaru-rear-differential', vehicle: '2019 Subaru Crosstrek Limited', category: 'Drivetrain',
+							engine: '2.0L FB20D H4 · AWD · CVT', title: 'Rear Differential Gear Oil Inspection & Service',
+							interval: 'Normal schedule: inspect every 48 months or 60,000 miles (96,000 km). Severe service: replace every 15 months or 24,000 km (15,000 miles).',
+							specs: ['Owner-manual lubricant: SUBARU Extra MT or API GL-5 75W-90', 'Rear differential capacity: approximately 0.8 L (0.8 US qt); the owner manual identifies this as a guideline', 'Service-manual drain/fill torque depends on the differential housing: T-type 49 N·m (36.1 ft-lb); VA1-type 50 N·m (36.9 ft-lb)', 'T-type plugs require THREE BOND 1105 or equivalent on the threads; VA1-type uses new gaskets', 'The exact differential type installed in this 2019 vehicle has not been confirmed; do not apply either torque until the housing is identified'],
+							steps: ['Inspect the rear differential case, seals and plugs for leakage or damage at the scheduled interval.', 'For a fluid-condition check, follow the factory inspection procedure; replace the oil if it is contaminated, deteriorated or cloudy.', 'Before draining, identify the rear differential housing type from its identification marking and verify the applicable VIN-specific service information.', 'If replacement is required, raise and support the vehicle level. Follow the identified housing procedure for drain/fill plug removal and sealing.', 'Refill with the specified oil to the bottom of the filler opening. Avoid overfilling or underfilling.', 'Apply only the sealing method and torque for the positively identified housing. Recheck for leakage.'],
+							caution: 'Do not assume the rear differential is T-type or VA1-type. Subaru service information includes different housings and different sealing/torque requirements; later service bulletins also document R152 and VB-type changes. The exact 2019 Limited housing and any VIN/production split remain unresolved, so this card intentionally does not provide a one-size-fits-all DIY torque instruction.',
+							sourceLabel: '2018–2023 Crosstrek Owner Manual · Specifications 12-6; Crosstrek Service Manual · Differentials / Differential Gear Oil Replacement 1628; Subaru TSB 03-87-21 and 03-95-24',
+							sourcePath: 'https://www.sucross.com/replacement-1628.html'
 						}
 
 					],
@@ -3361,6 +3408,11 @@
 
 					get predictiveItems() {
 						return this.predictiveForVehicle(this.activeVehicle);
+					},
+					get nextScheduledMaintenance() {
+						return this.predictiveItems
+							.filter(item => item.status !== 'Red')
+							.sort((a, b) => (a.remainingDays ?? 999999) - (b.remainingDays ?? 999999) || (a.remainingMiles ?? 999999999) - (b.remainingMiles ?? 999999999))[0] || null;
 					},
 
 					isMaintenanceArchived(vehicleId, scheduleId) {

@@ -1728,7 +1728,11 @@
 								<h2 class="text-lg font-bold text-white mb-1">Maintenance Knowledge Base</h2>
 								<p class="text-xs text-zinc-400">Vehicle-specific DIY procedures, factory steps, torque specs, and fluid capacities</p>
 							</div>
-							<span class="kb-badge" x-text="knowledgeBase.length + ' PROCEDURES'"></span>
+							<div class="flex items-center gap-2">
+								<button type="button" @click="expandAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Expand all</button>
+								<button type="button" @click="collapseAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Collapse all</button>
+								<span class="kb-badge" x-text="knowledgeBase.length + ' PROCEDURES'"></span>
+							</div>
 						</div>
 					</div>
 
@@ -1746,46 +1750,56 @@
 
 					<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
 						<template x-for="item in filteredKnowledgeBase" :key="item.id">
-							<article class="glass-panel p-4 sm:p-5 space-y-4">
-								<div class="flex flex-wrap items-center justify-between gap-2">
-									<span class="kb-badge" x-text="item.vehicle"></span>
-									<span class="text-[10px] uppercase tracking-widest text-zinc-500" x-text="item.category"></span>
+							<article class="glass-panel overflow-hidden">
+								<button
+									type="button"
+									class="w-full p-4 sm:p-5 text-left flex items-start gap-3 hover:bg-zinc-900/40 transition"
+									@click="toggleKnowledgeBaseCard(item.id)"
+									:aria-expanded="isKnowledgeBaseExpanded(item.id)"
+								>
+									<div class="flex-1 min-w-0 space-y-2">
+										<div class="flex flex-wrap items-center gap-2">
+											<span class="kb-badge" x-text="item.vehicle"></span>
+											<span class="text-[10px] uppercase tracking-widest text-zinc-500" x-text="item.category"></span>
+										</div>
+										<h3 class="text-base sm:text-lg font-bold text-white" x-text="item.title"></h3>
+										<div class="flex flex-col gap-1">
+											<p class="text-[11px] text-zinc-400" x-text="item.engine"></p>
+											<p class="text-xs text-amber-400 font-semibold" x-text="'Service interval: ' + item.interval"></p>
+										</div>
+									</div>
+									<span class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-[11px] font-bold text-amber-400">
+										<span x-text="isKnowledgeBaseExpanded(item.id) ? 'Hide details' : 'View details'"></span>
+										<span class="text-base leading-none" x-text="isKnowledgeBaseExpanded(item.id) ? '−' : '+'"></span>
+									</span>
+								</button>
+								<div x-show="isKnowledgeBaseExpanded(item.id)" x-transition class="px-4 pb-4 sm:px-5 sm:pb-5 space-y-4 border-t border-zinc-800">
+									<div class="rounded-xl bg-zinc-950/80 border border-zinc-800 p-3 space-y-2">
+										<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400">Specifications</h4>
+										<ul class="space-y-1.5 text-xs text-zinc-200">
+											<template x-for="(spec, index) in item.specs" :key="item.id + '-spec-' + index">
+												<li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li>
+											</template>
+										</ul>
+									</div>
+									<div>
+										<h4 class="text-[10px] uppercase tracking-widest font-bold text-zinc-400 mb-2">Step-by-step procedure</h4>
+										<ol class="list-decimal list-outside ml-5 space-y-2 text-xs sm:text-sm text-zinc-200">
+											<template x-for="(step, index) in item.steps" :key="item.id + '-step-' + index">
+												<li class="pl-1 leading-relaxed" x-text="step"></li>
+											</template>
+										</ol>
+									</div>
+									<div class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+										<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Safety & verification</h4>
+										<p class="text-xs leading-relaxed text-zinc-300" x-text="item.caution"></p>
+									</div>
+									<div class="flex flex-col sm:flex-row gap-2 pt-1">
+										<a :href="item.sourcePath" target="_blank" rel="noopener" class="flex-1 text-center rounded-xl border border-zinc-700 bg-zinc-900 hover:border-amber-500/50 text-zinc-200 py-3 text-xs font-semibold transition" x-text="'Factory manual: ' + item.sourceLabel"></a>
+										<button class="btn-primary flex-1 py-3 text-xs font-bold" @click="initServiceFromKB(item.id)">Log Service Record</button>
+									</div>
 								</div>
-								<div>
-									<h3 class="text-base sm:text-lg font-bold text-white" x-text="item.title"></h3>
-									<p class="text-xs text-zinc-400 mt-1" x-text="item.engine"></p>
-									<p class="text-xs text-amber-400 font-semibold mt-2" x-text="'Service interval: ' + item.interval"></p>
-								</div>
-
-								<div class="rounded-xl bg-zinc-950/80 border border-zinc-800 p-3 space-y-2">
-									<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400">Specifications</h4>
-									<ul class="space-y-1.5 text-xs text-zinc-200">
-										<template x-for="(spec, index) in item.specs" :key="item.id + '-spec-' + index">
-											<li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li>
-										</template>
-									</ul>
-								</div>
-
-								<div>
-									<h4 class="text-[10px] uppercase tracking-widest font-bold text-zinc-400 mb-2">Step-by-step procedure</h4>
-									<ol class="list-decimal list-outside ml-5 space-y-2 text-xs sm:text-sm text-zinc-200">
-										<template x-for="(step, index) in item.steps" :key="item.id + '-step-' + index">
-											<li class="pl-1 leading-relaxed" x-text="step"></li>
-										</template>
-									</ol>
-								</div>
-
-								<div class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
-									<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Safety & verification</h4>
-									<p class="text-xs leading-relaxed text-zinc-300" x-text="item.caution"></p>
-								</div>
-
-								<div class="flex flex-col sm:flex-row gap-2 pt-1">
-									<a :href="item.sourcePath" target="_blank" rel="noopener" class="flex-1 text-center rounded-xl border border-zinc-700 bg-zinc-900 hover:border-amber-500/50 text-zinc-200 py-3 text-xs font-semibold transition" x-text="'Factory manual: ' + item.sourceLabel"></a>
-									<button class="btn-primary flex-1 py-3 text-xs font-bold" @click="initServiceFromKB(item.id)">Log Service Record</button>
-								</div>
-							</article>
-						</template>
+							</article></template>
 					</div>
 				</div>
 
@@ -2862,6 +2876,7 @@
 					attachmentSearch: '',
 					attachmentCategoryFilter: 'all',
 					kbSearchQuery: '',
+					kbExpandedIds: [],
 					advisorQuery: '',
 					tempMileage: 0,
 					showLightbox: false,
@@ -3423,6 +3438,20 @@
 							allAtts = allAtts.filter(a => a.category === this.attachmentCategoryFilter);
 						}
 						return allAtts;
+					},
+
+					toggleKnowledgeBaseCard(id) {
+						if (this.kbExpandedIds.includes(id)) this.kbExpandedIds = this.kbExpandedIds.filter(value => value !== id);
+						else this.kbExpandedIds = [...this.kbExpandedIds, id];
+					},
+					isKnowledgeBaseExpanded(id) {
+						return this.kbExpandedIds.includes(id);
+					},
+					expandAllKnowledgeBaseCards() {
+						this.kbExpandedIds = this.filteredKnowledgeBase.map(item => item.id);
+					},
+					collapseAllKnowledgeBaseCards() {
+						this.kbExpandedIds = [];
 					},
 
 					get filteredKnowledgeBase() {

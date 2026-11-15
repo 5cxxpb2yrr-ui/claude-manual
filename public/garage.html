@@ -841,6 +841,18 @@
 							</div>
 						</template>
 					</div>
+					<div class="glass-panel p-5 space-y-3" x-show="archivedMaintenanceForActiveVehicle.length">
+						<div class="flex items-center justify-between gap-3">
+							<div><h3 class="font-bold text-white">Archived — History Reconciliation</h3><p class="text-[11px] text-zinc-400 mt-1">Hidden from upcoming maintenance until you match the service history. Nothing was marked completed.</p></div>
+							<span class="text-xs font-mono text-zinc-400" x-text="archivedMaintenanceForActiveVehicle.length + ' saved'"></span>
+						</div>
+						<template x-for="item in archivedMaintenanceForActiveVehicle" :key="item.id">
+							<div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-center justify-between gap-3">
+								<div class="min-w-0"><b class="text-white text-sm" x-text="item.serviceName"></b><p class="text-[11px] text-zinc-500 mt-1" x-text="'Due at ' + Number(item.nextDueMileageAtArchive||0).toLocaleString() + ' mi • ' + (item.lastPerformedMileageAtArchive ? 'Last matched record ' + Number(item.lastPerformedMileageAtArchive).toLocaleString() + ' mi' : 'No matching service record')"></p></div>
+								<button @click="unarchiveMaintenanceItem(item.id)" class="shrink-0 px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300 text-xs font-bold">Restore</button>
+							</div>
+						</template>
+					</div>
 					<div class="glass-panel p-5 space-y-3" x-show="activeMaintenancePlans.length">
 						<h3 class="font-bold text-white">Active Maintenance Plans</h3>
 						<template x-for="plan in activeMaintenancePlans" :key="plan.id"><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><div class="flex justify-between"><div><b class="text-white text-sm" x-text="plan.title"></b><div class="text-[11px] text-zinc-500" x-text="plan.status + ' • ' + plan.priority"></div></div><span class="text-xs text-purple-400 font-bold" x-text="plan.completion + '%' "></span></div><div class="flex gap-2 mt-2"><template x-for="(task,idx) in plan.tasks" :key="idx"><button @click="toggleMaintenanceTask(plan,idx)" class="text-[10px] px-2 py-1 rounded border" :class="task.done ? 'border-emerald-500/30 text-emerald-400' : 'border-zinc-700 text-zinc-400'" x-text="(task.done ? '✓ ' : '○ ') + task.name"></button></template></div></div></template>
@@ -2883,7 +2895,7 @@
 					showLightbox: false,
 					lightboxImage: '',
 					isEditingRepair: false,
-					appSchemaVersion: 4,
+					appSchemaVersion: 5,
 					garageDB: null,
 					saveState: 'saved',
 					lastSavedAt: null,
@@ -2941,8 +2953,8 @@
 
 					// Data Models
 					vehicles: [
-						{ id: 'scion-xb', name: '2006 Scion xB', odometer: 212000, engine: '1.5L 1NZ-FE I4', oilType: '5W-30 Synthetic', oilCapacity: '3.9 qts', sparkPlugs: 'NGK BKR5EYA-11', oilFilter: 'OEM Toyota 90915-YZZF2', vin: 'JTLKT324564019283' },
-						{ id: 'subaru-crosstrek', name: '2019 Subaru Crosstrek', odometer: 68450, engine: '2.0L FB20D H4', oilType: '0W-20 Synthetic', oilCapacity: '4.7 qts', sparkPlugs: 'NGK SILZKAR7B11', oilFilter: 'OEM Subaru 15208AA15A', vin: 'JF2GTAC68KH284910' }
+						{ id: 'scion-xb', name: '2006 Scion xB', odometer: 219634, engine: '1.5L 1NZ-FE I4', oilType: '5W-30 Synthetic', oilCapacity: '3.9 qts', sparkPlugs: 'NGK BKR5EYA-11', oilFilter: 'OEM Toyota 90915-YZZF2', vin: 'JTLKT324564019283' },
+						{ id: 'subaru-crosstrek', name: '2019 Subaru Crosstrek', odometer: 141265, engine: '2.0L FB20D H4', oilType: '0W-20 Synthetic', oilCapacity: '4.7 qts', sparkPlugs: 'NGK SILZKAR7B11', oilFilter: 'OEM Subaru 15208AA15A', vin: 'JF2GTAC68KH284910' }
 					],
 
 					schedules: [
@@ -2966,6 +2978,8 @@
 					],
 
 					maintenancePlans: [],
+					archivedMaintenance: [],
+					maintenanceSetupVersion: 0,
 
 					inventory: [
 						{ id: 301, partNumber: '90915-YZZF2', description: 'Toyota OEM Oil Filter', vendor: 'Toyota Direct', quantity: 4, unitCost: 6.50, purchaseDate: '2026-01-10', vehicleCompatibility: '2006 Scion xB' },
@@ -3299,13 +3313,53 @@
 						return this.predictiveForVehicle(this.activeVehicle);
 					},
 
-					predictiveForVehicle(vehicle) {
+					isMaintenanceArchived(vehicleId, scheduleId) {
+						return (this.archivedMaintenance || []).some(item => String(item.vehicleId) === String(vehicleId) && String(item.scheduleId) === String(scheduleId));
+					},
+
+					get archivedMaintenanceForActiveVehicle() {
+						return (this.archivedMaintenance || []).filter(item => String(item.vehicleId) === String(this.activeVehicleId)).sort((a,b) => String(b.archivedAt||'').localeCompare(String(a.archivedAt||'')));
+					},
+
+					async unarchiveMaintenanceItem(archiveId) {
+						this.archivedMaintenance = (this.archivedMaintenance || []).filter(item => String(item.id) !== String(archiveId));
+						await this.saveToStorage();
+					},
+
+					applyGarageSetupAdjustments() {
+						if (Number(this.maintenanceSetupVersion || 0) >= 1) return;
+						const readings = { 'scion-xb': 219634, 'subaru-crosstrek': 141265 };
+						this.vehicles = (this.vehicles || []).map(vehicle => readings[vehicle.id] ? { ...vehicle, odometer: readings[vehicle.id] } : vehicle);
+						this.archivedMaintenance = Array.isArray(this.archivedMaintenance) ? this.archivedMaintenance : [];
+						this.vehicles.forEach(vehicle => {
+							this.predictiveForVehicle(vehicle, true).filter(item => item.status === 'Red').forEach(item => {
+								if (this.isMaintenanceArchived(vehicle.id, item.id)) return;
+								this.archivedMaintenance.push({
+									id: `archive-${vehicle.id}-${item.id}`,
+									vehicleId: vehicle.id,
+									scheduleId: item.id,
+									serviceName: item.serviceName,
+									statusAtArchive: item.status,
+									remainingMilesAtArchive: item.remainingMiles,
+									nextDueMileageAtArchive: item.nextDueMileage,
+									nextDueDateAtArchive: item.nextDueDate,
+									lastPerformedMileageAtArchive: item.lastPerformedMileage,
+									lastPerformedDateAtArchive: item.lastPerformedDate,
+									archivedAt: new Date().toISOString(),
+									reason: 'Pending service-history reconciliation'
+								});
+							});
+						});
+						this.maintenanceSetupVersion = 1;
+					},
+
+					predictiveForVehicle(vehicle, includeArchived = false) {
 						if (!vehicle) return [];
 						const logs = this.logs.filter(l => l.vehicleId === vehicle.id || l.vehicle === vehicle.name).filter(l => Number.isFinite(Number(l.mileage))).sort((a,b) => Number(a.mileage||0)-Number(b.mileage||0));
 						const today = new Date(), odometer = Number(vehicle.odometer)||0;
 						let dailyMiles = 28;
 						if (logs.length >= 2) { const first=logs[0], last=logs[logs.length-1]; const days=Math.max(1,(new Date(last.date||today)-new Date(first.date||today))/86400000); const distance=Math.max(0,Number(last.mileage)-Number(first.mileage)); if(distance>0) dailyMiles=Math.max(5,Math.min(150,distance/days)); }
-						return this.schedules.map(sch => {
+						const computed = this.schedules.map(sch => {
 							const terms=(sch.terms||[sch.serviceName.split(' ')[0]]).map(x=>x.toLowerCase());
 							const matched=logs.filter(l=>terms.some(t=>(l.serviceType||'').toLowerCase().includes(t)));
 							const lastLog=matched[matched.length-1], hasHistory=!!lastLog;
@@ -3321,7 +3375,8 @@
 							const useMileage=dueByMileage||(!dueByDate&&daysToMileage<=remainingDaysByDate);
 							const projectedDate=useMileage&&remainingMiles>0?new Date(today.getTime()+daysToMileage*86400000):nextDueByDate;
 							return {id:sch.id,serviceName:sch.serviceName,intervalMiles:sch.intervalMiles,intervalDays:sch.intervalDays,lastPerformedMileage:hasHistory?Number(lastLog.mileage):null,lastPerformedDate:hasHistory?lastLog.date:null,nextDueMileage,remainingMiles,remainingDays:Math.min(daysToMileage||Infinity,remainingDaysByDate),remainingDaysByDate,urgencyScore,status,nextDueDate:projectedDate.toLocaleDateString(),dueDateISO:projectedDate.toISOString().split('T')[0],dailyMiles:Math.round(dailyMiles*10)/10,confidence:hasHistory?(matched.length>=2?'High':'Medium'):'Low',basis:useMileage?'mileage':'time',hasHistory,matchedCount:matched.length};
-						}).sort((a,b)=>b.urgencyScore-a.urgencyScore);
+						});
+						return (includeArchived ? computed : computed.filter(item => !this.isMaintenanceArchived(vehicle.id, item.id))).sort((a,b)=>b.urgencyScore-a.urgencyScore);
 					},
 
 					get dynamicHealth() { return this.healthForVehicleDetailed(this.activeVehicle); },
@@ -3568,6 +3623,7 @@
 								await this.migrateAttachmentData();
 								this.hydrateAttachments();
 							}
+							this.applyGarageSetupAdjustments();
 							if (!this.activeVehicleId || !this.activeVehicle) this.activeVehicleId = this.vehicles[0]?.id;
 							await this.saveToStorage();
 							await this.runDatabaseHealthCheck();
@@ -3604,6 +3660,8 @@
 						if (Array.isArray(saved.projects)) this.projects = saved.projects;
 						if (Array.isArray(saved.inventory)) this.inventory = saved.inventory;
 						if (Array.isArray(saved.maintenancePlans)) this.maintenancePlans = saved.maintenancePlans;
+						if (Array.isArray(saved.archivedMaintenance)) this.archivedMaintenance = saved.archivedMaintenance;
+						this.maintenanceSetupVersion = Number(saved.maintenanceSetupVersion || 0);
 					},
 
 				normalizeData() {
@@ -3618,12 +3676,13 @@
 					this.projects = (Array.isArray(this.projects)?this.projects:[]).map((p,i)=>({...p,id:p?.id||makeId('project',i),vehicleId:resolve(p?.vehicleId,p?.vehicle),tasks:Array.isArray(p?.tasks)?p.tasks:[]}));
 					this.inventory = (Array.isArray(this.inventory)?this.inventory:[]).map((p,i)=>({...p,id:p?.id||makeId('part',i),quantity:Number.isFinite(Number(p?.quantity))?Number(p.quantity):0,reservedQuantity:Math.max(0,Number(p?.reservedQuantity||0)),unitCost:Number.isFinite(Number(p?.unitCost))?Number(p.unitCost):0}));
 					this.maintenancePlans = (Array.isArray(this.maintenancePlans)?this.maintenancePlans:[]).map((p,i)=>({...p,id:p?.id||makeId('maint',i),vehicleId:resolve(p?.vehicleId,p?.vehicle),status:['Planned','Parts Reserved','In Progress','Paused','Completed','Cancelled'].includes(p?.status)?p.status:'Planned',tasks:Array.isArray(p?.tasks)?p.tasks:[],parts:Array.isArray(p?.parts)?p.parts:[],actualCost:Number(p?.actualCost||0),estimatedMin:Number(p?.estimatedMin||0),estimatedMax:Number(p?.estimatedMax||0)}));
+					this.archivedMaintenance = (Array.isArray(this.archivedMaintenance) ? this.archivedMaintenance : []).filter(item => item && item.vehicleId && item.scheduleId);
 					this.maintenancePlans.forEach(plan=>{if(plan.projectId){const project=this.projects.find(p=>String(p.id)===String(plan.projectId));if(project)project.maintenancePlanId=plan.id;}});
 				},
 
 				getPersistableState() {
 					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? undefined : val));
-					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), maintenancePlans: strip(this.maintenancePlans) };
+					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
 				},
 
 				loadGarageState() {

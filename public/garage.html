@@ -1723,12 +1723,12 @@
 					class="space-y-4"
 				>
 					<div class="mb-2">
-						<div class="flex items-center justify-between gap-3">
+						<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 							<div>
 								<h2 class="text-lg font-bold text-white mb-1">Maintenance Knowledge Base</h2>
 								<p class="text-xs text-zinc-400">Vehicle-specific DIY procedures, factory steps, torque specs, and fluid capacities</p>
 							</div>
-							<div class="flex items-center gap-2">
+							<div class="flex flex-wrap items-center gap-2">
 								<button type="button" @click="expandAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Expand all</button>
 								<button type="button" @click="collapseAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Collapse all</button>
 								<span class="kb-badge" x-text="knowledgeBase.length + ' PROCEDURES'"></span>

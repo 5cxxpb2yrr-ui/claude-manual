@@ -3430,30 +3430,39 @@
 					},
 
 					applyGarageSetupAdjustments() {
-						if (Number(this.maintenanceSetupVersion || 0) >= 1) return;
-						const readings = { 'scion-xb': 219634, 'subaru-crosstrek': 141265 };
-						this.vehicles = (this.vehicles || []).map(vehicle => readings[vehicle.id] ? { ...vehicle, odometer: readings[vehicle.id] } : vehicle);
+						const version = Number(this.maintenanceSetupVersion || 0);
 						this.archivedMaintenance = Array.isArray(this.archivedMaintenance) ? this.archivedMaintenance : [];
-						this.vehicles.forEach(vehicle => {
-							this.predictiveForVehicle(vehicle, true).filter(item => item.status === 'Red').forEach(item => {
-								if (this.isMaintenanceArchived(vehicle.id, item.id)) return;
-								this.archivedMaintenance.push({
-									id: `archive-${vehicle.id}-${item.id}`,
-									vehicleId: vehicle.id,
-									scheduleId: item.id,
-									serviceName: item.serviceName,
-									statusAtArchive: item.status,
-									remainingMilesAtArchive: item.remainingMiles,
-									nextDueMileageAtArchive: item.nextDueMileage,
-									nextDueDateAtArchive: item.nextDueDate,
-									lastPerformedMileageAtArchive: item.lastPerformedMileage,
-									lastPerformedDateAtArchive: item.lastPerformedDate,
-									archivedAt: new Date().toISOString(),
-									reason: 'Pending service-history reconciliation'
+						if (version < 1) {
+							const readings = { 'scion-xb': 219634, 'subaru-crosstrek': 141265 };
+							this.vehicles = (this.vehicles || []).map(vehicle => readings[vehicle.id] ? { ...vehicle, odometer: readings[vehicle.id] } : vehicle);
+							this.vehicles.forEach(vehicle => {
+								this.predictiveForVehicle(vehicle, true).filter(item => item.status === 'Red' && item.hasHistory).forEach(item => {
+									if (this.isMaintenanceArchived(vehicle.id, item.id)) return;
+									this.archivedMaintenance.push({
+										id: `archive-${vehicle.id}-${item.id}`,
+										vehicleId: vehicle.id,
+										scheduleId: item.id,
+										serviceName: item.serviceName,
+										statusAtArchive: item.status,
+										remainingMilesAtArchive: item.remainingMiles,
+										nextDueMileageAtArchive: item.nextDueMileage,
+										nextDueDateAtArchive: item.nextDueDate,
+										lastPerformedMileageAtArchive: item.lastPerformedMileage,
+										lastPerformedDateAtArchive: item.lastPerformedDate,
+										archivedAt: new Date().toISOString(),
+										reason: 'Pending service-history reconciliation'
+									});
 								});
 							});
-						});
-						this.maintenanceSetupVersion = 1;
+						}
+						if (version < 2) {
+							// Undo the earlier migration's false archives for services with no matching history.
+							this.archivedMaintenance = this.archivedMaintenance.filter(item =>
+								!(item.reason === 'Pending service-history reconciliation' &&
+									item.lastPerformedMileageAtArchive == null && item.lastPerformedDateAtArchive == null)
+							);
+						}
+						this.maintenanceSetupVersion = 2;
 					},
 
 					predictiveForVehicle(vehicle, includeArchived = false) {
@@ -3466,9 +3475,11 @@
 							const terms=(sch.terms||[sch.serviceName.split(' ')[0]]).map(x=>x.toLowerCase());
 							const matched=logs.filter(l=>terms.some(t=>(l.serviceType||'').toLowerCase().includes(t)));
 							const lastLog=matched[matched.length-1], hasHistory=!!lastLog;
-							const lastMiles=hasHistory?Number(lastLog.mileage):Math.max(0,odometer-sch.intervalMiles);
+							// Without a matching service log, start a low-confidence projection from today's known odometer/date.
+							// Do not fabricate a prior service or mark the item overdue solely because history is missing.
+							const lastMiles=hasHistory?Number(lastLog.mileage):odometer;
 							const nextDueMileage=lastMiles+sch.intervalMiles, remainingMiles=nextDueMileage-odometer;
-							const lastDate=hasHistory&&lastLog.date?new Date(lastLog.date):new Date(today.getTime()-sch.intervalDays*86400000);
+							const lastDate=hasHistory&&lastLog.date?new Date(lastLog.date):today;
 							const nextDueByDate=new Date(lastDate.getTime()+sch.intervalDays*86400000), remainingDaysByDate=Math.ceil((nextDueByDate-today)/86400000);
 							const daysToMileage=remainingMiles>0?Math.ceil(remainingMiles/dailyMiles):0, dueByMileage=remainingMiles<=0, dueByDate=remainingDaysByDate<=0;
 							const dueSoonMileage=remainingMiles>0&&remainingMiles<=Math.max(500,dailyMiles*30), dueSoonDate=remainingDaysByDate>0&&remainingDaysByDate<=30;

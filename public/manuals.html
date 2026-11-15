@@ -77,7 +77,7 @@ const NAV=[["/","Dock","grid"],["#/","Home","home"],["#/vehicles","Vehicles","ca
 function chrome(){const c=location.hash||"#/",h=NAV.map(([h,l,i])=>`<a href="${h}" class="${c===h||(h!=="#/"&&c.startsWith(h))?"on":""}">${I(i)}<span>${l}</span></a>`).join("");$("side").innerHTML=h;$("tabs").innerHTML=h}
 const hdr=(t,s,o={})=>`<div class="hd">${o.back?`<a class="ib" href="${o.back}" aria-label="Back">${I("back")}</a>`:`<a class="ib" href="#/more" aria-label="Menu">${I("menu")}</a>`}<div class="ht"><h1>${esc(t)}</h1>${s?`<small>${esc(s)}</small>`:""}</div>${o.right||""}</div>`;
 function fallbackVehicleImage(img){img.parentElement.innerHTML=I("car")}
-const vimg=(v,c="")=>`<div class="vi ${c}">${v.image?`<img src="${esc(v.image)}" alt="${esc(v.name)}" loading="lazy" onerror="fallbackVehicleImage(this)">`:I("car")}</div>`;
+const vimg=(v,c="")=>`<div class="vi ${c}">${v.image?`<img src="${esc("/"+v.image.replace(/^\\/+/, ""))}" alt="${esc(v.name)}" loading="eager" decoding="async" onerror="fallbackVehicleImage(this)">`:I("car")}</div>`;
 function route(){if(!M)return;chrome();const [,a,b,c,d]=decodeURIComponent(location.hash||"#/").split("/"),m=$("main");
  const vw=a==="v";m.className=vw?"vw":"";document.body.classList.toggle("vw",vw);m.scrollTop=0;
  ({"":home,vehicles:vlist,veh:()=>vehicle(m,+b,c||"man"),t:()=>tview(m,+b,+c,d),v:()=>viewer(m,+b,+c,+d),favs:()=>plist(m,"Favorites",favs),recent:()=>plist(m,"Recent Pages",rec),search:()=>{if(b)SQ=b;searchv(m)},more:more}[a||""]||home)(m);paintST()}

@@ -4033,6 +4033,11 @@
 						if (!Array.isArray(proj.tasks)) proj.tasks = [];
 						if (!Array.isArray(proj.milestones)) proj.milestones = [];
 						if (!Array.isArray(proj.procedures)) proj.procedures = [];
+						if (!Array.isArray(proj.partRequirements)) proj.partRequirements = [];
+						if (!Array.isArray(proj.costEntries)) proj.costEntries = [];
+						if (proj.legacyActualCost == null && proj.costEntries.length === 0) proj.legacyActualCost = Number(proj.actualCost || 0);
+						this.projectPartDraft = { inventoryId: '', quantity: 1 };
+						this.projectCostDraft = { description: '', category: 'Labor', amount: 0, date: new Date().toISOString().split('T')[0] };
 						this.modals.projectDetail = true;
 					},
 					projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length ? Math.round(tasks.filter(t=>t.done).length/tasks.length*100) : Number(project?.completion||0); },
@@ -4049,7 +4054,7 @@
 					projectCompatibleInventory(project) { const vehicle=this.vehicles.find(v=>String(v.id)===String(project?.vehicleId)); return this.inventory.filter(p=>!p.vehicleCompatibility || !vehicle || p.vehicleCompatibility===vehicle.name || p.vehicleCompatibility==='Universal'); },
 					projectAvailableInventory(part) { return Math.max(0,Number(part?.quantity||0)-Number(part?.reservedQuantity||0)); },
 					projectPartsEstimate(project) { return (project?.partRequirements||[]).reduce((sum,p)=>sum+Number(p.unitCost||0)*Number(p.quantity||0),0); },
-					projectActualCost(project) { return (project?.costEntries||[]).reduce((sum,e)=>sum+Number(e.amount||0),0); },
+					projectActualCost(project) { return Number(project?.legacyActualCost||0)+(project?.costEntries||[]).reduce((sum,e)=>sum+Number(e.amount||0),0); },
 					async addProjectPart(project) { const id=this.projectPartDraft.inventoryId,qty=Math.max(1,Math.floor(Number(this.projectPartDraft.quantity)||1)),part=this.inventory.find(p=>String(p.id)===String(id)); if(!project||!part)return; if((project.partRequirements||[]).some(p=>String(p.inventoryId)===String(part.id))){alert('This inventory item is already on the project.');return;} if(qty>this.projectAvailableInventory(part)){alert('Requested quantity exceeds available unreserved inventory.');return;} if(!Array.isArray(project.partRequirements))project.partRequirements=[]; project.partRequirements.push({id:'project-part-'+Date.now(),inventoryId:part.id,partNumber:part.partNumber,description:part.description,quantity:qty,unitCost:Number(part.unitCost||0),status:'Required',reserved:false}); this.projectPartDraft={inventoryId:'',quantity:1}; await this.saveToStorage(); },
 					async removeProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id); if(!req)return; if(req.reserved){const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(part)part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));} project.partRequirements=project.partRequirements.filter(p=>p.id!==id); await this.saveToStorage(); },
 					async reserveProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||req.reserved)return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||this.projectAvailableInventory(part)<Number(req.quantity||0)){alert('Not enough unreserved stock to reserve this quantity.');return;}part.reservedQuantity=Number(part.reservedQuantity||0)+Number(req.quantity||0);req.reserved=true;req.status='Reserved';await this.saveToStorage(); },

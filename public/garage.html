@@ -618,7 +618,7 @@
 											</div>
 											<span
 												class="text-xs font-mono font-bold text-emerald-400"
-												x-text="'String.fromCharCode(36) + (proj.actualCost||0) + ' / String.fromCharCode(36) + proj.budget"
+												x-text="String.fromCharCode(36) + (proj.actualCost||0) + ' / ' + String.fromCharCode(36) + proj.budget"
 											></span>
 										</div>
 										<div
@@ -679,7 +679,7 @@
 										</div>
 										<span
 											class="text-xs font-extrabold text-emerald-400 font-mono"
-											x-text="log?.cost > 0 ? 'String.fromCharCode(36) + log?.cost.toFixed(2) : 'DIY'"
+											x-text="log?.cost > 0 ? String.fromCharCode(36) + log?.cost.toFixed(2) : 'DIY'"
 										></span>
 									</div>
 								</template>
@@ -696,24 +696,24 @@
 					</div>
 
 					<div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
-						<div class="glass-panel p-4 border-l-4 border-l-amber-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Period Cost</div><div class="text-xl font-black text-white" x-text="'String.fromCharCode(36)+analyticsMetrics.lifetimeCost.toFixed(2)"></div></div>
-						<div class="glass-panel p-4 border-l-4 border-l-purple-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Monthly Avg</div><div class="text-xl font-black text-purple-400" x-text="'String.fromCharCode(36)+analyticsMetrics.monthlyAvg.toFixed(2)"></div></div>
-						<div class="glass-panel p-4 border-l-4 border-l-emerald-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Cost / Mile</div><div class="text-xl font-black text-emerald-400" x-text="'String.fromCharCode(36)+analyticsMetrics.costPerMile.toFixed(3)"></div></div>
-						<div class="glass-panel p-4 border-l-4 border-l-blue-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Annualized</div><div class="text-xl font-black text-blue-400" x-text="'String.fromCharCode(36)+analyticsOwnership.annualized.toFixed(0)"></div></div>
+						<div class="glass-panel p-4 border-l-4 border-l-amber-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Period Cost</div><div class="text-xl font-black text-white" x-text="String.fromCharCode(36)+analyticsMetrics.lifetimeCost.toFixed(2)"></div></div>
+						<div class="glass-panel p-4 border-l-4 border-l-purple-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Monthly Avg</div><div class="text-xl font-black text-purple-400" x-text="String.fromCharCode(36)+analyticsMetrics.monthlyAvg.toFixed(2)"></div></div>
+						<div class="glass-panel p-4 border-l-4 border-l-emerald-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Cost / Mile</div><div class="text-xl font-black text-emerald-400" x-text="String.fromCharCode(36)+analyticsMetrics.costPerMile.toFixed(3)"></div></div>
+						<div class="glass-panel p-4 border-l-4 border-l-blue-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Annualized</div><div class="text-xl font-black text-blue-400" x-text="String.fromCharCode(36)+analyticsOwnership.annualized.toFixed(0)"></div></div>
 						<div class="glass-panel p-4 border-l-4 border-l-amber-500"><div class="text-[10px] uppercase font-bold text-zinc-500">Avg Health</div><div class="text-xl font-black text-amber-400" x-text="analyticsOwnership.health.toFixed(0)+'/100'"></div></div>
 					</div>
 
 					<div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
-						<div class="glass-panel p-5 lg:col-span-2"><h3 class="text-sm font-bold text-white mb-4">Monthly Spending Trend</h3><div class="h-52 flex items-end gap-2 border-b border-zinc-800 px-2"><template x-for="m in monthlyChartData" :key="m.month"><div class="flex-1 h-full flex flex-col justify-end items-center group relative"><div class="absolute -top-5 text-[10px] text-amber-400 opacity-0 group-hover:opacity-100" x-text="'String.fromCharCode(36)+m.cost.toFixed(0)"></div><div class="w-full bg-gradient-to-t from-amber-500/30 to-amber-500 rounded-t" :style="'height:'+m.height+'%'"></div><span class="text-[10px] text-zinc-500 mt-2" x-text="m.month"></span></div></template><div x-show="!monthlyChartData.length" class="text-xs text-zinc-500 mb-4">No spending data for this period.</div></div></div>
-						<div class="glass-panel p-5"><h3 class="text-sm font-bold text-white mb-4">Cost Mix</h3><div class="space-y-3"><div class="flex justify-between text-xs"><span class="text-zinc-400">Parts</span><span class="text-white font-bold" x-text="'String.fromCharCode(36)+analyticsMetrics.parts.toFixed(2)"></span></div><div class="flex justify-between text-xs"><span class="text-zinc-400">Labor</span><span class="text-white font-bold" x-text="'String.fromCharCode(36)+analyticsMetrics.labor.toFixed(2)"></span></div><div class="flex justify-between text-xs"><span class="text-zinc-400">Other</span><span class="text-white font-bold" x-text="'String.fromCharCode(36)+analyticsMetrics.other.toFixed(2)"></span></div><div class="flex justify-between text-xs border-t border-zinc-800 pt-3"><span class="text-zinc-300">Preventive</span><span class="text-emerald-400 font-bold" x-text="'String.fromCharCode(36)+analyticsOwnership.preventive.toFixed(2)"></span></div><div class="flex justify-between text-xs"><span class="text-zinc-300">Corrective</span><span class="text-orange-400 font-bold" x-text="'String.fromCharCode(36)+analyticsOwnership.corrective.toFixed(2)"></span></div></div></div>
+						<div class="glass-panel p-5 lg:col-span-2"><h3 class="text-sm font-bold text-white mb-4">Monthly Spending Trend</h3><div class="h-52 flex items-end gap-2 border-b border-zinc-800 px-2"><template x-for="m in monthlyChartData" :key="m.month"><div class="flex-1 h-full flex flex-col justify-end items-center group relative"><div class="absolute -top-5 text-[10px] text-amber-400 opacity-0 group-hover:opacity-100" x-text="String.fromCharCode(36)+m.cost.toFixed(0)"></div><div class="w-full bg-gradient-to-t from-amber-500/30 to-amber-500 rounded-t" :style="'height:'+m.height+'%'"></div><span class="text-[10px] text-zinc-500 mt-2" x-text="m.month"></span></div></template><div x-show="!monthlyChartData.length" class="text-xs text-zinc-500 mb-4">No spending data for this period.</div></div></div>
+						<div class="glass-panel p-5"><h3 class="text-sm font-bold text-white mb-4">Cost Mix</h3><div class="space-y-3"><div class="flex justify-between text-xs"><span class="text-zinc-400">Parts</span><span class="text-white font-bold" x-text="String.fromCharCode(36)+analyticsMetrics.parts.toFixed(2)"></span></div><div class="flex justify-between text-xs"><span class="text-zinc-400">Labor</span><span class="text-white font-bold" x-text="String.fromCharCode(36)+analyticsMetrics.labor.toFixed(2)"></span></div><div class="flex justify-between text-xs"><span class="text-zinc-400">Other</span><span class="text-white font-bold" x-text="String.fromCharCode(36)+analyticsMetrics.other.toFixed(2)"></span></div><div class="flex justify-between text-xs border-t border-zinc-800 pt-3"><span class="text-zinc-300">Preventive</span><span class="text-emerald-400 font-bold" x-text="String.fromCharCode(36)+analyticsOwnership.preventive.toFixed(2)"></span></div><div class="flex justify-between text-xs"><span class="text-zinc-300">Corrective</span><span class="text-orange-400 font-bold" x-text="String.fromCharCode(36)+analyticsOwnership.corrective.toFixed(2)"></span></div></div></div>
 					</div>
 
 					<div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
-						<div class="glass-panel p-5"><h3 class="text-sm font-bold text-white mb-4">Cost by Category</h3><div class="space-y-3"><template x-for="cat in categoryChartData" :key="cat.name"><div><div class="flex justify-between text-xs mb-1"><span class="text-zinc-300" x-text="cat.name"></span><span class="text-amber-400 font-mono" x-text="'String.fromCharCode(36)+cat.cost.toFixed(2)+' ('+cat.percent+'%)'"></span></div><div class="h-2 bg-zinc-900 rounded overflow-hidden"><div class="h-full rounded" :class="cat.color" :style="'width:'+cat.percent+'%'"></div></div></div></template><div x-show="!categoryChartData.length" class="text-xs text-zinc-500">No categorized spending.</div></div></div>
-						<div class="glass-panel p-5"><h3 class="text-sm font-bold text-white mb-4">Cost Forecast</h3><div class="grid grid-cols-2 gap-3"><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><div class="text-[10px] uppercase text-zinc-500">30 Days</div><div class="text-lg font-black text-white" x-text="'String.fromCharCode(36)+analyticsForecast.next30Low.toFixed(0)+'–String.fromCharCode(36)+analyticsForecast.next30High.toFixed(0)"></div></div><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><div class="text-[10px] uppercase text-zinc-500">90 Days</div><div class="text-lg font-black text-amber-400" x-text="'String.fromCharCode(36)+analyticsForecast.next90Low.toFixed(0)+'–String.fromCharCode(36)+analyticsForecast.next90High.toFixed(0)"></div></div><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 col-span-2"><div class="text-[10px] uppercase text-zinc-500">12 Months</div><div class="text-2xl font-black text-purple-400" x-text="'String.fromCharCode(36)+analyticsForecast.next12Low.toFixed(0)+'–String.fromCharCode(36)+analyticsForecast.next12High.toFixed(0)"></div><div class="text-[10px] text-zinc-500 mt-1">Historical rate + open maintenance/project liability</div></div></div></div>
+						<div class="glass-panel p-5"><h3 class="text-sm font-bold text-white mb-4">Cost by Category</h3><div class="space-y-3"><template x-for="cat in categoryChartData" :key="cat.name"><div><div class="flex justify-between text-xs mb-1"><span class="text-zinc-300" x-text="cat.name"></span><span class="text-amber-400 font-mono" x-text="String.fromCharCode(36)+cat.cost.toFixed(2)+' ('+cat.percent+'%)'"></span></div><div class="h-2 bg-zinc-900 rounded overflow-hidden"><div class="h-full rounded" :class="cat.color" :style="'width:'+cat.percent+'%'"></div></div></div></template><div x-show="!categoryChartData.length" class="text-xs text-zinc-500">No categorized spending.</div></div></div>
+						<div class="glass-panel p-5"><h3 class="text-sm font-bold text-white mb-4">Cost Forecast</h3><div class="grid grid-cols-2 gap-3"><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><div class="text-[10px] uppercase text-zinc-500">30 Days</div><div class="text-lg font-black text-white" x-text="String.fromCharCode(36)+analyticsForecast.next30Low.toFixed(0)+'–'+String.fromCharCode(36)+analyticsForecast.next30High.toFixed(0)"></div></div><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><div class="text-[10px] uppercase text-zinc-500">90 Days</div><div class="text-lg font-black text-amber-400" x-text="String.fromCharCode(36)+analyticsForecast.next90Low.toFixed(0)+'–'+String.fromCharCode(36)+analyticsForecast.next90High.toFixed(0)"></div></div><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 col-span-2"><div class="text-[10px] uppercase text-zinc-500">12 Months</div><div class="text-2xl font-black text-purple-400" x-text="String.fromCharCode(36)+analyticsForecast.next12Low.toFixed(0)+'–'+String.fromCharCode(36)+analyticsForecast.next12High.toFixed(0)"></div><div class="text-[10px] text-zinc-500 mt-1">Historical rate + open maintenance/project liability</div></div></div></div>
 					</div>
 
-					<div class="glass-panel p-5"><div class="flex justify-between items-center mb-4"><div><h3 class="text-sm font-bold text-white">Fleet Ownership Comparison</h3><p class="text-[11px] text-zinc-500">Current-period spend normalized by miles driven.</p></div><span class="text-xs text-zinc-500" x-text="analyticsMetrics.miles.toLocaleString()+' miles analyzed'"></span></div><div class="overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-zinc-800 text-zinc-500 uppercase"><th class="pb-3">Vehicle</th><th class="pb-3">Health</th><th class="pb-3">Spend</th><th class="pb-3">Miles</th><th class="pb-3">$/Mile</th><th class="pb-3">Events</th></tr></thead><tbody class="divide-y divide-zinc-800/60"><template x-for="v in vehicleComparisonData" :key="v.id"><tr><td class="py-3 font-bold text-white" x-text="v.name"></td><td class="py-3" x-text="v.health+'/100'"></td><td class="py-3 text-amber-400" x-text="'String.fromCharCode(36)+v.cost.toFixed(2)"></td><td class="py-3 text-zinc-400" x-text="v.milesDriven.toLocaleString()"></td><td class="py-3 text-emerald-400 font-bold" x-text="v.costPerMile?'String.fromCharCode(36)+v.costPerMile.toFixed(3):'—'"></td><td class="py-3 text-zinc-400" x-text="v.repairsCount"></td></tr></template></tbody></table></div></div>
+					<div class="glass-panel p-5"><div class="flex justify-between items-center mb-4"><div><h3 class="text-sm font-bold text-white">Fleet Ownership Comparison</h3><p class="text-[11px] text-zinc-500">Current-period spend normalized by miles driven.</p></div><span class="text-xs text-zinc-500" x-text="analyticsMetrics.miles.toLocaleString()+' miles analyzed'"></span></div><div class="overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-zinc-800 text-zinc-500 uppercase"><th class="pb-3">Vehicle</th><th class="pb-3">Health</th><th class="pb-3">Spend</th><th class="pb-3">Miles</th><th class="pb-3">$/Mile</th><th class="pb-3">Events</th></tr></thead><tbody class="divide-y divide-zinc-800/60"><template x-for="v in vehicleComparisonData" :key="v.id"><tr><td class="py-3 font-bold text-white" x-text="v.name"></td><td class="py-3" x-text="v.health+'/100'"></td><td class="py-3 text-amber-400" x-text="String.fromCharCode(36)+v.cost.toFixed(2)"></td><td class="py-3 text-zinc-400" x-text="v.milesDriven.toLocaleString()"></td><td class="py-3 text-emerald-400 font-bold" x-text="v.costPerMile?String.fromCharCode(36)+v.costPerMile.toFixed(3):'—'"></td><td class="py-3 text-zinc-400" x-text="v.repairsCount"></td></tr></template></tbody></table></div></div>
 				</div>
 
 				<!-- 3. PREDICTIVE MAINTENANCE ENGINE TAB -->
@@ -1009,7 +1009,7 @@
 										></span>
 										<span
 											class="text-xs font-extrabold text-emerald-400 font-mono"
-											x-text="log?.cost > 0 ? 'String.fromCharCode(36) + log?.cost.toFixed(2) : 'DIY'"
+											x-text="log?.cost > 0 ? String.fromCharCode(36) + log?.cost.toFixed(2) : 'DIY'"
 										></span>
 									</div>
 								</div>
@@ -1074,7 +1074,7 @@
 									</div>
 									<span
 										class="text-xs font-mono font-bold text-emerald-400"
-										x-text="'String.fromCharCode(36) + repair.cost.toFixed(2)"
+										x-text="String.fromCharCode(36) + repair.cost.toFixed(2)"
 									></span>
 								</div>
 								<h4
@@ -1163,7 +1163,7 @@
 										></span>
 										<span
 											:class="proj.actualCost > proj.budget ? 'text-rose-400' : 'text-emerald-400'"
-											x-text="'Var: String.fromCharCode(36) + (proj.budget - proj.actualCost).toFixed(0)"
+											x-text="'Var: '+String.fromCharCode(36) + (proj.budget - proj.actualCost).toFixed(0)"
 										></span>
 									</div>
 								</div>
@@ -1236,7 +1236,7 @@
 												></span>
 												<span
 													:class="proj.actualCost > proj.budget ? 'text-rose-400' : 'text-emerald-400'"
-													x-text="'Var: String.fromCharCode(36) + (proj.budget - proj.actualCost).toFixed(0)"
+													x-text="'Var: '+String.fromCharCode(36) + (proj.budget - proj.actualCost).toFixed(0)"
 												></span>
 											</div>
 										</div>
@@ -1299,7 +1299,7 @@
 								</div>
 								<div class="grid grid-cols-2 gap-2 text-[11px] font-mono text-zinc-400">
 									<div>Vendor: <span class="text-zinc-300" x-text="item.vendor"></span></div>
-									<div>Unit Cost: <span class="text-emerald-400" x-text="'String.fromCharCode(36) + item.unitCost.toFixed(2)"></span></div>
+									<div>Unit Cost: <span class="text-emerald-400" x-text="String.fromCharCode(36) + item.unitCost.toFixed(2)"></span></div>
 								</div>
 								<div class="text-[11px] text-zinc-400">Fits: <span class="text-zinc-300" x-text="item.vehicleCompatibility"></span></div>
 								<button
@@ -1360,7 +1360,7 @@
 										</td>
 										<td
 											class="py-3 text-emerald-400"
-											x-text="'String.fromCharCode(36) + item.unitCost.toFixed(2)"
+											x-text="String.fromCharCode(36) + item.unitCost.toFixed(2)"
 										></td>
 										<td
 											class="py-3 text-zinc-300 font-sans"
@@ -1647,7 +1647,7 @@
 									>LIFETIME SERVICE EXPENSE</span
 								><span
 									class="text-lg font-bold text-emerald-400"
-									x-text="'String.fromCharCode(36) + analyticsMetrics.lifetimeCost.toFixed(2)"
+									x-text="String.fromCharCode(36) + analyticsMetrics.lifetimeCost.toFixed(2)"
 								></span>
 							</div>
 							<div
@@ -1667,7 +1667,7 @@
 									>AVERAGE SERVICE COST</span
 								><span
 									class="text-lg font-bold text-purple-400"
-									x-text="'String.fromCharCode(36) + analyticsMetrics.avgRepairCost.toFixed(2)"
+									x-text="String.fromCharCode(36) + analyticsMetrics.avgRepairCost.toFixed(2)"
 								></span>
 							</div>
 						</div>
@@ -1684,7 +1684,7 @@
 									<div class="bg-zinc-950/60 border border-zinc-800 rounded-xl p-3 space-y-1">
 										<div class="flex justify-between items-start gap-2">
 											<span class="text-white font-sans font-bold text-xs" x-text="log?.serviceType"></span>
-											<span class="text-emerald-400 font-bold whitespace-nowrap" x-text="'String.fromCharCode(36) + log?.cost.toFixed(2)"></span>
+											<span class="text-emerald-400 font-bold whitespace-nowrap" x-text="String.fromCharCode(36) + log?.cost.toFixed(2)"></span>
 										</div>
 										<div class="flex justify-between text-[11px] text-zinc-400">
 											<span x-text="log?.date"></span>
@@ -1735,7 +1735,7 @@
 												></td>
 												<td
 													class="py-2 text-right text-emerald-400 font-bold whitespace-nowrap"
-													x-text="'String.fromCharCode(36) + log?.cost.toFixed(2)"
+													x-text="String.fromCharCode(36) + log?.cost.toFixed(2)"
 												></td>
 											</tr>
 										</template>
@@ -2224,7 +2224,7 @@
 												>Cost</span
 											><span
 												class="font-mono text-emerald-400 font-bold"
-												x-text="'String.fromCharCode(36) + selectedRepair?.cost?.toFixed(2)"
+												x-text="String.fromCharCode(36) + selectedRepair?.cost?.toFixed(2)"
 											></span>
 										</div>
 									</div>
@@ -2840,16 +2840,16 @@
 						<h4 class="text-sm font-bold text-white">Parts & procurement</h4>
 						<p class="text-zinc-500">Select stocked parts. Inventory is reserved only when requested and deducted only when marked used.</p>
 						<button @click="openProjectPartsPicker(selectedProject)" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-500/50 bg-purple-500/10 text-purple-200 font-semibold"><span class="text-lg">＋</span> Browse & add inventory parts</button>
-						<template x-for="part in (selectedProject.partRequirements||[])" :key="part.id"><div class="bg-zinc-950 rounded-lg p-2"><div class="flex justify-between gap-2"><span class="text-white" x-text="part.description+' × '+part.quantity+' · String.fromCharCode(36)+Number(part.unitCost||0).toFixed(2)"></span><button @click="removeProjectPart(selectedProject,part.id)" class="text-rose-400">Remove</button></div><div class="flex justify-between mt-2"><span class="text-amber-300" x-text="part.status"></span><div class="flex gap-2"><button x-show="!part.reserved&&part.status!=='Used'" @click="reserveProjectPart(selectedProject,part.id)" class="text-amber-300">Reserve</button><button x-show="part.reserved" @click="useProjectPart(selectedProject,part.id)" class="text-emerald-300">Mark used</button></div></div></div></template>
-						<div class="flex justify-between text-zinc-300"><span>Parts estimate</span><strong x-text="'String.fromCharCode(36)+projectPartsEstimate(selectedProject).toFixed(2)"></strong></div>
+						<template x-for="part in (selectedProject.partRequirements||[])" :key="part.id"><div class="bg-zinc-950 rounded-lg p-2"><div class="flex justify-between gap-2"><span class="text-white" x-text="part.description+' × '+part.quantity+' · '+String.fromCharCode(36)+Number(part.unitCost||0).toFixed(2)"></span><button @click="removeProjectPart(selectedProject,part.id)" class="text-rose-400">Remove</button></div><div class="flex justify-between mt-2"><span class="text-amber-300" x-text="part.status"></span><div class="flex gap-2"><button x-show="!part.reserved&&part.status!=='Used'" @click="reserveProjectPart(selectedProject,part.id)" class="text-amber-300">Reserve</button><button x-show="part.reserved" @click="useProjectPart(selectedProject,part.id)" class="text-emerald-300">Mark used</button></div></div></div></template>
+						<div class="flex justify-between text-zinc-300"><span>Parts estimate</span><strong x-text="String.fromCharCode(36)+projectPartsEstimate(selectedProject).toFixed(2)"></strong></div>
 					</div>
 					<div class="border-t border-zinc-800 pt-3 space-y-2">
 						<h4 class="text-sm font-bold text-white">Actual expenses</h4>
 						<div class="grid grid-cols-2 gap-2"><input x-model="projectCostDraft.description" placeholder="Expense description" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><input type="number" min="0.01" step="0.01" x-model.number="projectCostDraft.amount" placeholder="Amount $" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></div>
 						<div class="grid grid-cols-2 gap-2"><select x-model="projectCostDraft.category" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option>Labor</option><option>Parts</option><option>Shop supplies</option><option>Other</option></select><input type="date" x-model="projectCostDraft.date" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></div>
 						<button @click="addProjectCostEntry(selectedProject)" class="w-full py-2 border border-emerald-500/40 text-emerald-300 rounded-lg">Record expense</button>
-						<template x-for="entry in (selectedProject.costEntries||[])" :key="entry.id"><div class="flex justify-between border-b border-zinc-800 py-1"><span class="text-zinc-300" x-text="entry.description+' · '+entry.category"></span><strong class="text-emerald-300" x-text="'String.fromCharCode(36)+Number(entry.amount).toFixed(2)"></strong></div></template>
-						<div class="flex justify-between text-white"><span>Actual total</span><strong x-text="'String.fromCharCode(36)+projectActualCost(selectedProject).toFixed(2)"></strong></div>
+						<template x-for="entry in (selectedProject.costEntries||[])" :key="entry.id"><div class="flex justify-between border-b border-zinc-800 py-1"><span class="text-zinc-300" x-text="entry.description+' · '+entry.category"></span><strong class="text-emerald-300" x-text="String.fromCharCode(36)+Number(entry.amount).toFixed(2)"></strong></div></template>
+						<div class="flex justify-between text-white"><span>Actual total</span><strong x-text="String.fromCharCode(36)+projectActualCost(selectedProject).toFixed(2)"></strong></div>
 					</div>
 					<button @click="saveProjectWorkspace(selectedProject)" class="w-full py-3 bg-purple-600 text-white font-bold rounded-xl">Save Project Workspace</button>
 					<button
@@ -2870,7 +2870,21 @@
 						<div class="flex items-center justify-between text-xs text-zinc-400"><span x-text="projectPartPickerItems(selectedProject).length+' matching inventory items'"></span><span x-text="Object.keys(projectPartSelections).filter(id=>projectPartSelections[id]?.selected).length+' selected'"></span></div>
 						<template x-if="!projectPartPickerItems(selectedProject).length"><p class="text-sm text-zinc-500 text-center py-8">No compatible inventory items match this search.</p></template>
 						<template x-for="part in projectPartPickerItems(selectedProject)" :key="part.id"><div class="rounded-xl border p-3 space-y-2" :class="projectPartSelections[String(part.id)]?.selected?'border-purple-500/60 bg-purple-500/5':'border-zinc-800 bg-zinc-950/70'">
-							<div class="flex items-start gap-3"><input type="checkbox" class="mt-1 w-5 h-5 accent-purple-500" :checked="!!projectPartSelections[String(part.id)]?.selected" :disabled="(selectedProject.partRequirements||[]).some(req=>String(req.inventoryId)===String(part.id))" @change="toggleProjectPartSelection(part,$event.target.checked)"><div class="min-w-0 flex-1"><p class="text-sm font-semibold text-white" x-text="part.description"></p><p class="text-xs text-zinc-500" x-text="(part.partNumber||'No part number')+' · '+projectAvailableInventory(part)+' available · 
+							<div class="flex items-start gap-3"><input type="checkbox" class="mt-1 w-5 h-5 accent-purple-500" :checked="!!projectPartSelections[String(part.id)]?.selected" :disabled="(selectedProject.partRequirements||[]).some(req=>String(req.inventoryId)===String(part.id))" @change="toggleProjectPartSelection(part,$event.target.checked)"><div class="min-w-0 flex-1"><p class="text-sm font-semibold text-white" x-text="part.description"></p><p class="text-xs text-zinc-500" x-text="(part.partNumber||'No part number')+' · '+projectAvailableInventory(part)+' available · '+String.fromCharCode(36)+Number(part.unitCost||0).toFixed(2)"></p>
+									<div class="flex items-center justify-between gap-3 mt-2">
+										<label class="text-xs text-zinc-400">Quantity
+											<input type="number" min="1" :max="projectAvailableInventory(part)" :value="projectPartSelections[String(part.id)]?.quantity || 1" @input="setProjectPartSelectionQuantity(part,$event.target.value)" :disabled="!projectPartSelections[String(part.id)]?.selected" class="w-20 ml-2 bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-white">
+										</label>
+										<span class="text-xs text-zinc-500">Available: <span x-text="projectAvailableInventory(part)"></span></span>
+									</div>
+								</div></template>
+						</div>
+						<div class="p-4 border-t border-zinc-800 flex justify-end gap-2">
+							<button @click="closeProjectPartsPicker()" class="px-4 py-2 rounded-lg border border-zinc-700 text-zinc-300">Cancel</button>
+							<button @click="addSelectedProjectParts(selectedProject)" :disabled="!Object.keys(projectPartSelections).some(id=>projectPartSelections[id]?.selected)" class="px-4 py-2 rounded-lg bg-purple-600 text-white font-bold disabled:opacity-40">Add selected parts</button>
+						</div>
+					</div>
+			</div>
 			<div
 				x-show="modals.importExport"
 				class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"

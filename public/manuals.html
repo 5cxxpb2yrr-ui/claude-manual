@@ -36,7 +36,7 @@ h2{display:flex;justify-content:space-between;align-items:baseline;font-size:17p
 .g{flex:1;min-width:0}.t{font-weight:650;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.d{color:var(--mut);font-size:13px;overflow:hidden;text-overflow:ellipsis}.t.or2{color:var(--or2)}
 .cnt{background:var(--p2);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--mut)}.chev{color:var(--mut);width:18px;height:18px}
 .pid{font:700 12px ui-monospace,Menlo,monospace;color:var(--or)}.doc{color:var(--mut)}
-.vi{width:84px;height:62px;border-radius:10px;background:var(--p2);display:grid;place-items:center;overflow:hidden;flex:none;color:var(--mut)}.vi img{width:100%;height:100%;object-fit:cover}.vi .i{width:34px;height:34px}.vi.sm{width:64px;height:48px}
+.vi{width:84px;height:62px;border-radius:10px;background:var(--p2);display:grid;place-items:center;overflow:hidden;flex:none;color:var(--mut)}.vi{position:relative}.vi img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}.vi .i{width:34px;height:34px}.vi.sm{width:64px;height:48px}
 .star{padding:6px;color:var(--mut)}.star.on{color:var(--or)}.star.on .i{fill:var(--or)}
 .chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}.chip{flex:none;padding:8px 14px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--mut);font-weight:600}.chip.on{background:var(--or);border-color:var(--or);color:var(--ink)}
 .qa{display:grid;grid-template-columns:1fr 1fr;gap:10px}.qa a{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}.qa .i{color:var(--tx)}
@@ -87,14 +87,14 @@ function paintST(){document.querySelectorAll("[data-st]").forEach(e=>{const k=e.
 const NAV=[["/","Dock","grid"],["#/","Home","home"],["#/vehicles","Vehicles","car"],["#/search","Search","search"],["#/favs","Favorites","star"],["#/more","More","more"]];
 function chrome(){const c=location.hash||"#/",h=NAV.map(([h,l,i])=>`<a href="${h}" class="${c===h||(h!=="#/"&&c.startsWith(h))?"on":""}">${I(i)}<span>${l}</span></a>`).join("");$("side").innerHTML=h;$("tabs").innerHTML=h}
 const hdr=(t,s,o={})=>`<div class="hd">${o.back?`<a class="ib" href="${o.back}" aria-label="Back">${I("back")}</a>`:`<a class="ib" href="#/more" aria-label="Menu">${I("menu")}</a>`}<div class="ht"><h1>${esc(t)}</h1>${s?`<small>${esc(s)}</small>`:""}</div>${o.right||""}</div>`;
-const vimg=(v,c="")=>`<div class="vi ${c}">${v.image?`<img src="${esc(v.image)}" alt="" loading="lazy">`:I("car")}</div>`;
+const vimg=(v,c="")=>`<div class="vi ${c}">${I("car")}${v.image?`<img src="${esc(v.image)}" alt="" loading="lazy" onerror="this.remove()">`:""}</div>`;
 function route(){if(!M)return;chrome();const [,a,b,c,d]=decodeURIComponent(location.hash||"#/").split("/"),m=$("main");
  const vw=a==="v";m.className=vw?"vw":"";document.body.classList.toggle("vw",vw);m.scrollTop=0;
  ({"":home,vehicles:vlist,veh:()=>vehicle(m,+b,c||"man"),t:()=>tview(m,+b,+c,d),v:()=>viewer(m,+b,+c,+d),favs:()=>plist(m,"Favorites",favs),recent:()=>plist(m,"Recent Pages",rec),search:()=>{if(b)SQ=b;searchv(m)},more:more}[a||""]||home)(m);paintST()}
 const fk=(vi,gi,p)=>vi+"/"+gi+"/"+p,isF=k=>favs.includes(k);
 function leaf(vi,gi,l,q,sub){const k=fk(vi,gi,l.p);return`<a class="row" href="#/v/${vi}/${gi}/${l.p}"><span class="doc">${I("doc")}</span><div class="g"><div class="t"><span class="pid">#${l.p}</span> ${hl(l.n,q)}</div><div class="d">${esc(sub||"Service page")}</div></div><button class="star ${isF(k)?"on":""}" data-fav="${k}" aria-label="Favorite">${I("star")}</button></a>`}
 function look(k){const [vi,gi,p]=k.split("/").map(Number),i=IX[K(vi,gi)]?.get(p);return i===undefined?null:{vi,gi,l:FL[K(vi,gi)][i]}}
-function vcard(v,vi){return`<a class="row" href="#/veh/${vi}"><div class="vi">${v.image?`<img src="${esc(v.image)}" alt="" loading="lazy">`:I("car")}</div><div class="g"><div class="t">${esc(v.name)}</div><div class="d">${esc(v.engine)}</div><div class="d">${v.guides.length} Manuals • ${nf(vpages(vi))} Pages</div></div>${I("chev","chev")}</a>`}
+function vcard(v,vi){return`<a class="row" href="#/veh/${vi}"><div class="vi">${I("car")}${v.image?`<img src="${esc(v.image)}" alt="" loading="lazy" onerror="this.remove()">`:""}</div><div class="g"><div class="t">${esc(v.name)}</div><div class="d">${esc(v.engine)}</div><div class="d">${v.guides.length} Manuals • ${nf(vpages(vi))} Pages</div></div>${I("chev","chev")}</a>`}
 function home(m){let pg=0;M.vehicles.forEach((_,i)=>pg+=vpages(i));const r=rec.map(look).filter(Boolean).slice(0,3),mc=M.vehicles.reduce((a,v)=>a+v.guides.length,0);
  m.innerHTML=`<div class="hd"><a class="ib" href="#/more" aria-label="Menu">${I("menu")}</a><div class="logo"><span class="or">${I("eng")}</span><div><span>LifeOS</span><b>Manual Explorer</b><small>Service Manuals • Knowledge • LifeOS</small></div></div><div class="av">KW</div></div>
  <a class="sb" href="#/search">${I("search")}<span>Search manuals, vehicles, or procedures…</span></a>

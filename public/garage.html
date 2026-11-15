@@ -1799,7 +1799,8 @@
 										<button class="btn-primary flex-1 py-3 text-xs font-bold" @click="initServiceFromKB(item.id)">Log Service Record</button>
 									</div>
 								</div>
-							</article></template>
+							</article>
+						</template>
 					</div>
 				</div>
 
@@ -3034,6 +3035,42 @@
 							steps: ['Confirm the vehicle has the manual transaxle; this procedure does not apply to the automatic transmission.', 'Park on a level surface and secure the vehicle.', 'Remove the transaxle filler plug and gasket.', 'Check that the oil level is 0–5 mm (0–0.20 in) below the bottom lip of the filler opening.', 'If low, inspect for leaks and correct the cause. Add API GL-4 or GL-5 SAE 75W-90 gear oil to the specified level.', 'Install a new gasket and the filler plug. Tighten to 39 N·m (29 ft-lb).', 'Drive the vehicle, then recheck the level and inspect for leakage.'],
 							caution: 'This is a level inspection/top-up procedure, not a complete drain-and-refill procedure. Do not overfill or underfill. The 1.9 L figure is the stated standard capacity, not a guaranteed refill quantity.',
 							sourceLabel: 'Scion Service Manual · Transmission Oil Service · page 2404', sourcePath: '/v/1/0/2404'
+						},
+						{
+							id: 'kb-subaru-tire-rotation', vehicle: '2019 Subaru Crosstrek Limited', category: 'Tires & Wheels',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Tire Inspection & Rotation',
+							interval: 'The owner manual recommends rotation every 7,500 miles (12,000 km); the service schedule also lists rotation at 6-month intervals. Use the earlier applicable interval.',
+							specs: ['Inspect for damage, nails, stones, abnormal wear, and tread depth', 'Replace tires when tread-wear indicators become visible (1.6 mm / 0.063 in)', 'After rotation, adjust tire pressures and tighten wheel nuts to the vehicle specification'],
+							steps: ['Park on a firm, level surface and secure the vehicle.', 'Inspect each tire for cuts, punctures, embedded objects, sidewall damage, and uneven wear.', 'Check tread depth and look for the built-in wear indicators. Replace a tire if the indicators are visible.', 'Raise and support the vehicle at the specified lifting points. Never work beneath a vehicle supported only by a jack.', 'Rotate the tires in the factory-specified order for this vehicle and tire setup. Confirm directional or asymmetric tire requirements before moving any wheel.', 'Reinstall wheels and hand-start the wheel nuts. Tighten in the specified sequence and to the torque shown in the owner manual under Flat Tires.', 'Set all four tire pressures to the door-jamb placard values and recheck after rotation.'],
+							caution: 'The owner manual specifies 7,500 miles for rotation while the service schedule lists rotation at six-month intervals. Do not use a generic rotation pattern or guessed lug torque; check the vehicle-specific rotation diagram and wheel-nut torque in the linked manual.',
+							sourceLabel: 'Subaru Crosstrek Owner Manual · Tire care / rotation guidance', sourcePath: 'https://www.sucross.com/tire_care_maintenance_and_safety_practices-718.html'
+						},
+						{
+							id: 'kb-subaru-air-cleaner', vehicle: '2019 Subaru Crosstrek Limited', category: 'Engine & Intake',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Engine Air Cleaner Element Replacement',
+							interval: 'Replace at 30,000-mile intervals in the factory schedule; inspect more often and replace more frequently in extremely dusty conditions.',
+							specs: ['Use the Subaru genuine air cleaner element specified for the engine type', 'The factory schedule lists replacement at 30,000 and 60,000 miles', 'Extremely dusty operating conditions require more frequent replacement'],
+							steps: ['Switch the ignition off and allow the engine compartment to cool.', 'Locate the air cleaner case and release its retaining clips or fasteners.', 'Lift the case cover carefully without pulling or damaging the intake duct or sensor wiring.', 'Remove the air cleaner element and inspect the case for leaves, dust, or debris.', 'Clean loose debris from the case without allowing dirt to enter the clean-air outlet.', 'Install the correct Subaru air cleaner element in the original orientation, making sure its sealing edge is seated evenly.', 'Reinstall the case cover and secure all clips or fasteners. Check that the intake duct is fully connected.'],
+							caution: 'The service manual directs use of the Subaru genuine air cleaner element for the applicable engine type and warns that an incorrect element may affect engine performance. If the case or duct does not reseat cleanly, stop and check the fit rather than forcing it.',
+							sourceLabel: 'Subaru Crosstrek Service Manual · Intake (Induction) / Air Cleaner Element', sourcePath: 'https://www.sucross.com/intake_induction_h4do_-2816.html'
+						},
+						{
+							id: 'kb-subaru-cabin-filter', vehicle: '2019 Subaru Crosstrek Limited', category: 'HVAC & Cabin',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Cabin A/C Filter Replacement',
+							interval: 'Every 12 months or 12,000 miles (19,200 km), whichever comes first; replace more often in extremely dusty conditions.',
+							specs: ['Factory maintenance schedule: 12 months / 12,000 miles', 'Use a filter listed for the 2019 Crosstrek HVAC configuration', 'Observe the airflow direction marked on the replacement filter'],
+							steps: ['Switch the ignition off and empty the glove box.', 'Open the glove box and carefully release its damper and side stops so the glove box can lower.', 'Release the cabin-filter access cover behind the glove box.', 'Slide the filter tray out and note the installed filter orientation and airflow marking.', 'Remove the old filter and clean loose debris from the tray without pushing debris into the HVAC housing.', 'Install the replacement filter in the same orientation, matching the airflow arrow to the housing marking.', 'Reinstall the filter cover, glove-box stops, and damper. Open and close the glove box to confirm normal operation.'],
+							caution: 'The periodic-maintenance manual refers the detailed removal and installation sequence to the A/C section. Do not force glove-box retainers or filter-tray tabs; verify the exact filter orientation and fit before closing the housing.',
+							sourceLabel: 'Subaru Crosstrek Service Manual · Periodic Maintenance / A/C Filter; HVAC section', sourcePath: 'https://www.sucross.com/hvac_system_heater_ventilator_and_a_c_-2584.html'
+						},
+						{
+							id: 'kb-subaru-coolant', vehicle: '2019 Subaru Crosstrek Limited', category: 'Cooling System',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Engine Coolant Replacement & Bleeding',
+							interval: 'First replacement after 11 years or 137,500 miles; then every 6 years or 75,000 miles. Inspect the cooling system at the factory schedule intervals.',
+							specs: ['Coolant: Subaru Super Coolant', 'Add Subaru genuine cooling-system conditioner when replacing coolant', 'The factory procedure requires repeated fill / warm-up / cool-down checks to remove air', 'Do not use plain water instead of coolant'],
+							steps: ['Turn the ignition off and allow the engine to cool completely. Raise and safely support the vehicle.', 'Remove the under cover and place a suitable drain container beneath the cooling-system drain.', 'Remove the drain plug and radiator cap to drain the coolant. Install the drain plug using new O-rings, then reinstall the under cover.', 'For CVT models, keep the select lever in P or N during the filling procedure and do not shift it.', 'Pour Subaru genuine cooling-system conditioner through the filler neck, then fill the radiator with Subaru Super Coolant to the filler-neck position.', 'Fill the coolant reservoir to the FULL mark. Close the radiator cap and start the engine; race the engine 5–6 times at 3,000 rpm or less, completing this sequence within 40 seconds, then stop the engine.', 'Wait one minute with the ignition off, reopen the radiator cap, and top up if the level has dropped. Repeat the warm-up and top-up sequence as specified.', 'Secure the radiator and reservoir caps. Set the heater to maximum hot, blower to LO, and A/C off. Run the engine at 3,000 rpm or less until the radiator fan starts and stops.', 'Stop the engine and allow the coolant temperature to fall to 30°C (86°F) or less. Recheck the radiator and reservoir levels and top up as required.', 'If a flowing or gurgling sound remains from the heater core, repeat the factory bleeding sequence. Check for leaks after the system is fully cool.'],
+							caution: 'Hot coolant can cause severe burns. Never open the radiator cap while hot. Use Subaru Super Coolant and the specified cooling-system conditioner; the manual warns against substituting water. Dispose of coolant responsibly. This is a detailed bleeding procedure—if you cannot safely raise the vehicle or control coolant temperature, use a qualified shop.',
+							sourceLabel: 'Subaru Crosstrek Service Manual · Engine Coolant / Replacement; Maintenance Schedule', sourcePath: 'https://www.sucross.com/replacement-1519.html'
 						}
 
 					],

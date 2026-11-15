@@ -4152,7 +4152,7 @@
 						this.advisorQuery='';
 						const q=promptText.toLowerCase().trim();
 						setTimeout(()=>{
-							const money=n=>'String.fromCharCode(36)+Number(n||0).toFixed(2);
+							const money=n=>String.fromCharCode(36)+Number(n||0).toFixed(2);
 							const list=arr=>arr.slice(0,8).map(x=>`• ${this.escapeHTML(x)}`).join('<br>');
 							const active=this.activeVehicle;
 							let resp='';

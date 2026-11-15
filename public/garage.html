@@ -2874,7 +2874,6 @@
 							</div></template>
 						</div>
 					</div>
-					<div class="border-t border-zinc-800 pt-3 space-y-2">
 						<div class="border-t border-zinc-800 pt-3 space-y-3">
 							<h4 class="text-sm font-bold text-white">Receipts & project evidence</h4>
 							<p class="text-xs text-zinc-500">Attach receipt photos or PDFs to keep proof with this project. Receipt amounts are reference-only and do not automatically create expenses.</p>
@@ -4197,8 +4196,8 @@
 					async useProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||!req.reserved||req.status==='Used')return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||Number(part.quantity||0)<Number(req.quantity||0)){alert('Inventory changed; cannot mark this part used.');return;}part.quantity=Math.max(0,Number(part.quantity||0)-Number(req.quantity||0));part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));req.reserved=false;req.status='Used';req.usedAt=new Date().toISOString();await this.saveToStorage(); },
 					async addProjectAttachments(project,event) {
 						const files=Array.from(event?.target?.files||[]); event.target.value=''; if(!project||!files.length)return;
-						const allowed=['image/jpeg','image/png','image/webp','application/pdf']; const valid=files.filter(file=>allowed.includes(file.type)&&file.size<=15*1024*1024);
-						if(valid.length!==files.length)alert('Only JPG, PNG, WebP, and PDF files up to 15 MB each are accepted. Unsupported files were skipped.');
+						const allowed=['image/jpeg','image/png','image/webp','application/pdf']; const valid=files.filter(file=>allowed.includes(file.type)&&file.size<=(this.garageDB?15:2)*1024*1024);
+						if(valid.length!==files.length)alert(this.garageDB?'Only JPG, PNG, WebP, and PDF files up to 15 MB each are accepted. Unsupported files were skipped.':'Without IndexedDB, local fallback is limited to 2 MB per file. Unsupported or oversized files were skipped.');
 						if(!Array.isArray(project.attachments))project.attachments=[];
 						for(const file of valid){const id='project-att-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),draft=this.projectAttachmentDraft||{},att={id,storageKey:id,name:file.name,type:file.type,size:file.size,description:String(draft.description||'').trim(),receiptDate:draft.date||new Date().toISOString().slice(0,10),amount:draft.amount===''||draft.amount==null?null:Math.max(0,Number(draft.amount)||0),createdAt:new Date().toISOString()};
 							try{if(this.garageDB){await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').put({id,blob:file,name:file.name,type:file.type,createdAt:att.createdAt});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Attachment storage failed'));});att.data=URL.createObjectURL(file);}else{att.dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||new Error('File read failed'));reader.readAsDataURL(file);});}project.attachments.unshift(att);}catch(error){console.error('Project attachment failed',error);alert('Could not save '+file.name+'. Check available browser storage and try again.');}}

@@ -2836,6 +2836,25 @@
 						<template x-for="procedure in knowledgeBaseForProject(selectedProject)" :key="procedure.id"><div class="flex items-center gap-2 bg-zinc-950 rounded-lg p-2"><div class="min-w-0 flex-1"><p class="text-white font-semibold" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p></div><button x-show="!projectHasProcedure(selectedProject,procedure.id)" @click="attachProjectProcedure(selectedProject,procedure.id)" class="px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300">Attach</button><span x-show="projectHasProcedure(selectedProject,procedure.id)" class="text-emerald-400">Attached</span></div></template>
 						<template x-for="procedure in (selectedProject.procedures||[])" :key="procedure.id"><div class="flex items-center justify-between gap-2 border border-emerald-500/20 rounded-lg p-2"><div class="min-w-0"><p class="text-emerald-300" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p><a :href="projectProcedureUrl(procedure)" target="_blank" rel="noopener" class="text-amber-400 underline">Open manual source ↗</a></div><button @click="detachProjectProcedure(selectedProject,procedure.id)" class="text-rose-400">Detach</button></div></template>
 					</div>
+					<div class="border-t border-zinc-800 pt-3 space-y-3">
+						<h4 class="text-sm font-bold text-white">Parts & procurement</h4>
+						<p class="text-zinc-500">Select stocked parts. Inventory is reserved only when requested and deducted only when marked used.</p>
+						<div class="grid grid-cols-[1fr_70px_auto] gap-2">
+							<select x-model="projectPartDraft.inventoryId" class="min-w-0 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option value="">Choose inventory…</option><template x-for="part in projectCompatibleInventory(selectedProject)" :key="part.id"><option :value="String(part.id)" x-text="part.description+' ('+projectAvailableInventory(part)+' available)'"></option></template></select>
+							<input type="number" min="1" x-model.number="projectPartDraft.quantity" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white">
+							<button @click="addProjectPart(selectedProject)" class="px-3 rounded-lg bg-purple-600 text-white">Add</button>
+						</div>
+						<template x-for="part in (selectedProject.partRequirements||[])" :key="part.id"><div class="bg-zinc-950 rounded-lg p-2"><div class="flex justify-between gap-2"><span class="text-white" x-text="part.description+' × '+part.quantity+' · $'+Number(part.unitCost||0).toFixed(2)"></span><button @click="removeProjectPart(selectedProject,part.id)" class="text-rose-400">Remove</button></div><div class="flex justify-between mt-2"><span class="text-amber-300" x-text="part.status"></span><div class="flex gap-2"><button x-show="!part.reserved&&part.status!=='Used'" @click="reserveProjectPart(selectedProject,part.id)" class="text-amber-300">Reserve</button><button x-show="part.reserved" @click="useProjectPart(selectedProject,part.id)" class="text-emerald-300">Mark used</button></div></div></div></template>
+						<div class="flex justify-between text-zinc-300"><span>Parts estimate</span><strong x-text="'$'+projectPartsEstimate(selectedProject).toFixed(2)"></strong></div>
+					</div>
+					<div class="border-t border-zinc-800 pt-3 space-y-2">
+						<h4 class="text-sm font-bold text-white">Actual expenses</h4>
+						<div class="grid grid-cols-2 gap-2"><input x-model="projectCostDraft.description" placeholder="Expense description" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><input type="number" min="0.01" step="0.01" x-model.number="projectCostDraft.amount" placeholder="Amount $" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></div>
+						<div class="grid grid-cols-2 gap-2"><select x-model="projectCostDraft.category" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option>Labor</option><option>Parts</option><option>Shop supplies</option><option>Other</option></select><input type="date" x-model="projectCostDraft.date" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></div>
+						<button @click="addProjectCostEntry(selectedProject)" class="w-full py-2 border border-emerald-500/40 text-emerald-300 rounded-lg">Record expense</button>
+						<template x-for="entry in (selectedProject.costEntries||[])" :key="entry.id"><div class="flex justify-between border-b border-zinc-800 py-1"><span class="text-zinc-300" x-text="entry.description+' · '+entry.category"></span><strong class="text-emerald-300" x-text="'$'+Number(entry.amount).toFixed(2)"></strong></div></template>
+						<div class="flex justify-between text-white"><span>Actual total</span><strong x-text="'$'+projectActualCost(selectedProject).toFixed(2)"></strong></div>
+					</div>
 					<button @click="saveProjectWorkspace(selectedProject)" class="w-full py-3 bg-purple-600 text-white font-bold rounded-xl">Save Project Workspace</button>
 					<button
 						@click="deleteProjectRecord(selectedProject.id)"
@@ -3215,6 +3234,8 @@
 					selectedProject: {},
 					projectTaskDraft: '',
 					projectMilestoneDraft: '',
+					projectPartDraft: { inventoryId: '', quantity: 1 },
+					projectCostDraft: { description: '', category: 'Labor', amount: 0, date: new Date().toISOString().split('T')[0] },
 					editRepairForm: { id: null, vehicle: '', mileage: 0, date: '', serviceType: '', cost: 0, notes: '', attachments: [] },
 					newRepairForm: { vehicle: '2006 Scion xB', mileage: 212000, date: new Date().toISOString().split('T')[0], serviceTitle: '', category: 'Scheduled Maintenance', cost: 0, notes: '' },
 					newProjectForm: { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' },

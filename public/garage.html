@@ -3989,6 +3989,50 @@
 						this.modals.projectDetail = true;
 					},
 
+					async linkProjectToMaintenance(project) {
+						if (!project) return;
+						const vehicle = this.vehicles.find(v => String(v.id) === String(project.vehicleId));
+						if (!vehicle) { alert('This project is not linked to a vehicle. Edit the project vehicle before creating a maintenance workflow.'); return; }
+
+						const existing = this.maintenancePlans.find(plan =>
+							(String(plan.projectId) === String(project.id) || String(plan.id) === String(project.maintenancePlanId)) &&
+							plan.status !== 'Cancelled'
+						);
+						if (existing) {
+							project.maintenancePlanId = existing.id;
+							await this.saveToStorage();
+							return;
+						}
+
+						const planId = `maint-project-${project.id}-${Date.now()}`;
+						const tasks = Array.isArray(project.tasks) && project.tasks.length
+							? project.tasks.map(task => ({ name: task.name || 'Project task', done: !!task.done }))
+							: [{ name: 'Acquire required parts', done: false }, { name: 'Perform project work', done: false }, { name: 'Verify work', done: false }];
+						const plan = {
+							id: planId,
+							projectId: project.id,
+							vehicleId: vehicle.id,
+						scheduleId: `project-${project.id}`,
+							title: project.title || 'Vehicle maintenance project',
+							priority: project.priority || 'Medium',
+						targetMileage: Number(vehicle.odometer || 0),
+						targetDate: project.dueDate || '',
+						estimatedMin: Number(project.budget || 0),
+						estimatedMax: Number(project.budget || 0),
+						actualCost: Number(project.actualCost || 0),
+						status: 'Planned',
+						notes: `Linked from active project: ${project.title || 'Vehicle maintenance project'}`,
+							createdAt: new Date().toISOString(),
+							startedAt: null,
+							completedAt: null,
+						tasks,
+							parts: []
+						};
+						this.maintenancePlans.unshift(plan);
+						project.maintenancePlanId = plan.id;
+						await this.saveToStorage();
+					},
+
 					saveNewProject() {
 						const p = {
 							id: Date.now(),

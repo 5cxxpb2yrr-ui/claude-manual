@@ -1,26 +1,78 @@
-name: Build page trees
+name: Build additional manual page trees
+
 on:
   workflow_dispatch:
   push:
-    branches: [look-update]
+    branches:
+      - look-update
     paths:
       - tools/crawl_pages.py
       - .github/workflows/build-trees.yml
+
 permissions:
   contents: write
+
+concurrency:
+  group: manual-tree-crawl-look-update
+  cancel-in-progress: false
+
 jobs:
   crawl:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-      - name: Crawl unindexed pages
+      - name: Check out look-update
+        uses: actions/checkout@v4
+        with:
+          ref: look-update
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Crawl pages missing from the existing indexes
         run: python3 tools/crawl_pages.py
         env:
           BASE: https://claude-manual.phillipstg.workers.dev
-      - name: Commit generated trees
+
+      - name: Validate generated trees and manifest
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          manifest_path = Path("public/data/manifest.json")
+          manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+          for vehicle in manifest.get("vehicles", []):
+              for guide in vehicle.get("guides", []):
+                  tree_path = Path("public") / guide["tree"]
+                  if not tree_path.is_file():
+                      raise SystemExit(f"Missing tree referenced by manifest: {tree_path}")
+                  tree = json.loads(tree_path.read_text(encoding="utf-8"))
+                  if not isinstance(tree, dict) or not isinstance(tree.get("c"), list):
+                      raise SystemExit(f"Invalid tree structure: {tree_path}")
+
+          for name in ("subaru-more.json", "scion-more.json"):
+              path = Path("public/data") / name
+              if not path.is_file():
+                  raise SystemExit(f"Crawler did not generate {path}")
+              json.loads(path.read_text(encoding="utf-8"))
+              print(f"Validated {path} ({path.stat().st_size:,} bytes)")
+
+          print("Manifest and all referenced trees are valid.")
+          PY
+
+      - name: Commit generated trees to look-update
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add public/data
-          if git diff --staged --quiet; then echo "No changes"; else git commit -m "Add trees for unindexed pages" && git push; fi
+          git add public/data/manifest.json public/data/subaru-more.json public/data/scion-more.json
+          if git diff --cached --quiet; then
+            echo "No generated index changes to commit."
+          else
+            git commit -m "Build trees for previously unindexed manual pages"
+            git push origin HEAD:look-update
+          fi

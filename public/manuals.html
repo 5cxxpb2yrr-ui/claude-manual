@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1216">
+<title>LifeOS Manual Explorer</title>
+<style>
+:root{--bg:#0f1216;--panel:#1a1e25;--p2:#252a33;--line:#2f3540;--tx:#f1f3f6;--mut:#98a1b0;--or:#ff8a1f;--or2:#ffb066;--ok:#3ccf6e;--ink:#15171c;color-scheme:dark}
+:root[data-theme=light]{--bg:#f2f3f5;--panel:#fff;--p2:#eceef2;--line:#d8dce3;--tx:#1b1e24;--mut:#5d6675;color-scheme:light}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;height:100dvh;padding-top:env(safe-area-inset-top);overflow:hidden}
+button,input,textarea{font:inherit;color:inherit}button{background:none;border:0;cursor:pointer}a{color:inherit;text-decoration:none}
+:focus-visible{outline:2px solid var(--or);outline-offset:2px}
+.i{width:22px;height:22px;flex:none}.i.fill{fill:var(--or);stroke:var(--or)}.or{color:var(--or)}
+.app{flex:1;min-height:0;display:flex;width:100%;max-width:1180px;margin:0 auto}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+main{flex:1;overflow:auto;padding:0 16px 20px}main.vw{padding:0;overflow:hidden}
+.side{display:none;width:200px;padding:16px 8px;flex-direction:column;gap:2px;border-right:1px solid var(--line)}
+.side a,.tabs a{display:flex;align-items:center;gap:12px;color:var(--mut);padding:10px 12px;border-radius:12px}.side a.on,.tabs a.on{color:var(--or);font-weight:700}.side a.on{background:var(--panel)}
+.tabs{display:flex;background:var(--panel);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom))}
+.tabs a{flex:1;flex-direction:column;gap:2px;font-size:11px;padding:6px 2px}body.vw .tabs{display:none}
+.hd{position:sticky;top:0;z-index:3;display:flex;align-items:center;gap:12px;padding:14px 0 10px;background:var(--bg)}
+.vw .hd{position:static;padding:12px 14px 8px}
+.ib{width:40px;height:40px;display:grid;place-items:center;border-radius:12px;flex:none}.ib:hover{background:var(--panel)}
+.ht{flex:1;min-width:0}.ht h1{margin:0;font-size:19px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.ht small{color:var(--mut);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.logo{display:flex;align-items:center;gap:10px;flex:1;justify-content:center;text-align:center}.logo b{display:block;font-size:20px;color:var(--or);line-height:1.1}.logo span{font-size:20px;font-weight:800}.logo small{display:block;font-size:11px;color:var(--mut)}
+.av{width:32px;height:32px;border-radius:50%;background:#3a6fd8;display:grid;place-items:center;font-size:12px;font-weight:700;color:#fff}
+.sb{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;color:var(--mut);margin-bottom:12px}
+.sb input{flex:1;min-width:0;background:none;border:0;outline:0;color:var(--tx)}.sb .x{color:var(--mut)}
+.stc{display:flex;align-items:center;gap:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+.stc b{display:block}.stc b.ok{color:var(--ok)}.stc b.bad{color:var(--or)}.stc small{color:var(--mut)}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.tile{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}.tile b{display:block;font-size:22px;line-height:1.1}.tile span{color:var(--mut);font-size:13px}.tile .i{width:30px;height:30px;color:var(--or)}
+h2{display:flex;justify-content:space-between;align-items:baseline;font-size:17px;margin:22px 0 10px}h2 a{color:var(--or);font-size:14px;font-weight:600}
+.list{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-height:60px}.row:hover{border-color:var(--or)}
+.g{flex:1;min-width:0}.t{font-weight:650;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.d{color:var(--mut);font-size:13px;overflow:hidden;text-overflow:ellipsis}.t.or2{color:var(--or2)}
+.cnt{background:var(--p2);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--mut)}.chev{color:var(--mut);width:18px;height:18px}
+.pid{font:700 12px ui-monospace,Menlo,monospace;color:var(--or)}.doc{color:var(--mut)}
+.vi{width:84px;height:62px;border-radius:10px;background:var(--p2);display:grid;place-items:center;overflow:hidden;flex:none;color:var(--mut)}.vi img{width:100%;height:100%;object-fit:cover}.vi .i{width:34px;height:34px}.vi.sm{width:64px;height:48px}
+.star{padding:6px;color:var(--mut)}.star.on{color:var(--or)}.star.on .i{fill:var(--or)}
+.chips{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;scrollbar-width:none}.chip{flex:none;padding:8px 14px;border-radius:999px;background:var(--panel);border:1px solid var(--line);color:var(--mut);font-weight:600}.chip.on{background:var(--or);border-color:var(--or);color:var(--ink)}
+.qa{display:grid;grid-template-columns:1fr 1fr;gap:10px}.qa a{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}.qa .i{color:var(--tx)}
+.kv{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:6px 16px}.kv div{display:flex;padding:9px 0;color:var(--mut)}.kv div span{width:90px}.kv div b{color:var(--tx);font-weight:500}
+.crumbs{font-size:13px;color:var(--mut);margin-bottom:10px;line-height:1.9}.crumbs a{color:var(--or2)}
+.sortb{display:flex;justify-content:space-between;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:11px 14px;color:var(--mut);margin-bottom:12px}.sortb b{color:var(--tx);font-weight:600}
+textarea.note{width:100%;min-height:200px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;color:var(--tx)}
+mark{background:#ffe14d;color:#000;border-radius:3px;padding:0 1px}.empty{padding:36px;text-align:center;color:var(--mut)}
+.vwrap{display:flex;flex-direction:column;height:100%}.vsb{margin:0 14px 10px}.vsb span{font-size:13px;white-space:nowrap}.vsb button{padding:2px}
+iframe.pg{flex:1;border:0;background:#fff;width:100%;min-height:0}
+.vfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line);color:var(--mut)}
+.btn{display:inline-flex;align-items:center;gap:6px;background:var(--p2);border:1px solid var(--line);border-radius:12px;padding:10px 16px;color:var(--tx)}.btn.p{background:var(--or);border-color:var(--or);color:var(--ink);font-weight:700}
+.foot{margin-top:22px;color:var(--mut);font-size:12px;text-align:center}
+@media(min-width:900px){.side{display:flex}.tabs{display:none}.grid{grid-template-columns:repeat(3,1fr)}main{padding:0 28px 28px}}
+</style></head><body>
+<div class="app"><nav class="side" id="side"></nav><div class="col"><main id="main"><div class="empty">Loading manuals…</div></main></div></div>
+<nav class="tabs" id="tabs"></nav>
+<script>
+const $=i=>document.getElementById(i),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])),enc=encodeURIComponent;
+const LS=(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},SV=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
+const P={home:'<path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/>',car:'<path d="M5 11l1.5-4.5A2 2 0 0 1 8.4 5h7.2a2 2 0 0 1 1.9 1.5L19 11M3 11h18v6H3zM6 17v2M18 17v2"/>',search:'<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',star:'<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9z"/>',more:'<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',back:'<path d="M15 5l-7 7 7 7"/>',chev:'<path d="M9 5l7 7-7 7"/>',up:'<path d="M5 15l7-7 7 7"/>',down:'<path d="M5 9l7 7 7-7"/>',x:'<path d="M6 6l12 12M18 6L6 18"/>',folder:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',doc:'<path d="M6 3h8l5 5v13H6zM14 3v5h5M9 13h7M9 17h7"/>',clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',book:'<path d="M4 5a2 2 0 0 1 2-2h6v16H6a2 2 0 0 0-2 2zM20 5a2 2 0 0 0-2-2h-6v16h6a2 2 0 0 1 2 2z"/>',note:'<path d="M5 3h10l4 4v14H5zM9 12h6M9 16h6"/>',cloud:'<path d="M7 18a4 4 0 0 1-.5-8A6 6 0 0 1 18 9a4.5 4.5 0 0 1-.5 9z"/>',menu:'<path d="M4 7h16M4 12h16M4 17h16"/>',ext:'<path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/>',sort:'<path d="M8 4v16M4 16l4 4 4-4M16 20V4M12 8l4-4 4 4"/>',eng:'<path d="M4 10h3l1-2h7l1 2h3v7h-3l-1 2H8l-1-2H4zM1 12v3M23 12v3"/>',grid:'<path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/>'};
+const I=(n,c="")=>`<svg class="i ${c}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[n]}</svg>`;
+let M,TR={},FL={},IX={},favs=LS("mx.f",[]),rec=LS("mx.r",[]),notes=LS("mx.n",{}),ST={ok:null,t:""},SORT=0,VF="All",VQ="",SQ="",SC="all";
+const K=(v,g)=>v+"/"+g,url=(v,p)=>"/m/"+[v.manual,v.folder,"pages",p+".html"].map(enc).join("/");
+const cnt=n=>n.p!==undefined?1:n.c.reduce((a,x)=>a+cnt(x),0),nf=n=>n.toLocaleString();
+const vpages=vi=>M.vehicles[vi].guides.reduce((a,_,gi)=>a+FL[K(vi,gi)].length,0);
+function flat(t){const o=[],seen=new Set();(function w(n,path,ix){(n.c||[]).forEach((c,i)=>{if(c.p!==undefined){if(!seen.has(c.p)){seen.add(c.p);o.push({p:c.p,n:c.n,path,ix})}}else w(c,[...path,c.n],[...ix,i])})})(t,[],[]);return o}
+function hl(t,q){t=esc(t);return q?t.replace(new RegExp("("+q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+")","ig"),"<mark>$1</mark>"):t}
+const clean=s=>s.replace(/^Relays and Modules - /,"");
+async function boot(){document.documentElement.dataset.theme=LS("mx.t","dark");
+ try{const b=new URLSearchParams(location.search).get("back");if(/^https?:\/\//i.test(b||""))SV("mx.back",b)}catch{}
+ try{M=await(await fetch("data/manifest.json")).json();await Promise.all(M.vehicles.flatMap((v,vi)=>v.guides.map(async(g,gi)=>{const t=await(await fetch(g.tree)).json(),k=K(vi,gi),f=flat(t);TR[k]=t;FL[k]=f;IX[k]=new Map(f.map((x,i)=>[x.p,i]))})))}
+ catch{$("main").innerHTML='<div class="empty">Could not load the page indexes.</div>';return}
+ probe();route()}
+async function probe(){try{const r=await fetch(url(M.vehicles[0],FL[K(0,0)][0].p),{method:"HEAD"});ST={ok:r.ok,t:new Date().toLocaleTimeString([],{hour:"numeric",minute:"2-digit"}),c:r.status}}catch{ST={ok:false,t:"",c:0}}paintST()}
+function paintST(){document.querySelectorAll("[data-st]").forEach(e=>{const k=e.dataset.st;e.textContent=k==="h"?(ST.ok===null?"Checking…":ST.ok?"R2 Connected":"R2 unreachable"+(ST.c?" ("+ST.c+")":"")):k==="s"?(ST.ok?"Online":ST.ok===null?"…":"Offline"):(ST.t?"Checked "+ST.t:"")});document.querySelectorAll("[data-stc]").forEach(e=>e.className=ST.ok?"ok":"bad")}
+const NAV=[["/","Dock","grid"],["#/","Home","home"],["#/vehicles","Vehicles","car"],["#/search","Search","search"],["#/favs","Favorites","star"],["#/more","More","more"]];
+function chrome(){const c=location.hash||"#/",h=NAV.map(([h,l,i])=>`<a href="${h}" class="${c===h||(h!=="#/"&&c.startsWith(h))?"on":""}">${I(i)}<span>${l}</span></a>`).join("");$("side").innerHTML=h;$("tabs").innerHTML=h}
+const hdr=(t,s,o={})=>`<div class="hd">${o.back?`<a class="ib" href="${o.back}" aria-label="Back">${I("back")}</a>`:`<a class="ib" href="#/more" aria-label="Menu">${I("menu")}</a>`}<div class="ht"><h1>${esc(t)}</h1>${s?`<small>${esc(s)}</small>`:""}</div>${o.right||""}</div>`;
+const vimg=(v,c="")=>`<div class="vi ${c}">${v.image?`<img src="${esc(v.image)}" alt="" loading="lazy">`:I("car")}</div>`;
+function route(){if(!M)return;chrome();const [,a,b,c,d]=decodeURIComponent(location.hash||"#/").split("/"),m=$("main");
+ const vw=a==="v";m.className=vw?"vw":"";document.body.classList.toggle("vw",vw);m.scrollTop=0;
+ ({"":home,vehicles:vlist,veh:()=>vehicle(m,+b,c||"man"),t:()=>tview(m,+b,+c,d),v:()=>viewer(m,+b,+c,+d),favs:()=>plist(m,"Favorites",favs),recent:()=>plist(m,"Recent Pages",rec),search:()=>{if(b)SQ=b;searchv(m)},more:more}[a||""]||home)(m);paintST()}
+const fk=(vi,gi,p)=>vi+"/"+gi+"/"+p,isF=k=>favs.includes(k);
+function leaf(vi,gi,l,q,sub){const k=fk(vi,gi,l.p);return`<a class="row" href="#/v/${vi}/${gi}/${l.p}"><span class="doc">${I("doc")}</span><div class="g"><div class="t"><span class="pid">#${l.p}</span> ${hl(l.n,q)}</div><div class="d">${esc(sub||"Service page")}</div></div><button class="star ${isF(k)?"on":""}" data-fav="${k}" aria-label="Favorite">${I("star")}</button></a>`}
+function look(k){const [vi,gi,p]=k.split("/").map(Number),i=IX[K(vi,gi)]?.get(p);return i===undefined?null:{vi,gi,l:FL[K(vi,gi)][i]}}
+function vcard(v,vi){return`<a class="row" href="#/veh/${vi}"><div class="vi">${v.image?`<img src="${esc(v.image)}" alt="" loading="lazy">`:I("car")}</div><div class="g"><div class="t">${esc(v.name)}</div><div class="d">${esc(v.engine)}</div><div class="d">${v.guides.length} Manuals • ${nf(vpages(vi))} Pages</div></div>${I("chev","chev")}</a>`}
+function home(m){let pg=0;M.vehicles.forEach((_,i)=>pg+=vpages(i));const r=rec.map(look).filter(Boolean).slice(0,3),mc=M.vehicles.reduce((a,v)=>a+v.guides.length,0);
+ m.innerHTML=`<div class="hd"><a class="ib" href="#/more" aria-label="Menu">${I("menu")}</a><div class="logo"><span class="or">${I("eng")}</span><div><span>LifeOS</span><b>Manual Explorer</b><small>Service Manuals • Knowledge • LifeOS</small></div></div><div class="av">KW</div></div>
+ <a class="sb" href="#/search">${I("search")}<span>Search manuals, vehicles, or procedures…</span></a>
+ <div class="stc">${I("cloud")}<div><b data-st="h" data-stc>Checking…</b><small>${esc(M.bucket||"")}</small></div></div>
+ <div class="grid"><a class="tile" href="#/vehicles">${I("car")}<div><b>${M.vehicles.length}</b><span>Vehicles</span></div></a><a class="tile" href="#/vehicles">${I("book")}<div><b>${mc}</b><span>Manuals</span></div></a><div class="tile">${I("doc")}<div><b>${nf(pg)}</b><span>Pages</span></div></div><a class="tile" href="#/favs">${I("star")}<div><b>${favs.length}</b><span>Favorites</span></div></a><a class="tile" href="#/recent">${I("clock")}<div><b>${rec.length}</b><span>Recent</span></div></a><div class="tile">${I("cloud")}<div><b data-st="s" data-stc>…</b><span data-st="t"></span></div></div></div>
+ <h2>${r.length?"Recent Pages":"Your Vehicles"}<a href="${r.length?"#/recent":"#/vehicles"}">See All</a></h2><div class="list">${r.length?r.map(x=>leaf(x.vi,x.gi,x.l,"",M.vehicles[x.vi].name)).join(""):M.vehicles.map(vcard).join("")}</div>`}
+function vlist(m){const makes=[...new Set(M.vehicles.map(v=>v.make))],q=VQ.toLowerCase();
+ m.innerHTML=hdr("Vehicles","",{back:"#/"})+`<label class="sb">${I("search")}<input id="vq" type="search" placeholder="Search vehicles…" value="${esc(VQ)}"></label><div class="chips"><button class="chip ${VF==="All"?"on":""}" data-vf="All">All (${M.vehicles.length})</button>${makes.map(x=>`<button class="chip ${VF===x?"on":""}" data-vf="${esc(x)}">${esc(x)} (${M.vehicles.filter(v=>v.make===x).length})</button>`).join("")}</div><div class="list" id="vl"></div>`;
+ const dr=()=>{const s=VQ.toLowerCase();$("vl").innerHTML=M.vehicles.map((v,i)=>[v,i]).filter(([v])=>(VF==="All"||v.make===VF)&&(!s||(v.name+v.engine).toLowerCase().includes(s))).map(([v,i])=>vcard(v,i)).join("")||'<div class="empty">No vehicles match.</div>'};dr();
+ $("vq").oninput=e=>{VQ=e.target.value;dr()};m.querySelectorAll("[data-vf]").forEach(b=>b.onclick=()=>{VF=b.dataset.vf;vlist(m)})}
+function vehicle(m,vi,tab){const v=M.vehicles[vi],T=(k,l)=>`<a class="chip ${tab===k?"on":""}" href="#/veh/${vi}/${k}">${l}</a>`;
+ const info=[["Year",v.year],["Make",v.make],["Model",v.model],["Engine",v.engine],["Platform",v.platform]].filter(x=>x[1]);
+ const kv=`<div class="kv">${info.map(([a,b])=>`<div><span>${a}</span><b>${esc(b)}</b></div>`).join("")}</div>`;let body="";
+ if(tab==="man")body=`<div class="list">${v.guides.map((g,gi)=>`<a class="row" href="#/t/${vi}/${gi}/">${I("folder","fill")}<div class="g"><div class="t or2">${esc(g.title)}</div><div class="d">${esc(g.sub||"")} • ${nf(FL[K(vi,gi)].length)} pages</div></div>${I("chev","chev")}</a>`).join("")}</div><h2>Quick Actions</h2><div class="qa"><a href="#/search">${I("search")}Search Manual</a><a href="#/favs">${I("star")}View Favorites</a><a href="#/recent">${I("clock")}Recent Pages</a><a href="#/veh/${vi}/not">${I("note")}Add Note</a></div><h2>Vehicle Information</h2>${kv}`;
+ else if(tab==="det")body=kv;else body=`<textarea class="note" id="nt" placeholder="Notes for this vehicle (saved on this device)…" aria-label="Notes">${esc(notes[vi]||"")}</textarea>`;
+ m.innerHTML=hdr(v.name,v.engine,{back:"#/vehicles",right:vimg(v,"sm")})+`<div class="chips">${T("man","Manuals")}${T("det","Details")}${T("not","Notes")}</div>`+body;
+ if($("nt"))$("nt").oninput=e=>{notes[vi]=e.target.value;SV("mx.n",notes)}}
+function tview(m,vi,gi,x){const v=M.vehicles[vi],t=TR[K(vi,gi)],g=v.guides[gi],path=x?x.split(".").map(Number):[],nodes=[t];try{for(const i of path)nodes.push(nodes.at(-1).c[i])}catch{}
+ const n=nodes.at(-1),b=`#/t/${vi}/${gi}/`,up=path.length?b+path.slice(0,-1).join("."):"#/veh/"+vi;
+ const cr=[`<a href="${b}">${esc(g.title)}</a>`,...path.map((_,k)=>`<a href="${b}${path.slice(0,k+1).join(".")}">${esc(clean(nodes[k+1].n))}</a>`)].join(" › ");
+ m.innerHTML=hdr(path.length?clean(n.n):g.title,v.name+" • "+nf(cnt(n))+" pages",{back:up})+`<div class="crumbs">${cr}</div><label class="sb">${I("search")}<input id="tf" type="search" placeholder="Search pages in this section…"></label><button class="sortb" id="so">Sort by: <b></b>${I("sort")}</button><div class="list" id="tl"></div>`;
+ const dr=()=>{const q=$("tf").value.trim().toLowerCase();$("so").querySelector("b").textContent=SORT?"Name":"Index order";let a=n.c.map((c,i)=>[c,i]).filter(([c])=>!q||c.n.toLowerCase().includes(q));if(SORT)a.sort((p,r)=>p[0].n.localeCompare(r[0].n,undefined,{numeric:true}));
+  $("tl").innerHTML=a.map(([c,i])=>c.p!==undefined?leaf(vi,gi,c,q,clean(n.n||g.title)):`<a class="row" href="${b}${[...path,i].join(".")}">${I("folder","fill")}<div class="g"><div class="t">${hl(clean(c.n),q)}</div><div class="d">${c.c.length} items</div></div><span class="cnt">${nf(cnt(c))}</span>${I("chev","chev")}</a>`).join("")||'<div class="empty">Nothing matches.</div>'};
+ dr();$("tf").oninput=dr;$("so").onclick=()=>{SORT^=1;dr()}}
+let hits=[],hi=0;
+function vgo(d){const c=$("vc");if(!c)return;if(!hits.length){c.textContent="0/0";return}hits[hi]&&hits[hi].style.removeProperty("outline");hi=(hi+d+hits.length)%hits.length;const k=hits[hi];k.style.outline="2px solid #ff8a1f";k.scrollIntoView({block:"center"});c.textContent=(hi+1)+"/"+hits.length}
+function vfind(q){const fr=$("fr"),d=fr&&fr.contentDocument;if(!d||!d.body)return;d.querySelectorAll("mark[data-mx]").forEach(k=>{const p=k.parentNode;p.replaceChild(d.createTextNode(k.textContent),k);p.normalize()});hits=[];hi=0;
+ if(q.length>=2){const re=new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g,"\\$&"),"gi"),w=d.createTreeWalker(d.body,NodeFilter.SHOW_TEXT),ns=[];while(w.nextNode()){const n=w.currentNode;if(!/^(SCRIPT|STYLE|NOSCRIPT)$/.test(n.parentNode.nodeName)&&re.test(n.nodeValue))ns.push(n);re.lastIndex=0}
+  for(const n of ns){if(hits.length>=500)break;const f=d.createDocumentFragment(),t=n.nodeValue;let last=0,mm;re.lastIndex=0;while((mm=re.exec(t))){f.append(t.slice(last,mm.index));const k=d.createElement("mark");k.dataset.mx=1;k.style.cssText="background:#ffe14d;color:#000";k.textContent=mm[0];f.append(k);hits.push(k);last=mm.index+mm[0].length}f.append(t.slice(last));n.parentNode.replaceChild(f,n)}}
+ vgo(0)}
+function viewer(m,vi,gi,p){const v=M.vehicles[vi],f=FL[K(vi,gi)],i=IX[K(vi,gi)].get(p);if(i===undefined){m.innerHTML='<div class="empty">Page not found.</div>';return}
+ const l=f[i],k=fk(vi,gi,p),u=url(v,p),nv=j=>f[j]?`href="#/v/${vi}/${gi}/${f[j].p}"`:"";rec=[k,...rec.filter(x=>x!==k)].slice(0,20);SV("mx.r",rec);
+ m.innerHTML=`<div class="vwrap">${hdr(l.n,"#"+p+" • "+v.name,{back:`#/t/${vi}/${gi}/${l.ix.join(".")}`,right:`<a class="ib" href="/" aria-label="System Deck">${I("grid")}</a><button class="star ${isF(k)?"on":""}" data-fav="${k}" aria-label="Favorite">${I("star")}</button><a class="ib" href="${u}" target="_blank" rel="noopener" aria-label="Open in new tab">${I("ext")}</a>`})}
+ <label class="sb vsb">${I("search")}<input id="vs" type="search" placeholder="Search this manual…"><span id="vc">0/0</span><button id="vu" aria-label="Previous match">${I("up")}</button><button id="vd" aria-label="Next match">${I("down")}</button></label>
+ <iframe class="pg" id="fr" src="${u}" title="${esc(l.n)}"></iframe><div class="vfoot"><a class="btn" ${nv(i-1)}>${I("back")} Previous</a><span>Page ${nf(i+1)} of ${nf(f.length)}</span><a class="btn p" ${nv(i+1)}>Next ${I("chev")}</a></div></div>`;
+ hits=[];hi=0;const fr=$("fr");fr.onload=()=>{try{const d=fr.contentDocument,s=d.createElement("style");s.textContent=".header,.footer{display:none!important}.main{padding:12px}";d.head.append(s);if($("vs").value)vfind($("vs").value.trim())}catch{}};
+ let tm;$("vs").oninput=e=>{clearTimeout(tm);tm=setTimeout(()=>vfind(e.target.value.trim()),250)};$("vs").onkeydown=e=>{if(e.key==="Enter")vgo(e.shiftKey?-1:1)};$("vu").onclick=()=>vgo(-1);$("vd").onclick=()=>vgo(1)}
+function plist(m,title,keys){const r=keys.map(look).filter(Boolean);m.innerHTML=hdr(title,r.length+" pages",{back:"#/"})+`<div class="list">${r.map(x=>leaf(x.vi,x.gi,x.l,"",M.vehicles[x.vi].name)).join("")||'<div class="empty">Nothing here yet.</div>'}</div>`}
+function searchv(m){m.innerHTML=hdr("Search","",{back:"#/"})+`<label class="sb">${I("search")}<input id="sq" type="search" placeholder="Search pages and vehicles…" value="${esc(SQ)}" autofocus><button class="x" id="sx" aria-label="Clear">${I("x")}</button></label><div class="chips" id="sc"></div><div class="list" id="sl"></div>`;
+ const dr=()=>{const q=SQ.trim().toLowerCase(),pg=[];let vs=[];if(q.length>=2){M.vehicles.forEach((v,vi)=>v.guides.forEach((g,gi)=>FL[K(vi,gi)].forEach(l=>{if(pg.length<150&&l.n.toLowerCase().includes(q))pg.push([vi,gi,l])})));vs=M.vehicles.map((v,i)=>[v,i]).filter(([v])=>(v.name+v.engine+v.make).toLowerCase().includes(q))}
+  const C=[["all","All",pg.length+vs.length],["pages","Manual Pages",pg.length],["veh","Vehicles",vs.length]];$("sc").innerHTML=C.map(([k,l,n])=>`<button class="chip ${SC===k?"on":""}" data-c="${k}">${l} (${n})</button>`).join("");
+  $("sl").innerHTML=q.length<2?'<div class="empty">Type at least 2 letters.</div>':((SC!=="pages"?vs.map(([v,i])=>vcard(v,i)):[]).concat(SC!=="veh"?pg.map(([vi,gi,l])=>leaf(vi,gi,l,q,M.vehicles[vi].name+" › "+l.path.map(clean).join(" › "))):[]).join("")||'<div class="empty">No matches.</div>');
+  $("sc").querySelectorAll("[data-c]").forEach(b=>b.onclick=()=>{SC=b.dataset.c;dr()})};dr();
+ $("sq").oninput=e=>{SQ=e.target.value;dr()};$("sx").onclick=()=>{SQ="";$("sq").value="";dr();$("sq").focus()}}
+function more(m){const back=LS("mx.back","");const pg=Object.values(FL).reduce((a,f)=>a+f.length,0);
+ m.innerHTML=hdr("More","",{back:"#/"})+`<div class="list"><a class="row" href="/">${I("home")}<div class="g"><div class="t or2">Back to System Deck</div><div class="d">Return to the launcher</div></div></a>${back?`<a class="row" href="${esc(back)}#specs">${I("back")}<div class="g"><div class="t or2">Back to MotorNote Pro</div><div class="d">Return to the Specs page</div></div></a>`:""}<button class="row" id="th"><div class="g"><div class="t">Theme</div><div class="d">${LS("mx.t","dark")==="dark"?"Dark":"Light"} — tap to switch</div></div></button><button class="row" id="cf"><div class="g"><div class="t">Clear favorites</div><div class="d">${favs.length} saved</div></div></button><button class="row" id="cr"><div class="g"><div class="t">Clear recent pages</div><div class="d">${rec.length} saved</div></div></button><div class="row"><div class="g"><div class="t" data-st="h">Checking…</div><div class="d">${esc(M.bucket||"")} • ${nf(pg)} indexed pages</div></div></div></div><div class="foot">LifeOS Manual Explorer • Built for Nomie • Knowledge for a Better Drive</div>`;
+ $("th").onclick=()=>{const t=LS("mx.t","dark")==="dark"?"light":"dark";SV("mx.t",t);document.documentElement.dataset.theme=t;more(m)};$("cf").onclick=()=>{favs=[];SV("mx.f",favs);more(m)};$("cr").onclick=()=>{rec=[];SV("mx.r",rec);more(m)}}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-fav]");if(!b)return;e.preventDefault();e.stopPropagation();const k=b.dataset.fav;favs=isF(k)?favs.filter(x=>x!==k):[k,...favs];SV("mx.f",favs);if(location.hash.startsWith("#/v/"))b.classList.toggle("on",isF(k));else route()},true);
+addEventListener("hashchange",route);boot();
+</script></body></html>

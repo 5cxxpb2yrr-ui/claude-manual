@@ -11,5 +11,12 @@
   },
   "r2_buckets": [
     { "binding": "MANUALS", "bucket_name": "motornote-manual-site" }
-  ]
+  ],
+  "previews": {
+    "r2_buckets": [
+      { "binding": "MANUALS", "bucket_name": "motornote-manual-site" }
+    ]
+  },
+  "workers_dev": true,
+  "preview_urls": true
 }

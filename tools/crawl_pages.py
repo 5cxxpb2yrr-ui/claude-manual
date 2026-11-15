@@ -1,94 +1,310 @@
 #!/usr/bin/env python3
-"""Builds drill-down trees for pages that no index file lists.
-Each page's breadcrumb (top of the HTML) gives its folder path, so we read only the first 8 KB of
-every unindexed page via the Worker's /m/ route and assemble a tree. Run from the repo root."""
-import os, re, json, html, sys, time, urllib.request, urllib.parse, urllib.error
+"""Build additional drill-down trees for manual pages absent from the main indexes.
+
+Each page's breadcrumb supplies its folder path. The crawler reads only the first
+8 KB of each candidate page through the Worker's /m/ route. Run from the repo root.
+"""
+import os
+import re
+import json
+import html
+import sys
+import time
+import urllib.request
+import urllib.parse
+import urllib.error
 from concurrent.futures import ThreadPoolExecutor
 
 BASE = os.environ.get("BASE", "https://claude-manual.phillipstg.workers.dev").rstrip("/")
 DEFAULT = [
-    {"manual": "subaru-service-manual", "folder": "2019 Subaru Crosstrek Limited", "maxid": 38502, "out": "subaru-more.json"},
-    {"manual": "scion-service-manual", "folder": "2006 Scion xB L4-1.5L (1NZ-FE)", "maxid": 7569, "out": "scion-more.json"},
+    {
+        "manual": "subaru-service-manual",
+        "folder": "2019 Subaru Crosstrek Limited",
+        "maxid": 38502,
+        "out": "subaru-more.json",
+    },
+    {
+        "manual": "scion-service-manual",
+        "folder": "2006 Scion xB L4-1.5L (1NZ-FE)",
+        "maxid": 7569,
+        "out": "scion-more.json",
+    },
 ]
 CFG = json.loads(os.environ["CRAWL_CONFIG"]) if os.environ.get("CRAWL_CONFIG") else DEFAULT
 TAG = re.compile(r"<[^>]+>")
-CR = re.compile(r'<a[^>]*class="breadcrumb-part"[^>]*href="([^"]*)"[^>]*>(.*?)</a>', re.S)
-txt = lambda s: html.unescape(TAG.sub("", s)).strip()
+ANCHOR = re.compile(r"<a\b([^>]*)>(.*?)</a\s*>", re.I | re.S)
+ATTRIBUTE = re.compile(r"""([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""", re.S)
 
-def leaves(n, o):
-    for c in n.get("c", []):
-        if isinstance(c.get("p"), int): o.add(c["p"])
-        else: leaves(c, o)
-    return o
 
-def fetch(u):
-    for i in range(4):
+def txt(value):
+    return html.unescape(TAG.sub("", value)).strip()
+
+
+def leaves(node, output):
+    for child in node.get("c", []):
+        if isinstance(child.get("p"), int):
+            output.add(child["p"])
+        else:
+            leaves(child, output)
+    return output
+
+
+def fetch(url):
+    for attempt in range(4):
         try:
-            req = urllib.request.Request(u, headers={"User-Agent": "LifeOS-Indexer/1.0"})
-            with urllib.request.urlopen(req, timeout=30) as r:
-                return r.read(8192).decode("utf-8", "ignore")
-        except urllib.error.HTTPError as e:
-            if e.code == 404: return None
+            request = urllib.request.Request(
+                url, headers={"User-Agent": "LifeOS-Indexer/1.0"}
+            )
+            with urllib.request.urlopen(request, timeout=30) as response:
+                return response.read(16384).decode("utf-8", "ignore")
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return None
         except Exception:
             pass
-        time.sleep(1 + i)
-    return ""  # failed after retries
+        if attempt < 3:
+            time.sleep(1 + attempt)
+    return ""
 
-def place(t, pid):
-    cr = [(h, txt(x)) for h, x in CR.findall(t)]
-    m = re.search(r"<h1>(.*?)</h1>", t, re.S); h1 = txt(m.group(1)) if m else ""
-    idx = next((i for i, (h, _) in enumerate(cr) if re.search(r"pages/1\.html$", h)), None)
-    rest = cr[idx + 1:] if idx is not None else cr[4:]
-    if rest and re.search(rf"pages/{pid}\.html$", rest[-1][0]):
+
+def breadcrumbs(source):
+    """Read breadcrumb anchors regardless of HTML attribute order or quote style."""
+    found = []
+    for attributes, label in ANCHOR.findall(source):
+        values = {}
+        for match in ATTRIBUTE.finditer(attributes):
+            values[match.group(1).lower()] = next(
+                (value for value in match.groups()[1:] if value is not None), ""
+            )
+        if "breadcrumb-part" in values.get("class", "").split() and values.get("href"):
+            found.append((values["href"], txt(label)))
+    return found
+
+
+def place(source, page_id):
+    crumbs = breadcrumbs(source)
+    heading = re.search(r"<h1\b[^>]*>(.*?)</h1\s*>", source, re.I | re.S)
+    h1 = txt(heading.group(1)) if heading else ""
+
+    def page_path(href):
+        return urllib.parse.urlsplit(html.unescape(href)).path.rstrip("/")
+
+    first_page = next(
+        (
+            index
+            for index, (href, _) in enumerate(crumbs)
+            if re.search(r"pages/1\.html$", page_path(href), re.I)
+        ),
+        None,
+    )
+    rest = crumbs[first_page + 1 :] if first_page is not None else crumbs[4:]
+
+    if rest and re.search(
+        rf"pages/{page_id}\.html$", page_path(rest[-1][0]), re.I
+    ):
         title, rest = rest[-1][1], rest[:-1]
     else:
-        title = h1 or f"Page {pid}"
-    return [n for _, n in rest if n], title
+        title = h1 or f"Page {page_id}"
 
-def add(root, path, pid, title):
+    path = [name for _, name in rest if name]
+    return path, title
+
+
+def add(root, path, page_id, title):
     node = root
     for name in path:
-        nxt = next((c for c in node["c"] if "c" in c and c["n"] == name), None)
-        if not nxt:
-            nxt = {"n": name, "c": []}; node["c"].append(nxt)
-        node = nxt
-    node["c"].append({"n": title, "p": pid})
+        child = next(
+            (
+                item
+                for item in node["c"]
+                if "c" in item and item["n"] == name
+            ),
+            None,
+        )
+        if child is None:
+            child = {"n": name, "c": []}
+            node["c"].append(child)
+        node = child
+    node["c"].append({"n": title, "p": page_id})
 
-def merge(n):  # a folder page and its folder share a name -> fold the page in as "Overview"
-    for c in n["c"]:
-        if "c" in c: merge(c)
-    leafs = {c["n"]: c for c in n["c"] if "p" in c}
-    for f in [c for c in n["c"] if "c" in c]:
-        l = leafs.get(f["n"])
-        if l:
-            n["c"].remove(l); f["c"].insert(0, {"n": "Overview", "p": l["p"]})
+
+def merge(node):
+    # If a folder and a page share a name, expose the page as that folder's Overview.
+    for child in node["c"]:
+        if "c" in child:
+            merge(child)
+
+    page_by_name = {
+        child["n"]: child for child in node["c"] if "p" in child
+    }
+    for folder in [child for child in node["c"] if "c" in child]:
+        page = page_by_name.get(folder["n"])
+        if page:
+            node["c"].remove(page)
+            folder["c"].insert(0, {"n": "Overview", "p": page["p"]})
+
+
+def validate_tree(tree, label):
+    if not isinstance(tree, dict) or not isinstance(tree.get("c"), list):
+        raise ValueError(f"{label}: tree root must contain a children list")
+    stack = list(tree["c"])
+    while stack:
+        node = stack.pop()
+        if not isinstance(node, dict) or not isinstance(node.get("n"), str):
+            raise ValueError(f"{label}: invalid tree node: {node!r}")
+        if "p" in node:
+            if not isinstance(node["p"], int):
+                raise ValueError(f"{label}: page ID must be an integer")
+        elif isinstance(node.get("c"), list):
+            stack.extend(node["c"])
+        else:
+            raise ValueError(f"{label}: node has neither a page ID nor children")
+
 
 def main():
-    mp = "public/data/manifest.json"
-    man = json.load(open(mp)); fails = total = 0
-    for cfg in CFG:
-        v = next(v for v in man["vehicles"] if v["manual"] == cfg["manual"])
-        known = set(range(1, 6))
-        for g in v["guides"]:
-            if os.path.basename(g["tree"]) == cfg["out"]: continue
-            known |= leaves(json.load(open("public/" + g["tree"])), set())
-        ids = [i for i in range(1, cfg["maxid"] + 1) if i not in known]
-        base = f'{BASE}/m/{urllib.parse.quote(cfg["manual"])}/{urllib.parse.quote(cfg["folder"])}/pages/'
-        print(f'{cfg["manual"]}: crawling {len(ids)} unindexed ids', flush=True)
-        with ThreadPoolExecutor(24) as ex:
-            res = list(ex.map(lambda i: fetch(f"{base}{i}.html"), ids))
-        root = {"title": "Additional Pages", "c": []}; n = 0
-        for i, t in zip(ids, res):
-            if t is None: continue
-            if t == "": fails += 1; continue
-            path, title = place(t, i); add(root, path, i, title); n += 1
-        total += len(ids); merge(root)
-        json.dump(root, open("public/data/" + cfg["out"], "w"), separators=(",", ":"), ensure_ascii=False)
-        print(f'  indexed {n} pages, {len(root["c"])} top-level folders', flush=True)
-        if not any(os.path.basename(g["tree"]) == cfg["out"] for g in v["guides"]):
-            v["guides"].append({"title": "Additional Pages", "sub": "Pages not in the main index", "tree": "data/" + cfg["out"]})
-    json.dump(man, open(mp, "w"), ensure_ascii=False, indent=1)
-    print(f"failed fetches: {fails}")
-    if fails > 0.02 * max(total, 1): sys.exit("too many failed fetches")
+    manifest_path = "public/data/manifest.json"
+    with open(manifest_path, encoding="utf-8") as source:
+        manifest = json.load(source)
 
-main()
+    pending = []
+    total_candidates = 0
+    total_failures = 0
+
+    for config in CFG:
+        vehicle = next(
+            (
+                item
+                for item in manifest["vehicles"]
+                if item["manual"] == config["manual"]
+            ),
+            None,
+        )
+        if vehicle is None:
+            raise ValueError(
+                f'Manifest has no vehicle for manual "{config["manual"]}"'
+            )
+
+        known = set(range(1, 6))
+        for guide in vehicle["guides"]:
+            if os.path.basename(guide["tree"]) == config["out"]:
+                continue
+            tree_path = os.path.join("public", guide["tree"])
+            with open(tree_path, encoding="utf-8") as source:
+                known |= leaves(json.load(source), set())
+
+        page_ids = [
+            page_id
+            for page_id in range(1, config["maxid"] + 1)
+            if page_id not in known
+        ]
+        base_url = (
+            f'{BASE}/m/{urllib.parse.quote(config["manual"])}/'
+            f'{urllib.parse.quote(config["folder"])}/pages/'
+        )
+        print(
+            f'{config["manual"]}: crawling {len(page_ids)} unindexed IDs',
+            flush=True,
+        )
+
+        with ThreadPoolExecutor(max_workers=24) as executor:
+            results = list(
+                executor.map(
+                    lambda page_id: fetch(f"{base_url}{page_id}.html"),
+                    page_ids,
+                )
+            )
+
+        sample = next((source for source in results if source), None)
+        if sample:
+            print("  HTML diagnostic: " + repr(sample[:2400]), flush=True)
+            print(
+                "  HTML tags: " + repr(re.findall(r"<[^>]{1,240}>", sample)[:35]),
+                flush=True,
+            )
+
+        root = {"title": "Additional Pages", "c": []}
+        indexed = 0
+        nested = 0
+        pages_with_breadcrumbs = 0
+        failures = 0
+
+        for page_id, source in zip(page_ids, results):
+            if source is None:
+                continue
+            if source == "":
+                failures += 1
+                continue
+            path, title = place(source, page_id)
+            if breadcrumbs(source):
+                pages_with_breadcrumbs += 1
+            if path:
+                nested += 1
+            add(root, path, page_id, title)
+            indexed += 1
+
+        if indexed and nested / indexed < 0.20:
+            raise RuntimeError(
+                f'{config["manual"]}: only {nested}/{indexed} pages have a '
+                "breadcrumb-derived parent path; refusing to write a flat index"
+            )
+        merge(root)
+        validate_tree(root, config["out"])
+        pending.append((config, vehicle, root))
+        total_candidates += len(page_ids)
+        total_failures += failures
+        print(
+            f"  indexed {indexed} pages; {failures} fetch failures; "
+            f"{pages_with_breadcrumbs} pages with breadcrumbs; "
+            f"{nested} nested pages; {len(root['c'])} top-level folders",
+            flush=True,
+        )
+
+    failure_rate = total_failures / max(total_candidates, 1)
+    if failure_rate > 0.02:
+        raise RuntimeError(
+            f"aborting without writing: {total_failures}/{total_candidates} "
+            f"fetches failed ({failure_rate:.1%}; maximum allowed is 2%)"
+        )
+
+    # Write only after every configured manual has crawled and passed validation.
+    for config, vehicle, tree in pending:
+        output_path = os.path.join("public/data", config["out"])
+        with open(output_path, "w", encoding="utf-8") as output:
+            json.dump(
+                tree,
+                output,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+
+        if not any(
+            os.path.basename(guide["tree"]) == config["out"]
+            for guide in vehicle["guides"]
+        ):
+            vehicle["guides"].append(
+                {
+                    "title": "Additional Pages",
+                    "sub": "Pages not in the main index",
+                    "tree": "data/" + config["out"],
+                }
+            )
+
+    # Confirm every guide referenced by the manifest exists and parses as JSON.
+    for vehicle in manifest["vehicles"]:
+        for guide in vehicle["guides"]:
+            path = os.path.join("public", guide["tree"])
+            with open(path, encoding="utf-8") as source:
+                json.load(source)
+
+    with open(manifest_path, "w", encoding="utf-8") as output:
+        json.dump(manifest, output, ensure_ascii=False, indent=1)
+        output.write("\n")
+
+    print(
+        f"crawl complete: {total_failures} failed fetches across "
+        f"{total_candidates} candidate IDs"
+    )
+
+
+if __name__ == "__main__":
+    main()

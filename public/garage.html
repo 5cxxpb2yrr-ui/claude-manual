@@ -484,6 +484,23 @@
 						<ul class="space-y-1 text-[11px] text-zinc-300"><template x-for="reason in dynamicHealth.reasons" :key="reason"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="reason"></span></li></template></ul>
 					</div>
 
+					<!-- Next Scheduled Maintenance -->
+					<div class="glass-panel p-4 mb-4 border border-amber-500/30">
+						<div class="flex items-center justify-between gap-3 mb-3">
+							<div><h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">Next Scheduled Maintenance</h3><p class="text-[10px] text-zinc-500 mt-1">Next non-overdue item not in the history-reconciliation archive</p></div>
+							<button @click="currentTab = 'predictive'" class="text-xs font-bold text-amber-400">View Schedule →</button>
+						</div>
+						<template x-if="nextScheduledMaintenance">
+							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+								<div class="min-w-0"><span class="inline-flex text-[9px] font-bold uppercase px-2 py-1 rounded border" :class="getStatusBadgeClass(nextScheduledMaintenance.status)" x-text="nextScheduledMaintenance.status"></span><h4 class="text-base font-bold text-white mt-2" x-text="nextScheduledMaintenance.serviceName"></h4><p class="text-xs text-zinc-400 mt-1" x-text="nextScheduledMaintenance.remainingMiles.toLocaleString() + ' miles remaining • estimated ' + nextScheduledMaintenance.nextDueDate"></p><p class="text-[10px] text-zinc-500 mt-1" x-text="nextScheduledMaintenance.confidence + ' confidence · ' + (nextScheduledMaintenance.basis === 'mileage' ? 'mileage-based' : 'time-based')"></p></div>
+								<div class="text-right"><div class="text-xl font-black font-mono text-amber-300" x-text="nextScheduledMaintenance.nextDueMileage.toLocaleString()"></div><div class="text-[9px] uppercase text-zinc-500">Due at miles</div></div>
+							</div>
+						</template>
+						<template x-if="!nextScheduledMaintenance">
+							<div class="rounded-xl bg-zinc-950/70 border border-zinc-800 p-3"><p class="text-sm font-semibold text-white">No upcoming item can be calculated yet.</p><p class="text-xs text-zinc-400 mt-1">Past-due items remain archived while you reconcile service history. Restore an item or add a matching service record to establish its next due point.</p><button @click="currentTab = 'maintenance'" class="mt-3 px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300 text-xs font-bold">Review Archived Maintenance</button></div>
+						</template>
+					</div>
+
 					<!-- Predictive Maintenance Deck -->
 					<div>
 						<div class="flex items-center justify-between mb-3">
@@ -838,6 +855,18 @@
 								<div class="flex justify-between gap-3"><div><span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded border" :class="getStatusBadgeClass(item.status)" x-text="item.status"></span><h3 class="text-base font-bold text-white mt-2" x-text="item.serviceName"></h3><p class="text-xs text-zinc-400" x-text="(item.remainingMiles < 0 ? Math.abs(item.remainingMiles).toLocaleString() + ' mi overdue' : item.remainingMiles.toLocaleString() + ' mi remaining') + ' • due ' + item.nextDueDate"></p></div><div class="text-right text-xs text-zinc-400" x-text="item.confidence + ' confidence'"></div></div>
 								<div x-show="item.plan" class="bg-zinc-950 rounded-xl p-3 border border-purple-500/20"><div class="flex justify-between"><span class="text-[10px] uppercase font-bold text-purple-400">Plan</span><span class="text-[10px] text-zinc-400" x-text="item.plan?.status || 'Not Planned'"></span></div><div class="mt-2 text-xs text-white" x-text="(item.plan?.completion ?? 0) + '% complete'"></div><div class="h-1.5 bg-zinc-800 rounded-full mt-2 overflow-hidden"><div class="h-full bg-purple-500" :style="`width:${item.plan?.completion ?? 0}%`"></div></div></div>
 								<div class="flex gap-2 flex-wrap"><button x-show="!item.plan" @click="openMaintenancePlanner(item)" class="px-3 py-1.5 rounded-lg bg-amber-500 text-zinc-950 text-xs font-bold">Plan Service</button><button x-show="item.plan?.status === 'Planned'" @click="startMaintenancePlan(item.plan)" class="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-bold">Start Service</button><button x-show="['Parts Reserved','In Progress','Paused'].includes(item.plan?.status)" @click="openCompleteMaintenance(item.plan)" class="px-3 py-1.5 rounded-lg bg-emerald-500 text-zinc-950 text-xs font-bold">Complete</button><button x-show="item.plan?.status !== 'Completed'" @click="cancelMaintenancePlan(item.plan)" class="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold">Cancel</button></div>
+							</div>
+						</template>
+					</div>
+					<div class="glass-panel p-5 space-y-3" x-show="archivedMaintenanceForActiveVehicle.length">
+						<div class="flex items-center justify-between gap-3">
+							<div><h3 class="font-bold text-white">Archived — History Reconciliation</h3><p class="text-[11px] text-zinc-400 mt-1">Hidden from upcoming maintenance until you match the service history. Nothing was marked completed.</p></div>
+							<span class="text-xs font-mono text-zinc-400" x-text="archivedMaintenanceForActiveVehicle.length + ' saved'"></span>
+						</div>
+						<template x-for="item in archivedMaintenanceForActiveVehicle" :key="item.id">
+							<div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3 flex items-center justify-between gap-3">
+								<div class="min-w-0"><b class="text-white text-sm" x-text="item.serviceName"></b><p class="text-[11px] text-zinc-500 mt-1" x-text="'Due at ' + Number(item.nextDueMileageAtArchive||0).toLocaleString() + ' mi • ' + (item.lastPerformedMileageAtArchive ? 'Last matched record ' + Number(item.lastPerformedMileageAtArchive).toLocaleString() + ' mi' : 'No matching service record')"></p></div>
+								<button @click="unarchiveMaintenanceItem(item.id)" class="shrink-0 px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300 text-xs font-bold">Restore</button>
 							</div>
 						</template>
 					</div>
@@ -1716,61 +1745,90 @@
 					</div>
 				</div>
 
-				<!-- 11. KNOWLEDGE BASE TAB -->
+				<!-- 11. MAINTENANCE KNOWLEDGE BASE TAB -->
 				<div
 					x-show="currentTab === 'kb'"
 					x-transition.opacity
 					class="space-y-4"
 				>
 					<div class="mb-2">
-						<h2 class="text-lg font-bold text-white mb-1">
-							Maintenance Knowledge Base
-						</h2>
-						<p class="text-xs text-zinc-400">
-							DIY procedures, step-by-step guides, torque specs,
-							and fluid capacities
-						</p>
+						<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+							<div>
+								<h2 class="text-lg font-bold text-white mb-1">Maintenance Knowledge Base</h2>
+								<p class="text-xs text-zinc-400">Vehicle-specific DIY procedures, factory steps, torque specs, and fluid capacities</p>
+							</div>
+							<div class="flex flex-wrap items-center gap-2">
+								<button type="button" @click="expandAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Expand all</button>
+								<button type="button" @click="collapseAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Collapse all</button>
+								<span class="kb-badge" x-text="knowledgeBase.length + ' PROCEDURES'"></span>
+							</div>
+						</div>
 					</div>
 
 					<input
-						type="text"
+						type="search"
 						x-model="kbSearchQuery"
-						placeholder="Search procedures, torque specs, or models..."
-						class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-500 transition"
+						placeholder="Search by vehicle, procedure, fluid, or torque..."
+						aria-label="Search maintenance procedures"
+						class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-base text-white focus:outline-none focus:border-amber-500 transition"
 					/>
 
-					<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-						<template
-							x-for="item in filteredKnowledgeBase"
-							:key="item.id"
-						>
-							<div class="glass-panel p-5 space-y-3">
-								<span
-									class="kb-badge"
-									x-text="item.vehicle"
-								></span>
-								<h4
-									class="text-base font-bold text-white"
-									x-text="item.title"
-								></h4>
-								<p
-									class="text-xs text-amber-400 font-semibold"
-									x-text="'Interval: ' + item.interval"
-								></p>
-								<ol
-									class="list-decimal list-inside space-y-1.5 text-xs text-zinc-300"
-								>
-									<template x-for="step in item.steps">
-										<li x-text="step"></li>
-									</template>
-								</ol>
+					<template x-if="filteredKnowledgeBase.length === 0">
+						<div class="glass-panel p-5 text-sm text-zinc-400">No procedures match that search.</div>
+					</template>
+
+					<div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+						<template x-for="item in filteredKnowledgeBase" :key="item.id">
+							<article class="glass-panel overflow-hidden">
 								<button
-									class="btn-primary w-full py-2.5 text-xs font-bold"
-									@click="initServiceFromKB(item.id)"
+									type="button"
+									class="w-full p-4 sm:p-5 text-left flex items-start gap-3 hover:bg-zinc-900/40 transition"
+									@click="toggleKnowledgeBaseCard(item.id)"
+									:aria-expanded="isKnowledgeBaseExpanded(item.id)"
 								>
-									Log Service Record
+									<div class="flex-1 min-w-0 space-y-2">
+										<div class="flex flex-wrap items-center gap-2">
+											<span class="kb-badge" x-text="item.vehicle"></span>
+											<span class="text-[10px] uppercase tracking-widest text-zinc-500" x-text="item.category"></span>
+										</div>
+										<h3 class="text-base sm:text-lg font-bold text-white" x-text="item.title"></h3>
+										<div class="flex flex-col gap-1">
+											<p class="text-[11px] text-zinc-400" x-text="item.engine"></p>
+											<p class="text-xs text-amber-400 font-semibold" x-text="'Service interval: ' + item.interval"></p>
+										</div>
+									</div>
+									<span class="shrink-0 inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-[11px] font-bold text-amber-400">
+										<span x-text="isKnowledgeBaseExpanded(item.id) ? 'Hide details' : 'View details'"></span>
+										<span class="text-base leading-none" x-text="isKnowledgeBaseExpanded(item.id) ? '−' : '+'"></span>
+									</span>
 								</button>
-							</div>
+								<div x-show="isKnowledgeBaseExpanded(item.id)" x-transition class="px-4 pb-4 sm:px-5 sm:pb-5 space-y-4 border-t border-zinc-800">
+									<div class="rounded-xl bg-zinc-950/80 border border-zinc-800 p-3 space-y-2">
+										<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400">Specifications</h4>
+										<ul class="space-y-1.5 text-xs text-zinc-200">
+											<template x-for="(spec, index) in item.specs" :key="item.id + '-spec-' + index">
+												<li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li>
+											</template>
+										</ul>
+									</div>
+									<div>
+										<h4 class="text-[10px] uppercase tracking-widest font-bold text-zinc-400 mb-2">Step-by-step procedure</h4>
+										<ol class="list-decimal list-outside ml-5 space-y-2 text-xs sm:text-sm text-zinc-200">
+											<template x-for="(step, index) in item.steps" :key="item.id + '-step-' + index">
+												<li class="pl-1 leading-relaxed" x-text="step"></li>
+											</template>
+										</ol>
+									</div>
+									<div class="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+										<h4 class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Safety & verification</h4>
+										<p class="text-xs leading-relaxed text-zinc-300" x-text="item.caution"></p>
+									</div>
+									<div class="flex flex-col sm:flex-row gap-2 pt-1">
+										<a :href="item.sourcePath" target="_blank" rel="noopener" class="flex-1 text-center rounded-xl border border-zinc-700 bg-zinc-900 hover:border-amber-500/50 text-zinc-200 py-3 text-xs font-semibold transition" x-text="'Factory manual: ' + item.sourceLabel"></a>
+										<button class="btn-primary flex-1 py-3 text-xs font-bold" @click="initServiceFromKB(item.id)">Log Service Record</button>
+									</div>
+								</div>
+							</article>
 						</template>
 					</div>
 				</div>
@@ -2848,12 +2906,13 @@
 					attachmentSearch: '',
 					attachmentCategoryFilter: 'all',
 					kbSearchQuery: '',
+					kbExpandedIds: [],
 					advisorQuery: '',
 					tempMileage: 0,
 					showLightbox: false,
 					lightboxImage: '',
 					isEditingRepair: false,
-					appSchemaVersion: 4,
+					appSchemaVersion: 5,
 					garageDB: null,
 					saveState: 'saved',
 					lastSavedAt: null,
@@ -2911,8 +2970,8 @@
 
 					// Data Models
 					vehicles: [
-						{ id: 'scion-xb', name: '2006 Scion xB', odometer: 212000, engine: '1.5L 1NZ-FE I4', oilType: '5W-30 Synthetic', oilCapacity: '3.9 qts', sparkPlugs: 'NGK BKR5EYA-11', oilFilter: 'OEM Toyota 90915-YZZF2', vin: 'JTLKT324564019283' },
-						{ id: 'subaru-crosstrek', name: '2019 Subaru Crosstrek', odometer: 68450, engine: '2.0L FB20D H4', oilType: '0W-20 Synthetic', oilCapacity: '4.7 qts', sparkPlugs: 'NGK SILZKAR7B11', oilFilter: 'OEM Subaru 15208AA15A', vin: 'JF2GTAC68KH284910' }
+						{ id: 'scion-xb', name: '2006 Scion xB', odometer: 219634, engine: '1.5L 1NZ-FE I4', oilType: '5W-30 Synthetic', oilCapacity: '3.9 qts', sparkPlugs: 'NGK BKR5EYA-11', oilFilter: 'OEM Toyota 90915-YZZF2', vin: 'JTLKT324564019283' },
+						{ id: 'subaru-crosstrek', name: '2019 Subaru Crosstrek', odometer: 141265, engine: '2.0L FB20D H4', oilType: '0W-20 Synthetic', oilCapacity: '4.7 qts', sparkPlugs: 'NGK SILZKAR7B11', oilFilter: 'OEM Subaru 15208AA15A', vin: 'JF2GTAC68KH284910' }
 					],
 
 					schedules: [
@@ -2936,6 +2995,8 @@
 					],
 
 					maintenancePlans: [],
+					archivedMaintenance: [],
+					maintenanceSetupVersion: 0,
 
 					inventory: [
 						{ id: 301, partNumber: '90915-YZZF2', description: 'Toyota OEM Oil Filter', vendor: 'Toyota Direct', quantity: 4, unitCost: 6.50, purchaseDate: '2026-01-10', vehicleCompatibility: '2006 Scion xB' },
@@ -2943,8 +3004,186 @@
 					],
 
 					knowledgeBase: [
-						{ id: 'kb-1', vehicle: '2006 Scion xB', title: 'Synthetic Oil & Filter Replacement', interval: ' Every 5,000 miles / 6 months', steps: ['Warm engine to operating temperature', 'Locate 14mm drain plug under oil pan', 'Drain oil completely into catch pan', 'Replace crush washer and torque drain plug to 28 ft-lbs', 'Replace oil filter and lubricate rubber gasket', 'Refill with 3.9 qts 5W-30 oil'] },
-						{ id: 'kb-2', vehicle: '2019 Subaru Crosstrek', title: 'Front Brake Pad & Rotor Service', interval: 'Every 30,000 miles', steps: ['Jack up front end and secure on jack stands', 'Remove 14mm caliper guide pin bolts', 'Compress piston with caliper tool', 'Torque caliper brackets to 59 ft-lbs'] }
+						{
+							id: 'kb-scion-oil-filter', vehicle: '2006 Scion xB', category: 'Engine & Lubrication',
+							engine: '1.5L 1NZ-FE I4', title: 'Engine Oil & Filter Replacement',
+							interval: 'Follow the factory maintenance schedule; shorten the interval for severe service.',
+							specs: ['Vehicle profile oil: 5W-30 synthetic', 'Vehicle profile capacity: 3.9 US qt — treat as a starting reference and verify on the dipstick', 'Drain plug: 37.5 N·m (28 ft-lb), new gasket', 'Oil filter: 17.2 N·m (13 ft-lb), or 3/4 turn after gasket contact when a torque wrench cannot be used', 'Filter tool: Toyota SST 09228-06501'],
+							steps: ['Park on level ground, apply the parking brake, and warm the engine.', 'Remove the oil filler cap and position a suitable drain pan beneath the oil pan.', 'Remove the drain plug and allow the used oil to drain completely.', 'Remove the oil filter using SST 09228-06501.', 'Clean the filter mounting surface. Apply clean engine oil to the new filter gasket.', 'Install the filter. Tighten to 17.2 N·m (13 ft-lb) when using a torque wrench; otherwise tighten 3/4 turn after gasket contact.', 'Install the drain plug with a new gasket and tighten to 37.5 N·m (28 ft-lb).', 'Add the specified engine oil gradually. Start the engine briefly, check for leaks, shut it off, wait, and verify the dipstick level. Top up as needed.'],
+							caution: 'Wear gloves and avoid prolonged skin contact with used oil. Dispose of used oil and the filter at an approved collection facility. The indexed capacity is presented in an image; verify the final fill level with the dipstick.',
+							sourceLabel: 'Scion Service Manual · Oil Filter: Service and Repair · page 6674', sourcePath: '/v/1/0/6674'
+						},
+						{
+							id: 'kb-subaru-oil-filter', vehicle: '2019 Subaru Crosstrek Limited', category: 'Engine & Lubrication',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Engine Oil & Filter Replacement',
+							interval: 'Follow the factory maintenance schedule; check the schedule for severe-use conditions.',
+							specs: ['Oil-and-filter replacement capacity: 4.4 L (4.7 US qt)', 'Oil drain plug: 41.7 N·m (30.8 ft-lb), new gasket', 'Engine oil: use the API / ILSAC specification and SAE viscosity shown in the factory lubricant chart', 'Oil filter: 68 mm black = 14 N·m (10.3 ft-lb); 67.4 mm blue = 12 N·m (8.9 ft-lb)'],
+							steps: ['Park on level ground, apply the parking brake, and warm the engine.', 'Remove the oil filler cap and place a drain pan beneath the engine.', 'Loosen the drain plug and drain the engine oil completely.', 'Install the drain plug with a new gasket and tighten to 41.7 N·m (30.8 ft-lb).', 'Clean the oil filter mounting surface.', 'Apply a thin coat of clean engine oil to the new filter seal.', 'Install the filter by hand. For the 68 mm black filter, tighten approximately one turn after seal contact or to 14 N·m (10.3 ft-lb) with a torque wrench. For the 67.4 mm blue filter, tighten approximately 7/8 turn after seal contact or to 12 N·m (8.9 ft-lb). Confirm which filter is fitted before tightening.', 'Add oil gradually, staying below the F mark until the level is checked.', 'Start the engine briefly and inspect for leaks. Shut it off, wait, check the dipstick, and top up to the F mark as required.'],
+							caution: 'Do not overtighten the oil filter. Filter torque depends on the filter diameter / color. The factory lubricant chart uses an image for the SAE viscosity range; confirm the correct viscosity for ambient temperature and oil specification before service.',
+							sourceLabel: 'Subaru Service Manual · Engine Oil: Replacement · page 22980', sourcePath: '/v/0/0/22980'
+						},
+						{
+							id: 'kb-scion-tire-rotation', vehicle: '2006 Scion xB', category: 'Tires & Wheels',
+							engine: '1.5L 1NZ-FE I4', title: 'Tire Rotation & Inspection',
+							interval: 'Every 5,000 miles or 6 months, whichever comes first, per the factory maintenance schedule.',
+							specs: ['Wheel lug nut torque: 103 N·m (76 ft-lb)', 'Inspect for damage and uneven tire wear during rotation', 'Use the rotation pattern appropriate for the installed tire type and wheel configuration'],
+							steps: ['Park on a firm, level surface and secure the vehicle.', 'Before lifting, check tire pressures and inspect each tire for cuts, damage, and uneven wear.', 'Loosen wheel nuts slightly, then raise and support the vehicle only at the specified jacking/support points.', 'Rotate the tires using the correct pattern for the installed tires; do not reverse directional tires or mix incompatible tire sizes/positions.', 'Reinstall the wheels and hand-start all wheel nuts.', 'Lower the vehicle enough to prevent wheel rotation and tighten the nuts evenly in a crossing sequence.', 'Torque all wheel nuts to 103 N·m (76 ft-lb). Recheck tire pressure and inspect for abnormal wear.'],
+							caution: 'Never work under a vehicle supported only by a jack. The factory schedule specifies rotation and inspection but the indexed page does not show a single universal rotation pattern; confirm tire directionality and fitment before moving wheels.',
+							sourceLabel: 'Scion Service Manual · 5,000-mile maintenance schedule · page 1668; wheel torque · page 6748', sourcePath: '/v/1/0/1668'
+						},
+						{
+							id: 'kb-scion-spark-plugs', vehicle: '2006 Scion xB', category: 'Engine & Ignition',
+							engine: '1.5L 1NZ-FE I4', title: 'Spark Plug Inspection & Service',
+							interval: 'Inspect according to the factory maintenance schedule; the indexed procedure does not state a replacement interval.',
+							specs: ['Spark plug: DENSO K16R-U or NGK BKR5EYA', 'Electrode gap: 0.7–0.8 mm (0.028–0.031 in)', 'Spark plug torque: 18 N·m (13 ft-lb)', 'Socket: 16 mm'],
+							steps: ['Allow the engine to cool and switch the ignition off.', 'Remove the ignition coils to access the four spark plugs.', 'Use a 16 mm spark plug socket to remove the plugs.', 'Inspect the threads and insulators for damage. Replace any damaged plug.', 'Inspect the electrodes and check the gap. The factory specification is 0.7–0.8 mm (0.028–0.031 in).', 'If cleaning is appropriate, use a spark plug cleaner; the factory procedure specifies 588 kPa (85 psi) maximum and 20 seconds or less for cleaning.', 'Install the plugs and torque to 18 N·m (13 ft-lb).', 'Reinstall the ignition coils.'],
+							caution: 'Work only on a cool engine. Do not force a plug into the cylinder head; start each plug by hand to avoid cross-threading. Replace plugs with damaged threads or insulators.',
+							sourceLabel: 'Scion Service Manual · Spark Plug: Testing and Inspection · page 6892; specifications · page 6893', sourcePath: '/v/1/0/6892'
+						},
+						{
+							id: 'kb-scion-coolant-service', vehicle: '2006 Scion xB', category: 'Cooling System',
+							engine: '1.5L 1NZ-FE I4', title: 'Engine Coolant Replacement & Bleed Check',
+							interval: 'Use the factory maintenance schedule for the applicable coolant replacement interval; the indexed repair procedure does not state the interval.',
+							specs: ['Coolant: Toyota Super Long Life Coolant (SLLC), or the specified equivalent long-life hybrid organic-acid coolant', 'Total capacity: manual transmission 4.4 L (4.7 US qt); automatic transmission 4.3 L (4.5 US qt)', 'Radiator drain plug torque shown in procedure: 13 N·m (9.4 ft-lb)', 'Cooling-system pressure test: 137 kPa (19.9 psi)'],
+							steps: ['Let the engine and radiator cool completely. Never remove a hot radiator cap.', 'Place a suitable drain container under the radiator. Open the radiator drain plug, remove the radiator cap, and open the cylinder-block drain cock.', 'Close the drain points and refill the radiator with Toyota Super Long Life Coolant (SLLC). Tighten the radiator drain plug to the specified 13 N·m (9.4 ft-lb).', 'Fill the coolant reservoir to the FULL line with the same coolant.', 'With the radiator cap secured, warm the engine at 2,000–2,500 rpm until the cooling fan operates. Follow the factory procedure for heater/A/C settings.', 'While warming, carefully compress the radiator hoses several times to help release trapped air. Keep hands clear of the fan and use protective gloves.', 'Shut the engine off and allow it to cool completely. Recheck the radiator and reservoir levels; top up as needed.', 'Pressure-test the cooling system at 137 kPa (19.9 psi) and inspect for leaks.'],
+							caution: 'Hot coolant is pressurized and can cause severe burns. Do not open the radiator cap while hot. Never substitute plain water for coolant. Dispose of used coolant according to local regulations. Capacity varies by transmission.',
+							sourceLabel: 'Scion Service Manual · Coolant: Testing and Inspection · page 6870; capacity · page 6871; coolant type · page 6872', sourcePath: '/v/1/0/6870'
+						},
+						{
+							id: 'kb-scion-drive-belt-inspection', vehicle: '2006 Scion xB', category: 'Engine & Accessories',
+							engine: '1.5L 1NZ-FE I4', title: 'Drive Belt Inspection & Tension Check',
+							interval: 'Inspect during scheduled maintenance and whenever belt noise, visible damage, or charging/steering concerns occur.',
+							specs: ['Factory procedure uses a belt tension gauge or a deflection check', 'Deflection check pressing force: 98 N (22 lb)', 'After installing a new belt, run the engine for approximately 5 minutes and recheck tension'],
+							steps: ['With the engine off, inspect both accessory belts for cracking, fraying, glazing, contamination, and damaged ribs.', 'Check that each belt is seated correctly in every pulley groove.', 'Use a belt tension gauge to measure tension, or use the factory deflection method with a 98 N (22 lb) pressing force at the specified measurement point.', 'Compare the measurement with the correct new-belt or used-belt specification in the factory manual. The numeric tension/deflection table is embedded as an image in the source page and is not reproduced here.', 'If a belt has been removed or replaced, confirm correct pulley routing and seating.', 'After installing a new belt, run the engine for approximately 5 minutes, shut it off, and recheck tension.'],
+							caution: 'Do not guess the belt tension target: the source table is image-based. Use the factory chart for the correct belt condition and measurement point. Keep hands, clothing, and tools clear of moving belts and pulleys.',
+							sourceLabel: 'Scion Service Manual · Drive Belt: Testing and Inspection · page 6879; Service and Repair · page 6880', sourcePath: '/v/1/0/6879'
+						},
+						{
+							id: 'kb-scion-manual-trans-fluid', vehicle: '2006 Scion xB', category: 'Drivetrain',
+							engine: '1.5L 1NZ-FE I4 · manual transaxle only', title: 'Manual Transaxle Oil Level Inspection',
+							interval: 'Condition-based inspection; follow the factory maintenance schedule and inspect for leaks or abnormal transmission noise.',
+							specs: ['Oil grade: API GL-4 or GL-5', 'Viscosity: SAE 75W-90', 'Standard capacity: 1.9 L (2.0 US qt)', 'Filler plug torque: 39 N·m (29 ft-lb)', 'Oil level: 0–5 mm (0–0.20 in) below the bottom edge of the filler opening'],
+							steps: ['Confirm the vehicle has the manual transaxle; this procedure does not apply to the automatic transmission.', 'Park on a level surface and secure the vehicle.', 'Remove the transaxle filler plug and gasket.', 'Check that the oil level is 0–5 mm (0–0.20 in) below the bottom lip of the filler opening.', 'If low, inspect for leaks and correct the cause. Add API GL-4 or GL-5 SAE 75W-90 gear oil to the specified level.', 'Install a new gasket and the filler plug. Tighten to 39 N·m (29 ft-lb).', 'Drive the vehicle, then recheck the level and inspect for leakage.'],
+							caution: 'This is a level inspection/top-up procedure, not a complete drain-and-refill procedure. Do not overfill or underfill. The 1.9 L figure is the stated standard capacity, not a guaranteed refill quantity.',
+							sourceLabel: 'Scion Service Manual · Transmission Oil Service · page 2404', sourcePath: '/v/1/0/2404'
+						},
+						{
+							id: 'kb-subaru-tire-rotation', vehicle: '2019 Subaru Crosstrek Limited', category: 'Tires & Wheels',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Tire Inspection & Rotation',
+							interval: 'The owner manual recommends rotation every 7,500 miles (12,000 km); Subaru of America’s 2019 maintenance recommendations list tire rotation and inspection every 12 months or 12,000 miles (19,000 km). Follow the earlier applicable interval.',
+							specs: ['Inspect for damage, nails, stones, abnormal wear, and tread depth', 'Replace tires when tread-wear indicators become visible (1.6 mm / 0.063 in)', 'After rotation, adjust tire pressures and tighten wheel nuts to the vehicle specification'],
+							steps: ['Park on a firm, level surface and secure the vehicle.', 'Inspect each tire for cuts, punctures, embedded objects, sidewall damage, and uneven wear.', 'Check tread depth and look for the built-in wear indicators. Replace a tire if the indicators are visible.', 'Raise and support the vehicle at the specified lifting points. Never work beneath a vehicle supported only by a jack.', 'Rotate the tires in the factory-specified order for this vehicle and tire setup. Confirm directional or asymmetric tire requirements before moving any wheel.', 'Reinstall wheels and hand-start the wheel nuts. Tighten in the specified sequence and to the torque shown in the owner manual under Flat Tires.', 'Set all four tire pressures to the door-jamb placard values and recheck after rotation.'],
+							caution: 'The owner-manual 7,500-mile interval is earlier than the 12-month / 12,000-mile maintenance recommendation in Subaru’s 2019 schedule. Do not use a generic rotation pattern or guessed lug torque; check the vehicle-specific rotation diagram and wheel-nut torque in the linked manual.',
+							sourceLabel: 'Subaru Crosstrek Owner Manual · Tire care / rotation guidance', sourcePath: 'https://www.sucross.com/tire_care_maintenance_and_safety_practices-718.html'
+						},
+						{
+							id: 'kb-subaru-air-cleaner', vehicle: '2019 Subaru Crosstrek Limited', category: 'Engine & Intake',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Engine Air Cleaner Element Replacement',
+							interval: 'Every 36 months or 45,000 miles (72,000 km), whichever comes first, per Subaru of America’s 2019 maintenance recommendations. Inspect more often and replace more frequently in extremely dusty conditions.',
+							specs: ['Use the Subaru genuine air cleaner element specified for the engine type', '2019 schedule interval: 36 months / 45,000 miles (72,000 km)', 'Extremely dusty operating conditions require more frequent replacement'],
+							steps: ['Switch the ignition off and allow the engine compartment to cool.', 'Locate the air cleaner case and release its retaining clips or fasteners.', 'Lift the case cover carefully without pulling or damaging the intake duct or sensor wiring.', 'Remove the air cleaner element and inspect the case for leaves, dust, or debris.', 'Clean loose debris from the case without allowing dirt to enter the clean-air outlet.', 'Install the correct Subaru air cleaner element in the original orientation, making sure its sealing edge is seated evenly.', 'Reinstall the case cover and secure all clips or fasteners. Check that the intake duct is fully connected.'],
+							caution: 'The service manual directs use of the Subaru genuine air cleaner element for the applicable engine type and warns that an incorrect element may affect engine performance. If the case or duct does not reseat cleanly, stop and check the fit rather than forcing it.',
+							sourceLabel: 'Subaru Crosstrek Service Manual · Intake (Induction) / Air Cleaner Element', sourcePath: 'https://www.sucross.com/intake_induction_h4do_-2816.html'
+						},
+						{
+							id: 'kb-subaru-cabin-filter', vehicle: '2019 Subaru Crosstrek Limited', category: 'HVAC & Cabin',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Cabin A/C Filter Replacement',
+							interval: 'Every 12 months or 12,000 miles (19,200 km), whichever comes first; replace more often in extremely dusty conditions.',
+							specs: ['Factory maintenance schedule: 12 months / 12,000 miles', 'Use a filter listed for the 2019 Crosstrek HVAC configuration', 'Observe the airflow direction marked on the replacement filter'],
+							steps: ['Switch the ignition off and empty the glove box.', 'Open the glove box and carefully release its damper and side stops so the glove box can lower.', 'Release the cabin-filter access cover behind the glove box.', 'Slide the filter tray out and note the installed filter orientation and airflow marking.', 'Remove the old filter and clean loose debris from the tray without pushing debris into the HVAC housing.', 'Install the replacement filter in the same orientation, matching the airflow arrow to the housing marking.', 'Reinstall the filter cover, glove-box stops, and damper. Open and close the glove box to confirm normal operation.'],
+							caution: 'The periodic-maintenance manual refers the detailed removal and installation sequence to the A/C section. Do not force glove-box retainers or filter-tray tabs; verify the exact filter orientation and fit before closing the housing.',
+							sourceLabel: 'Subaru Crosstrek Service Manual · Periodic Maintenance / A/C Filter; HVAC section', sourcePath: 'https://www.sucross.com/hvac_system_heater_ventilator_and_a_c_-2584.html'
+						},
+						{
+							id: 'kb-subaru-coolant', vehicle: '2019 Subaru Crosstrek Limited', category: 'Cooling System',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Engine Coolant Replacement & Bleeding',
+							interval: 'First replacement after 11 years or 137,500 miles; then every 6 years or 75,000 miles. Inspect the cooling system at the factory schedule intervals.',
+							specs: ['Coolant: Subaru Super Coolant', 'Add Subaru genuine cooling-system conditioner when replacing coolant', 'The factory procedure requires repeated fill / warm-up / cool-down checks to remove air', 'Do not use plain water instead of coolant'],
+							steps: ['Turn the ignition off and allow the engine to cool completely. Raise and safely support the vehicle.', 'Remove the under cover and place a suitable drain container beneath the cooling-system drain.', 'Remove the drain plug and radiator cap to drain the coolant. Install the drain plug using new O-rings, then reinstall the under cover.', 'For CVT models, keep the select lever in P or N during the filling procedure and do not shift it.', 'Pour Subaru genuine cooling-system conditioner through the filler neck, then fill the radiator with Subaru Super Coolant to the filler-neck position.', 'Fill the coolant reservoir to the FULL mark. Close the radiator cap and start the engine; race the engine 5–6 times at 3,000 rpm or less, completing this sequence within 40 seconds, then stop the engine.', 'Wait one minute with the ignition off, reopen the radiator cap, and top up if the level has dropped. Repeat the warm-up and top-up sequence as specified.', 'Secure the radiator and reservoir caps. Set the heater to maximum hot, blower to LO, and A/C off. Run the engine at 3,000 rpm or less until the radiator fan starts and stops.', 'Stop the engine and allow the coolant temperature to fall to 30°C (86°F) or less. Recheck the radiator and reservoir levels and top up as required.', 'If a flowing or gurgling sound remains from the heater core, repeat the factory bleeding sequence. Check for leaks after the system is fully cool.'],
+							caution: 'Hot coolant can cause severe burns. Never open the radiator cap while hot. Use Subaru Super Coolant and the specified cooling-system conditioner; the manual warns against substituting water. Dispose of coolant responsibly. This is a detailed bleeding procedure—if you cannot safely raise the vehicle or control coolant temperature, use a qualified shop.',
+							sourceLabel: 'Subaru Crosstrek Service Manual · Engine Coolant / Replacement; Maintenance Schedule', sourcePath: 'https://www.sucross.com/replacement-1519.html'
+						},
+						{
+							id: 'kb-subaru-annual-brake-chassis-inspection', vehicle: '2019 Subaru Crosstrek Limited', category: 'Brakes & Chassis',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: 'Annual Brake, Axle & Chassis Inspection',
+							interval: 'Every 12 months or 12,000 miles (19,000 km), whichever comes first, per Subaru of America’s 2019 maintenance recommendations.',
+							specs: ['Inspect brake lines, parking brake and service-brake operation', 'Inspect disc brake pads and discs, axle boots and joints, steering and suspension', 'The schedule’s clutch-operation item does not apply to this CVT-only Limited configuration', 'No pad/disc wear limits or fastener torque values are supplied here; use the VIN-specific 2019 service procedure'],
+							steps: ['Park on level ground, switch the ignition off and allow the brakes to cool.', 'Check visible brake pipes and flexible hoses for corrosion, kinks, abrasion, cracking, wetness or leakage.', 'Check the parking brake and service brake for normal operation; investigate warning lamps, abnormal pedal feel, pulling, noise or vibration.', 'Through the wheel openings, inspect pad material and rotor surfaces for uneven wear, deep scoring, cracking, heavy corrosion or signs of overheating.', 'Inspect accessible axle boots for splits, loose clamps and grease leakage.', 'Inspect steering and suspension components for damaged rubber boots/bushings, leaks, looseness or impact damage.', 'Record defects and arrange repair using the exact 2019 service-manual measurements and torque specifications before returning an unsafe vehicle to service.'],
+							caution: 'This card is a scheduled visual/functional inspection, not a brake overhaul. Do not work under a vehicle supported only by a jack, and do not dismantle brake or suspension joints without the model-specific procedure. Any brake-fluid leak, structural corrosion, severe rotor damage or abnormal brake operation requires prompt professional diagnosis.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations (12 months / 12,000 miles); Subaru Crosstrek Service Manual · Brake / Suspension sections',
+							sourcePath: 'https://contactus.subaru.com/knowledgebase/article/1001832/en-us'
+						},
+						{
+							id: 'kb-subaru-brake-fluid', vehicle: '2019 Subaru Crosstrek Limited', category: 'Brakes & Chassis',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: 'Brake Fluid Replacement',
+							interval: 'Every 24 months or 30,000 miles (48,000 km), whichever comes first, per Subaru of America’s 2019 maintenance recommendations.',
+							specs: ['Crosstrek service-manual mirror lists FMVSS No. 116 DOT 3 or DOT 4 brake fluid; confirm the correct fluid against the vehicle reservoir cap and VIN-specific 2019 information before service', 'The mirrored procedure estimates approximately 500 mL (16.9 US fl oz) for the entire brake system; this is an estimate, not a guaranteed purchase/fill quantity', 'Use new fluid only; do not mix brands or grades', 'No bleeder torque is stated in this card because 2019 Limited applicability was not independently confirmed'],
+							steps: ['Confirm the correct fluid specification for this exact vehicle before opening the hydraulic system.', 'Protect painted surfaces and keep dirt out of the reservoir. Use a clean, dedicated brake-fluid container and fresh unopened fluid.', 'Safely lift and support the vehicle and remove the wheels only if equipped to do so.', 'Drain the reservoir as directed by the service procedure, replenish with new specified fluid, and bleed each caliper using the factory sequence.', 'Keep the reservoir above MIN throughout the process; never allow it to run dry or introduce air.', 'Continue until fresh fluid is visible at each bleeder, then set the reservoir level and inspect all connections for leaks.', 'With the vehicle safely stationary, verify a firm, consistent brake pedal and correct braking operation before road use. If pedal feel is abnormal, do not drive the vehicle.'],
+							caution: 'Brake hydraulics are safety-critical. The service-manual mirror is not confirmed as the exact 2019 GT revision. If the reservoir runs dry, air enters the ABS/VDC hydraulic unit, or the pedal is not firm, stop and use a qualified Subaru-capable shop; additional diagnostic bleeding may be required. Brake fluid damages paint—wash spills away immediately with water.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations; Crosstrek Service Manual mirror · Brake Fluid / Replacement and Air Bleeding',
+							sourcePath: 'https://www.sucross.com/replacement-1063.html'
+						},
+						{
+							id: 'kb-subaru-30k-inspection', vehicle: '2019 Subaru Crosstrek Limited', category: 'Engine & Chassis',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: '30,000-Mile Drive Belt, Fuel, Cooling & Wheel-Bearing Inspection',
+							interval: 'Every 24 months or 30,000 miles (48,000 km), whichever comes first, per Subaru of America’s 2019 maintenance recommendations.',
+							specs: ['Inspect drive belts; fuel systems, lines and connections; cooling-system hoses and connections; and wheel bearings', 'This is an inspection interval, not an instruction to replace these components automatically', 'No belt tension value, wheel-bearing play limit or fastener torque is supplied because the exact 2019 specifications were not verified'],
+							steps: ['With the engine off and cool, inspect the accessory drive belt for cracks, fraying, missing ribs, glazing, contamination and incorrect seating.', 'Inspect visible fuel lines and connections for abrasion, corrosion, damage, looseness or any sign of fuel leakage. Do not disconnect or open the pressurized fuel system.', 'Inspect radiator and coolant hoses and connections for swelling, cracking, hardening, chafing, seepage or loose clamps.', 'Check for wheel-bearing noise, roughness or looseness using the factory inspection method; do not assume a generic play limit.', 'Record any abnormality and use the VIN-specific Subaru procedure for measurements, diagnosis and repair.'],
+							caution: 'Never inspect a moving belt with hands or tools near pulleys. Do not open the fuel system or remove cooling-system caps while hot. Wheel-bearing measurement and repair require correct lifting/support and model-specific specifications.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations (24 months / 30,000 miles); Crosstrek Service Manual · H4DO V-belt section',
+							sourcePath: 'https://contactus.subaru.com/knowledgebase/article/1001832/en-us'
+						},
+						{
+							id: 'kb-subaru-fuel-filter', vehicle: '2019 Subaru Crosstrek Limited', category: 'Fuel System',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: 'Fuel Filter Replacement — Scheduled Service',
+							interval: 'Every 36 months or 45,000 miles (72,000 km), whichever comes first, per Subaru of America’s 2019 maintenance recommendations.',
+							specs: ['The interval is confirmed by Subaru’s 2019 schedule', 'The exact 2019 filter assembly, service access, pressure-relief procedure, seals and torque values were not verified', 'Do not use a generic external-filter procedure or assume the filter is separately serviceable'],
+							steps: ['Use this card as a maintenance reminder only.', 'Before parts are ordered or the fuel system is opened, identify the correct fuel-filter/strainer service procedure and part for the vehicle VIN in the 2019 Subaru service information.', 'Have a qualified technician depressurize the fuel system and follow the specified fire-safety, sealing and leak-check procedure.', 'After service, verify there is no fuel leakage before operating the vehicle.'],
+							caution: 'Fuel-system work involves flammable, pressurized fuel. No DIY removal/installation sequence is provided because the exact 2019 Limited procedure and torque specifications were not verified.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations (36 months / 45,000 miles)',
+							sourcePath: 'https://contactus.subaru.com/knowledgebase/article/1001832/en-us'
+						},
+						{
+							id: 'kb-subaru-spark-plugs', vehicle: '2019 Subaru Crosstrek Limited', category: 'Engine & Ignition',
+							engine: '2.0L FB20D H4 (non-hybrid)', title: 'Spark Plug Replacement',
+							interval: 'Schedule discrepancy: Subaru of America’s 2019 recommendations list 72 months (approximately 70,000–90,000 miles); the US service-manual periodic schedule table marks replacement at 60 months / 60,000 miles. Confirm the current VIN-specific schedule before setting the due date.',
+							specs: ['Factory plug: NGK SILZKAR7B11', 'Spark plug gap: 1.0–1.1 mm (0.039–0.043 in); replace the plug if outside specification', 'Spark plug tightening torque: 17.5 N·m (12.9 ft-lb)', 'Ignition coil tightening torque: 8.5 N·m (6.3 ft-lb)', 'Four spark plugs are required'],
+							steps: ['Allow the engine to cool completely and switch the ignition off.', 'Disconnect the battery ground cable before accessing the ignition coils.', 'RH side: remove the air cleaner case. LH side: access the coil after disconnecting the battery ground cable; follow the factory side-specific access instructions.', 'Disconnect each ignition-coil connector. The factory procedure releases the connector lock by pressing its spring and sliding it with a clip remover.', 'Remove the ignition coil, then remove the spark plug with a spark-plug socket.', 'Inspect the plug terminal, insulator, gasket and electrodes. Look for cracks, damage, abnormal deposits or overheating.', 'If cleaning is appropriate, use a nylon brush only. Subaru says not to use a plug cleaner or metal brush. Check the gap with a gap gauge; replace the plug if the gap is outside 1.0–1.1 mm.', 'Install the specified NGK SILZKAR7B11 plug and tighten to 17.5 N·m (12.9 ft-lb).', 'Reinstall each ignition coil and tighten its mounting fastener to 8.5 N·m (6.3 ft-lb). Reconnect the coil connectors and reinstall the RH air cleaner case.'],
+							caution: 'The 60,000-mile / 60-month service-manual table conflicts with Subaru of America’s 2019 owner-facing recommendation of 72 months (about 70,000–90,000 miles). Do not silently choose one interval; confirm the applicable schedule for this vehicle. Work only on a cool engine. Do not force plugs into the aluminum cylinder head or adjust a fine-wire electrode by prying on the center electrode.',
+							sourceLabel: 'Subaru Service Manual · IGNITION(H4DO) Spark Plug · Specification 2695, Inspection 2702, Removal 2703, Installation 2704; Schedule 3417; Subaru of America 2019 schedule',
+							sourcePath: 'https://www.sucross.com/ignition_h4do_-2692.html'
+						},
+						{
+							id: 'kb-subaru-cvt-fluid', vehicle: '2019 Subaru Crosstrek Limited', category: 'Drivetrain',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: 'TR580 CVT Fluid Inspection & Service',
+							interval: 'Normal schedule: inspect every 48 months or 60,000 miles (96,000 km). Severe service: replace every 40,000 km (24,855 miles).',
+							specs: ['Specified fluid: SUBARU CVT FLUID LINEARTRONIC II; Subaru warns that using another fluid can cause malfunction', 'Total system capacity: 11.68–12.18 L (12.3–12.9 US qt); this is not the drain-and-refill quantity', 'CVTF level-setting temperature: 35–45°C (95–113°F), read with Subaru Select Monitor', 'Drain plug: 31 N·m (22.9 ft-lb), new gasket', 'Filler plug: 50 N·m (36.9 ft-lb), new gasket'],
+							steps: ['At each scheduled inspection, check the transmission case, cooler connections and lines for CVTF leakage.', 'If replacement is required by severe-use conditions or diagnosis, raise the vehicle level and remove the CVTF drain plug. Inspect the drained fluid for metal particles, burnt/thick varnish appearance, cloudiness or bubbles.', 'Install the drain plug with a new gasket and tighten to 31 N·m (22.9 ft-lb).', 'Remove the filler plug and add only SUBARU CVT FLUID LINEARTRONIC II to the lower section of the filler opening. Temporarily install the filler plug.', 'With the engine idling, use Subaru Select Monitor to bring CVTF temperature to 35–45°C (95–113°F).', 'With the engine idling, move the select lever P → R → N → D, then D → N → R → P to circulate fluid.', 'With the engine still running and the select lever in P, follow the factory level-adjustment procedure. The correct level is at the lower section of the filler opening; check for leakage.', 'Install the filler plug with a new gasket and tighten to 50 N·m (36.9 ft-lb).'],
+							caution: 'This is not a conventional dipstick check or a generic drain-and-fill. Correct level setting requires the specified temperature window, Subaru Select Monitor and the engine idling while the vehicle is raised. CVTF is hot after operation; avoid burns and keep spilled fluid off the exhaust. Use a Subaru-capable shop if the correct scan tool and safe lifting equipment are unavailable.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations; Crosstrek Service Manual · TR580 CVTF Specification 1366, Adjustment 1306, Condition Check 1307, Inspection 1308, Replacement 1309',
+							sourcePath: 'https://www.sucross.com/continuously_variable_transmission_tr580_-1284.html'
+						},
+						{
+							id: 'kb-subaru-front-differential', vehicle: '2019 Subaru Crosstrek Limited', category: 'Drivetrain',
+							engine: '2.0L FB20D H4 · TR580 CVT', title: 'Front Differential Gear Oil Inspection & Service',
+							interval: 'Normal schedule: inspect every 48 months or 60,000 miles (96,000 km). Severe service: replace every 15 months or 24,000 km (15,000 miles).',
+							specs: ['Specified lubricant: SUBARU GEAR OIL EXTRA MT or equivalent; the owner manual also lists API GL-5 75W-90 as an alternative', 'Front differential capacity: 1.14–1.24 L (1.2–1.3 US qt)', 'Front differential is separate from the TR580 CVT fluid circuit', 'Drain plug: T70 Torx, 70 N·m (51.6 ft-lb), new gasket', 'Overflow/check plug and filler plug: each 50 N·m (36.9 ft-lb), new gaskets'],
+							steps: ['Inspect the front differential housing and seals for leakage or damage at the scheduled interval.', 'If service is required, let the gear oil cool and raise the vehicle level using approved lifting points and supports.', 'Remove the T70 drain plug and drain the differential gear oil. Install the drain plug with a new gasket and tighten to 70 N·m (51.6 ft-lb).', 'Remove the filler plug and overflow drain plug. Fill through the filler opening with the specified gear oil until oil flows from the overflow opening.', 'When the flow narrows to a thin stream, install the overflow plug with a new gasket and tighten to 50 N·m (36.9 ft-lb).', 'Install the filler plug with a new gasket and tighten to 50 N·m (36.9 ft-lb). Check for leakage.'],
+							caution: 'Do not confuse the front differential gear oil with the CVTF; they are separate fluids and use different service points. Keep the vehicle level during the overflow-level procedure. Differential oil is hot after driving, and spilled oil on the exhaust can smoke or ignite.',
+							sourceLabel: 'Subaru of America · 2019 Maintenance Recommendations; Crosstrek Service Manual · TR580 Differential Gear Oil Specification 1366, Adjustment 1321, Replacement 1322, Inspection 1323',
+							sourcePath: 'https://www.sucross.com/replacement-1322.html'
+						},
+						{
+							id: 'kb-subaru-rear-differential', vehicle: '2019 Subaru Crosstrek Limited', category: 'Drivetrain',
+							engine: '2.0L FB20D H4 · AWD · CVT', title: 'Rear Differential Gear Oil Inspection & Service',
+							interval: 'Normal schedule: inspect every 48 months or 60,000 miles (96,000 km). Severe service: replace every 15 months or 24,000 km (15,000 miles).',
+							specs: ['Vehicle identification confirmed from the rear-differential white label: serial 571852, I.D. 43; Subaru TSB 03-87-21 maps I.D. 43 to R152 differential model VB1BAA, part 38300AC380', 'R152 corresponds to the VA1-type service procedure in the Crosstrek service manual; use the VA1-type plug sealing and torque specifications', 'For this identified VA1/R152 unit: drain plug 50 N·m (36.9 ft-lb) and filler plug 50 N·m (36.9 ft-lb); install a new gasket at each plug', 'Rear differential oil capacity: approximately 0.8 L (0.8 US qt); fill to the bottom of the filler opening and avoid overfilling', 'Subaru TSB 03-87-21 specifies Subaru High Performance 75W-90 gear oil for R152 differential service; confirm current VIN-specific Subaru fluid/parts guidance before service'],
+							steps: ['Inspect the rear differential case, seals and plugs for leakage or damage at the scheduled interval.', 'For a fluid-condition check, follow the factory inspection procedure; replace the oil if it is contaminated, deteriorated or cloudy.', 'The white differential label identifies serial 571852 and I.D. 43. Subaru TSB 03-87-21 lists I.D. 43 as R152 / VB1BAA. The separate cast/stamped mark X96 is not the identification number used by that bulletin.', 'If replacement is required, raise and support the vehicle level. Differential oil can be hot; avoid burns and keep spilled oil off the exhaust.', 'Remove the drain and filler plugs, drain the oil, and install each plug with a new gasket. Tighten both VA1/R152 plugs to 50 N·m (36.9 ft-lb).', 'Refill with the specified R152 gear oil to the bottom of the filler opening. Carefully control the level; avoid overfilling or underfilling.', 'Check for leaks after installation. Use the current VIN-specific Subaru service information and proper lifting/support equipment.'],
+							caution: 'Identification is now confirmed by the white label: I.D. 43 maps to R152 in Subaru TSB 03-87-21. The matching Crosstrek service-manual VA1-type procedure specifies new plug gaskets and 50 N·m for both drain and filler plugs. Do not use the T-type 49 N·m / liquid-gasket procedure. Subaru describes its service bulletins as professional-technician information; safe lifting and correct fluid-level setup are essential.',
+							sourceLabel: 'Crosstrek Service Manual · Differential Gear Oil Replacement 1628 and Inspection 1627 (VA1-type); Subaru TSB 03-87-21 · R152 I.D. 43 / VB1BAA / 38300AC380 / High Performance 75W-90; 2018–2023 Crosstrek Owner Manual · Specifications 12-6',
+							sourcePath: 'https://www.sucross.com/replacement-1628.html'
+						}
+
 					],
 
 					advisorChat: [
@@ -3170,14 +3409,59 @@
 					get predictiveItems() {
 						return this.predictiveForVehicle(this.activeVehicle);
 					},
+					get nextScheduledMaintenance() {
+						return this.predictiveItems
+							.filter(item => item.status !== 'Red')
+							.sort((a, b) => (a.remainingDays ?? 999999) - (b.remainingDays ?? 999999) || (a.remainingMiles ?? 999999999) - (b.remainingMiles ?? 999999999))[0] || null;
+					},
 
-					predictiveForVehicle(vehicle) {
+					isMaintenanceArchived(vehicleId, scheduleId) {
+						return (this.archivedMaintenance || []).some(item => String(item.vehicleId) === String(vehicleId) && String(item.scheduleId) === String(scheduleId));
+					},
+
+					get archivedMaintenanceForActiveVehicle() {
+						return (this.archivedMaintenance || []).filter(item => String(item.vehicleId) === String(this.activeVehicleId)).sort((a,b) => String(b.archivedAt||'').localeCompare(String(a.archivedAt||'')));
+					},
+
+					async unarchiveMaintenanceItem(archiveId) {
+						this.archivedMaintenance = (this.archivedMaintenance || []).filter(item => String(item.id) !== String(archiveId));
+						await this.saveToStorage();
+					},
+
+					applyGarageSetupAdjustments() {
+						if (Number(this.maintenanceSetupVersion || 0) >= 1) return;
+						const readings = { 'scion-xb': 219634, 'subaru-crosstrek': 141265 };
+						this.vehicles = (this.vehicles || []).map(vehicle => readings[vehicle.id] ? { ...vehicle, odometer: readings[vehicle.id] } : vehicle);
+						this.archivedMaintenance = Array.isArray(this.archivedMaintenance) ? this.archivedMaintenance : [];
+						this.vehicles.forEach(vehicle => {
+							this.predictiveForVehicle(vehicle, true).filter(item => item.status === 'Red').forEach(item => {
+								if (this.isMaintenanceArchived(vehicle.id, item.id)) return;
+								this.archivedMaintenance.push({
+									id: `archive-${vehicle.id}-${item.id}`,
+									vehicleId: vehicle.id,
+									scheduleId: item.id,
+									serviceName: item.serviceName,
+									statusAtArchive: item.status,
+									remainingMilesAtArchive: item.remainingMiles,
+									nextDueMileageAtArchive: item.nextDueMileage,
+									nextDueDateAtArchive: item.nextDueDate,
+									lastPerformedMileageAtArchive: item.lastPerformedMileage,
+									lastPerformedDateAtArchive: item.lastPerformedDate,
+									archivedAt: new Date().toISOString(),
+									reason: 'Pending service-history reconciliation'
+								});
+							});
+						});
+						this.maintenanceSetupVersion = 1;
+					},
+
+					predictiveForVehicle(vehicle, includeArchived = false) {
 						if (!vehicle) return [];
 						const logs = this.logs.filter(l => l.vehicleId === vehicle.id || l.vehicle === vehicle.name).filter(l => Number.isFinite(Number(l.mileage))).sort((a,b) => Number(a.mileage||0)-Number(b.mileage||0));
 						const today = new Date(), odometer = Number(vehicle.odometer)||0;
 						let dailyMiles = 28;
 						if (logs.length >= 2) { const first=logs[0], last=logs[logs.length-1]; const days=Math.max(1,(new Date(last.date||today)-new Date(first.date||today))/86400000); const distance=Math.max(0,Number(last.mileage)-Number(first.mileage)); if(distance>0) dailyMiles=Math.max(5,Math.min(150,distance/days)); }
-						return this.schedules.map(sch => {
+						const computed = this.schedules.map(sch => {
 							const terms=(sch.terms||[sch.serviceName.split(' ')[0]]).map(x=>x.toLowerCase());
 							const matched=logs.filter(l=>terms.some(t=>(l.serviceType||'').toLowerCase().includes(t)));
 							const lastLog=matched[matched.length-1], hasHistory=!!lastLog;
@@ -3193,7 +3477,8 @@
 							const useMileage=dueByMileage||(!dueByDate&&daysToMileage<=remainingDaysByDate);
 							const projectedDate=useMileage&&remainingMiles>0?new Date(today.getTime()+daysToMileage*86400000):nextDueByDate;
 							return {id:sch.id,serviceName:sch.serviceName,intervalMiles:sch.intervalMiles,intervalDays:sch.intervalDays,lastPerformedMileage:hasHistory?Number(lastLog.mileage):null,lastPerformedDate:hasHistory?lastLog.date:null,nextDueMileage,remainingMiles,remainingDays:Math.min(daysToMileage||Infinity,remainingDaysByDate),remainingDaysByDate,urgencyScore,status,nextDueDate:projectedDate.toLocaleDateString(),dueDateISO:projectedDate.toISOString().split('T')[0],dailyMiles:Math.round(dailyMiles*10)/10,confidence:hasHistory?(matched.length>=2?'High':'Medium'):'Low',basis:useMileage?'mileage':'time',hasHistory,matchedCount:matched.length};
-						}).sort((a,b)=>b.urgencyScore-a.urgencyScore);
+						});
+						return (includeArchived ? computed : computed.filter(item => !this.isMaintenanceArchived(vehicle.id, item.id))).sort((a,b)=>b.urgencyScore-a.urgencyScore);
 					},
 
 					get dynamicHealth() { return this.healthForVehicleDetailed(this.activeVehicle); },
@@ -3349,10 +3634,27 @@
 						return allAtts;
 					},
 
+					toggleKnowledgeBaseCard(id) {
+						if (this.kbExpandedIds.includes(id)) this.kbExpandedIds = this.kbExpandedIds.filter(value => value !== id);
+						else this.kbExpandedIds = [...this.kbExpandedIds, id];
+					},
+					isKnowledgeBaseExpanded(id) {
+						return this.kbExpandedIds.includes(id);
+					},
+					expandAllKnowledgeBaseCards() {
+						this.kbExpandedIds = this.filteredKnowledgeBase.map(item => item.id);
+					},
+					collapseAllKnowledgeBaseCards() {
+						this.kbExpandedIds = [];
+					},
+
 					get filteredKnowledgeBase() {
-						if (!this.kbSearchQuery.trim()) return this.knowledgeBase;
-						const q = this.kbSearchQuery.toLowerCase();
-						return this.knowledgeBase.filter(k => k.title.toLowerCase().includes(q) || k.vehicle.toLowerCase().includes(q));
+						const q = String(this.kbSearchQuery || '').trim().toLowerCase();
+						if (!q) return this.knowledgeBase;
+						return this.knowledgeBase.filter(k => [
+							k.title, k.vehicle, k.engine, k.category, k.interval, k.sourceLabel,
+							...(k.steps || []), ...(k.specs || []), k.caution
+						].filter(Boolean).join(' ').toLowerCase().includes(q));
 					},
 
 					get smartSearchResults() {
@@ -3423,6 +3725,7 @@
 								await this.migrateAttachmentData();
 								this.hydrateAttachments();
 							}
+							this.applyGarageSetupAdjustments();
 							if (!this.activeVehicleId || !this.activeVehicle) this.activeVehicleId = this.vehicles[0]?.id;
 							await this.saveToStorage();
 							await this.runDatabaseHealthCheck();
@@ -3459,6 +3762,8 @@
 						if (Array.isArray(saved.projects)) this.projects = saved.projects;
 						if (Array.isArray(saved.inventory)) this.inventory = saved.inventory;
 						if (Array.isArray(saved.maintenancePlans)) this.maintenancePlans = saved.maintenancePlans;
+						if (Array.isArray(saved.archivedMaintenance)) this.archivedMaintenance = saved.archivedMaintenance;
+						this.maintenanceSetupVersion = Number(saved.maintenanceSetupVersion || 0);
 					},
 
 				normalizeData() {
@@ -3473,12 +3778,13 @@
 					this.projects = (Array.isArray(this.projects)?this.projects:[]).map((p,i)=>({...p,id:p?.id||makeId('project',i),vehicleId:resolve(p?.vehicleId,p?.vehicle),tasks:Array.isArray(p?.tasks)?p.tasks:[]}));
 					this.inventory = (Array.isArray(this.inventory)?this.inventory:[]).map((p,i)=>({...p,id:p?.id||makeId('part',i),quantity:Number.isFinite(Number(p?.quantity))?Number(p.quantity):0,reservedQuantity:Math.max(0,Number(p?.reservedQuantity||0)),unitCost:Number.isFinite(Number(p?.unitCost))?Number(p.unitCost):0}));
 					this.maintenancePlans = (Array.isArray(this.maintenancePlans)?this.maintenancePlans:[]).map((p,i)=>({...p,id:p?.id||makeId('maint',i),vehicleId:resolve(p?.vehicleId,p?.vehicle),status:['Planned','Parts Reserved','In Progress','Paused','Completed','Cancelled'].includes(p?.status)?p.status:'Planned',tasks:Array.isArray(p?.tasks)?p.tasks:[],parts:Array.isArray(p?.parts)?p.parts:[],actualCost:Number(p?.actualCost||0),estimatedMin:Number(p?.estimatedMin||0),estimatedMax:Number(p?.estimatedMax||0)}));
+					this.archivedMaintenance = (Array.isArray(this.archivedMaintenance) ? this.archivedMaintenance : []).filter(item => item && item.vehicleId && item.scheduleId);
 					this.maintenancePlans.forEach(plan=>{if(plan.projectId){const project=this.projects.find(p=>String(p.id)===String(plan.projectId));if(project)project.maintenancePlanId=plan.id;}});
 				},
 
 				getPersistableState() {
 					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? undefined : val));
-					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), maintenancePlans: strip(this.maintenancePlans) };
+					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
 				},
 
 				loadGarageState() {

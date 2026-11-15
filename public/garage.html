@@ -1861,6 +1861,53 @@
 						</div>
 					</div>
 
+					<!-- COMMON SPECS (routine maintenance) -->
+					<div class="glass-panel p-5 space-y-4">
+						<div>
+							<h3 class="text-sm font-bold text-white">Common Specs</h3>
+							<p class="text-xs text-zinc-400">
+								Routine maintenance: capacities, fluids, battery, filters and tires
+								<span class="text-zinc-500" x-text="'· ' + specsFilled() + ' of ' + specsTotal() + ' filled'"></span>
+							</p>
+						</div>
+
+						<template x-if="specLinks.length">
+							<div>
+								<p class="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Look it up in the factory manual</p>
+								<div class="flex flex-wrap gap-2">
+									<template x-for="l in specLinks" :key="l.h">
+										<a
+											:href="manualLink(l.h)"
+											target="_blank" rel="noopener"
+											class="px-3 py-1.5 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] text-amber-400 hover:border-amber-500 transition"
+											x-text="l.label"
+										></a>
+									</template>
+								</div>
+							</div>
+						</template>
+
+						<template x-for="g in commonSpecGroups" :key="g.title">
+							<div class="space-y-2">
+								<h4 class="text-[11px] font-bold uppercase tracking-widest text-amber-400" x-text="g.title"></h4>
+								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+									<template x-for="it in g.items" :key="it.k">
+										<label class="block bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 focus-within:border-amber-500 transition">
+											<span class="block text-[10px] text-zinc-500" x-text="it.label"></span>
+											<input
+												type="text"
+												:value="specVal(it)"
+												@input="setSpec(it, $event.target.value)"
+												:placeholder="it.hint || '—'"
+												class="w-full bg-transparent text-sm text-white focus:outline-none placeholder-zinc-700"
+											/>
+										</label>
+									</template>
+								</div>
+							</div>
+						</template>
+					</div>
+
 					<!-- SERVICE MANUALS (LifeOS Manual Explorer) -->
 					<div class="glass-panel p-5 space-y-4">
 						<div class="flex justify-between items-start gap-3">
@@ -2917,6 +2964,72 @@
 					maintenancePartDraft: { inventoryId: '', quantity: 1 },
 					tempVehicleForm: { name: '', engine: '', vin: '', oilType: '', oilCapacity: '' },
 
+					// Common Specs (routine maintenance) - values are saved on each vehicle (legacy = existing vehicle field)
+					commonSpecGroups: [
+						{ title: 'Engine & Fuel', items: [
+							{ k: 'oilType', legacy: 'oilType', label: 'Engine oil type', hint: 'e.g. 0W-20 synthetic' },
+							{ k: 'oilCapacity', legacy: 'oilCapacity', label: 'Oil capacity (with filter)' },
+							{ k: 'oilFilter', legacy: 'oilFilter', label: 'Oil filter' },
+							{ k: 'drainPlug', label: 'Drain plug torque / washer' },
+							{ k: 'sparkPlugs', legacy: 'sparkPlugs', label: 'Spark plugs' },
+							{ k: 'plugGap', label: 'Spark plug gap' },
+							{ k: 'airFilter', label: 'Engine air filter' },
+							{ k: 'cabinFilter', label: 'Cabin air filter' },
+							{ k: 'fuelFilter', label: 'Fuel filter' },
+							{ k: 'driveBelt', label: 'Drive belt' },
+							{ k: 'fuelType', label: 'Fuel / octane' },
+							{ k: 'fuelTank', label: 'Fuel tank capacity' }
+						] },
+						{ title: 'Fluids', items: [
+							{ k: 'coolantType', label: 'Coolant type' },
+							{ k: 'coolantCap', label: 'Coolant capacity' },
+							{ k: 'transType', label: 'Transmission fluid type' },
+							{ k: 'transCap', label: 'Transmission fluid capacity' },
+							{ k: 'diffFluid', label: 'Differential / transfer fluid' },
+							{ k: 'brakeFluid', label: 'Brake fluid' },
+							{ k: 'psFluid', label: 'Power steering fluid' },
+							{ k: 'washerFluid', label: 'Washer fluid' },
+							{ k: 'acRefrigerant', label: 'A/C refrigerant' },
+							{ k: 'acOil', label: 'A/C oil / charge' }
+						] },
+						{ title: 'Battery & Electrical', items: [
+							{ k: 'batteryType', label: 'Battery type' },
+							{ k: 'batteryGroup', label: 'Battery group size' },
+							{ k: 'batteryCCA', label: 'Battery CCA' },
+							{ k: 'fobBattery', label: 'Key fob battery' }
+						] },
+						{ title: 'Tires & Wheels', items: [
+							{ k: 'tireSize', label: 'Tire size' },
+							{ k: 'tirePsi', label: 'Tire pressure (front / rear)' },
+							{ k: 'lugTorque', label: 'Lug nut torque' },
+							{ k: 'lugSize', label: 'Lug nut socket / thread' },
+							{ k: 'spareTire', label: 'Spare tire' }
+						] },
+						{ title: 'Wipers & Bulbs', items: [
+							{ k: 'wiperDriver', label: 'Wiper - driver' },
+							{ k: 'wiperPass', label: 'Wiper - passenger' },
+							{ k: 'wiperRear', label: 'Wiper - rear' },
+							{ k: 'bulbHead', label: 'Headlight bulb' },
+							{ k: 'bulbFog', label: 'Fog light bulb' },
+							{ k: 'bulbTail', label: 'Brake / tail bulb' }
+						] }
+					],
+					// Factory manual pages for this vehicle (page numbers from the Manual Explorer index; /v/<vehicle>/<manual>/<page>)
+					commonSpecLinks: {
+						'scion-xb': [
+							{ label: 'Engine oil', h: '/v/1/0/1635' }, { label: 'Coolant', h: '/v/1/0/1632' },
+							{ label: 'A/T fluid', h: '/v/1/0/1633' }, { label: 'M/T fluid', h: '/v/1/0/1634' },
+							{ label: 'Brake fluid', h: '/v/1/0/1630' }, { label: 'Power steering', h: '/v/1/0/1636' },
+							{ label: 'Refrigerant', h: '/v/1/0/1637' }, { label: 'Spark plug', h: '/v/1/0/1618' },
+							{ label: 'Oil filter', h: '/v/1/0/1626' }, { label: 'Cabin filter', h: '/v/1/0/1624' },
+							{ label: 'Wheel & tire specs', h: '/v/1/0/1660' }, { label: 'Routine service', h: '/v/1/0/1667' }
+						],
+						'subaru-crosstrek': [
+							{ label: 'Common specs', h: '/v/0/0/510' }, { label: 'Fluids', h: '/v/0/0/614' },
+							{ label: 'Tire fitment', h: '/v/0/0/619' }, { label: 'Specifications index', h: '/v/0/0/12028' }
+						]
+					},
+
 					// Service Manuals (LifeOS Manual Explorer) - not saved with garage data
 					manualQuery: '',
 					manualLibrary: {
@@ -2969,6 +3082,32 @@
 
 					get activeVehicle() {
 						return this.vehicles.find(v => v.id === this.activeVehicleId) || this.vehicles[0];
+					},
+
+					get specLinks() {
+						const v = this.activeVehicle || {};
+						const m = this.commonSpecLinks;
+						return m[v.id] || (/scion/i.test(v.name || '') ? m['scion-xb'] : /subaru|crosstrek/i.test(v.name || '') ? m['subaru-crosstrek'] : []);
+					},
+
+					specVal(it) {
+						const v = this.activeVehicle || {};
+						return it.legacy ? (v[it.legacy] ?? '') : ((v.commonSpecs || {})[it.k] ?? '');
+					},
+
+					setSpec(it, val) {
+						const v = this.activeVehicle;
+						if (!v) return;
+						if (it.legacy) { v[it.legacy] = val; }
+						else { if (!v.commonSpecs) v.commonSpecs = {}; v.commonSpecs[it.k] = val; }
+						clearTimeout(this._specTimer);
+						this._specTimer = setTimeout(() => this.saveToStorage(), 600);
+					},
+
+					specsTotal() { return this.commonSpecGroups.reduce((n, g) => n + g.items.length, 0); },
+
+					specsFilled() {
+						return this.commonSpecGroups.reduce((n, g) => n + g.items.filter(it => String(this.specVal(it)).trim()).length, 0);
 					},
 
 					get manualInfo() {

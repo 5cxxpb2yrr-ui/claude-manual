@@ -2274,7 +2274,11 @@
 											<div class="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
 												<p class="font-semibold text-amber-200" x-text="reference.title"></p>
 												<p class="text-[10px] text-zinc-500" x-text="procedureReferenceLabel(reference)"></p>
-												<a :href="projectProcedureUrl(reference)" target="_blank" rel="noopener" class="inline-block mt-1 text-amber-400 underline">Open factory manual ↗</a>
+												<div x-show="procedureHasQuickSpecs(reference)" class="mt-2 rounded-lg bg-zinc-950/80 border border-zinc-800 p-2">
+													<p class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Quick specs</p>
+													<ul class="space-y-1 text-[11px] text-zinc-200"><template x-for="(spec,index) in procedureQuickSpecs(reference)" :key="reference.id+'-record-spec-'+index"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li></template></ul>
+												</div>
+												<a :href="projectProcedureUrl(reference)" target="_blank" rel="noopener" class="inline-block mt-2 text-amber-400 underline">Open factory manual ↗</a>
 											</div>
 										</template>
 									</div>
@@ -2873,7 +2877,7 @@
 						<p class="text-zinc-500">Attach only procedures already curated in this vehicle's Maintenance Knowledge Base. The source reference is preserved; no generic repair steps are invented.</p>
 						<template x-if="!knowledgeBaseForProject(selectedProject).length"><p class="text-amber-300">No curated procedures are available for this vehicle yet. Add a verified manual procedure to the Knowledge Base first.</p></template>
 						<template x-for="procedure in knowledgeBaseForProject(selectedProject)" :key="procedure.id"><div class="flex items-center gap-2 bg-zinc-950 rounded-lg p-2"><div class="min-w-0 flex-1"><p class="text-white font-semibold" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p></div><button x-show="!projectHasProcedure(selectedProject,procedure.id)" @click="attachProjectProcedure(selectedProject,procedure.id)" class="px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300">Attach</button><span x-show="projectHasProcedure(selectedProject,procedure.id)" class="text-emerald-400">Attached</span></div></template>
-						<template x-for="procedure in (selectedProject.procedures||[])" :key="procedure.id"><div class="flex items-center justify-between gap-2 border border-emerald-500/20 rounded-lg p-2"><div class="min-w-0"><p class="text-emerald-300" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p><a :href="projectProcedureUrl(procedure)" target="_blank" rel="noopener" class="text-amber-400 underline">Open manual source ↗</a></div><button @click="detachProjectProcedure(selectedProject,procedure.id)" class="text-rose-400">Detach</button></div></template>
+						<template x-for="procedure in (selectedProject.procedures||[])" :key="procedure.id"><div class="flex items-center justify-between gap-2 border border-emerald-500/20 rounded-lg p-2"><div class="min-w-0 flex-1"><p class="text-emerald-300" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p><div x-show="procedureHasQuickSpecs(procedure)" class="mt-2 rounded-lg bg-zinc-950/80 border border-zinc-800 p-2"><p class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Quick specs</p><ul class="space-y-1 text-[11px] text-zinc-200"><template x-for="(spec,index) in procedureQuickSpecs(procedure)" :key="procedure.id+'-project-spec-'+index"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li></template></ul></div><a :href="projectProcedureUrl(procedure)" target="_blank" rel="noopener" class="inline-block mt-2 text-amber-400 underline">Open manual source ↗</a></div><button @click="detachProjectProcedure(selectedProject,procedure.id)" class="text-rose-400">Detach</button></div></template>
 					</div>
 					<div class="border-t border-zinc-800 pt-3 space-y-3">
 						<h4 class="text-sm font-bold text-white">Parts & procurement</h4>
@@ -4220,7 +4224,10 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					projectHasProcedure(project,id) { return (project?.procedures||[]).some(p=>p.id===id); },
 					projectProcedureUrl(procedure) { const path=procedure?.sourcePath||''; return path.startsWith('http') ? path : this.manualLink(path); },
 					procedureReferenceLabel(reference) { return reference?.sourceLabel || 'Factory service manual'; },
-					async attachProjectProcedure(project,id) { const kb=this.knowledgeBase.find(k=>k.id===id); if(!kb||this.projectHasProcedure(project,id))return; if(!this.knowledgeBaseForProject(project).some(k=>k.id===id))return; project.procedures.push({id:kb.id,title:kb.title,category:kb.category,engine:kb.engine,interval:kb.interval,sourceLabel:kb.sourceLabel,sourcePath:kb.sourcePath,attachedAt:new Date().toISOString()}); await this.saveToStorage(); },
+					procedureQuickSpecs(reference) { const snapshot=Array.isArray(reference?.specs)?reference.specs:[]; if(snapshot.length)return snapshot; return this.knowledgeBase.find(item=>item.id===reference?.id)?.specs||[]; },
+					procedureHasQuickSpecs(reference) { return this.procedureQuickSpecs(reference).length>0; },
+					
+					async attachProjectProcedure(project,id) { const kb=this.knowledgeBase.find(k=>k.id===id); if(!kb||this.projectHasProcedure(project,id))return; if(!this.knowledgeBaseForProject(project).some(k=>k.id===id))return; project.procedures.push({id:kb.id,title:kb.title,category:kb.category,engine:kb.engine,interval:kb.interval,specs:[...(kb.specs||[])],sourceLabel:kb.sourceLabel,sourcePath:kb.sourcePath,attachedAt:new Date().toISOString()}); await this.saveToStorage(); },
 					async detachProjectProcedure(project,id) { project.procedures=(project.procedures||[]).filter(p=>p.id!==id); await this.saveToStorage(); },
 					async addProjectTask(project) { const name=this.projectTaskDraft.trim(); if(!name||!project)return; project.tasks.push({id:'task-'+Date.now(),name,done:false,dependencies:[],plannedHours:0,hourlyRate:0}); this.projectTaskDraft=''; project.completion=this.projectCompletion(project); this.syncProjectMaintenancePlan(project); await this.saveToStorage(); },
 					projectTaskName(project,id) { return (project?.tasks||[]).find(task=>String(task.id)===String(id))?.name || 'Missing task'; },
@@ -4435,7 +4442,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							this.newRepairForm.vehicle = kb.vehicle;
 							this.newRepairForm.serviceTitle = kb.title;
 							this.newRepairForm.notes = kb.steps.join('\n');
-							this.newRepairForm.procedureReference = { id: kb.id, title: kb.title, category: kb.category, engine: kb.engine, interval: kb.interval, sourceLabel: kb.sourceLabel, sourcePath: kb.sourcePath, attachedAt: new Date().toISOString() };
+							this.newRepairForm.procedureReference = { id: kb.id, title: kb.title, category: kb.category, engine: kb.engine, interval: kb.interval, specs: [...(kb.specs || [])], sourceLabel: kb.sourceLabel, sourcePath: kb.sourcePath, attachedAt: new Date().toISOString() };
 							this.modals.newRepair = true;
 						}
 					},

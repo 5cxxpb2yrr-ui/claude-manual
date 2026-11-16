@@ -1784,7 +1784,7 @@
 							<div class="flex flex-wrap items-center gap-2">
 								<button type="button" @click="expandAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Expand all</button>
 								<button type="button" @click="collapseAllKnowledgeBaseCards()" class="px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-950 text-[10px] font-bold text-zinc-300 hover:border-amber-500/50">Collapse all</button>
-								<span class="kb-badge" x-text="knowledgeBase.length + ' PROCEDURES'"></span>
+								<span class="kb-badge" x-text="activeVehicleKnowledgeBase.length + ' PROCEDURES'"></span>
 							</div>
 						</div>
 					</div>
@@ -1792,7 +1792,7 @@
 					<input
 						type="search"
 						x-model="kbSearchQuery"
-						placeholder="Search by vehicle, procedure, fluid, or torque..."
+						placeholder="Search this vehicle's procedures, fluids, or torque specs..."
 						aria-label="Search maintenance procedures"
 						class="w-full bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-base text-white focus:outline-none focus:border-amber-500 transition"
 					/>
@@ -3827,11 +3827,20 @@
 						this.kbExpandedIds = [];
 					},
 
+					get activeVehicleKnowledgeBase() {
+						const vehicleName = String(this.activeVehicle?.name || '').trim().toLowerCase();
+						if (!vehicleName) return [];
+						return this.knowledgeBase.filter(k => {
+							const procedureVehicle = String(k.vehicle || '').trim().toLowerCase();
+							return procedureVehicle === vehicleName || procedureVehicle.startsWith(vehicleName + ' ');
+						});
+					},
 					get filteredKnowledgeBase() {
 						const q = String(this.kbSearchQuery || '').trim().toLowerCase();
-						if (!q) return this.knowledgeBase;
-						return this.knowledgeBase.filter(k => [
-							k.title, k.vehicle, k.engine, k.category, k.interval, k.sourceLabel,
+						const procedures = this.activeVehicleKnowledgeBase;
+						if (!q) return procedures;
+						return procedures.filter(k => [
+							k.title, k.engine, k.category, k.interval, k.sourceLabel,
 							...(k.steps || []), ...(k.specs || []), k.caution
 						].filter(Boolean).join(' ').toLowerCase().includes(q));
 					},

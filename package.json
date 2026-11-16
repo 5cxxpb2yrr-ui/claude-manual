@@ -1,1 +1,8 @@
-{ "name": "lifeos-manual-explorer-b", "private": true, "scripts": { "build": "echo no build step" } }
+{
+  "name": "lifeos-manual-explorer-b",
+  "private": true,
+  "scripts": {
+    "build": "echo no build step",
+    "test": "node --test"
+  }
+}

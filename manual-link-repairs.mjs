@@ -33,7 +33,7 @@ const SCION_MANUAL_PREFIX =
 
 export function resolveScionPageKey(key) {
   const match = key.match(
-    /^(manuals\/scion-service-manual\/2006 Scion xB L4-1\.5L \(1NZ-FE\)\/pages\/)(\d+)\.html(?:\/.*)?$/,
+    /^(manuals\/scion-service-manual\/2006 Scion xB L4-1\.5L \(1NZ-FE\)\/pages\/)(\d+)\.html(?:[,/].*)?$/,
   );
   if (!match) return null;
 

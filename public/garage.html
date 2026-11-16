@@ -2250,6 +2250,16 @@
 											x-text="selectedRepair.notes"
 										></p>
 									</div>
+									<div x-show="(selectedRepair.procedureReferences||[]).length" class="border-t border-zinc-800 pt-2 space-y-2">
+										<span class="text-zinc-500 block">Factory procedure</span>
+										<template x-for="reference in (selectedRepair.procedureReferences||[])" :key="reference.id">
+											<div class="rounded-lg border border-amber-500/20 bg-amber-500/5 p-2">
+												<p class="font-semibold text-amber-200" x-text="reference.title"></p>
+												<p class="text-[10px] text-zinc-500" x-text="procedureReferenceLabel(reference)"></p>
+												<a :href="projectProcedureUrl(reference)" target="_blank" rel="noopener" class="inline-block mt-1 text-amber-400 underline">Open factory manual ↗</a>
+											</div>
+										</template>
+									</div>
 								</div>
 							</template>
 
@@ -3328,7 +3338,7 @@
 					projectPurchaseOrderDraft: { vendor: 'Amazon', orderNumber: '', orderedDate: new Date().toISOString().split('T')[0], expectedDate: '' },
 					selectedProjectPurchasePartIds: [],
 					editRepairForm: { id: null, vehicle: '', mileage: 0, date: '', serviceType: '', cost: 0, notes: '', attachments: [] },
-					newRepairForm: { vehicle: '2006 Scion xB', mileage: 212000, date: new Date().toISOString().split('T')[0], serviceTitle: '', category: 'Scheduled Maintenance', cost: 0, notes: '' },
+					newRepairForm: { vehicle: '2006 Scion xB', mileage: 212000, date: new Date().toISOString().split('T')[0], serviceTitle: '', category: 'Scheduled Maintenance', cost: 0, notes: '', procedureReference: null },
 					newProjectForm: { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' },
 					newPartForm: { partNumber: '', vendor: '', description: '', quantity: 1, unitCost: 10.00 },
 					maintenancePlanForm: { scheduleId: '', vehicleId: '', title: '', priority: 'Medium', targetMileage: 0, targetDate: '', estimatedMin: 0, estimatedMax: 0, notes: '', parts: [] },
@@ -4036,12 +4046,14 @@
 					triggerUpcomingService(vehicleName, serviceName) {
 						this.newRepairForm.vehicle = vehicleName;
 						this.newRepairForm.serviceTitle = serviceName;
+						this.newRepairForm.procedureReference = null;
 						this.newRepairForm.mileage = this.activeVehicle.odometer;
 						this.modals.newRepair = true;
 					},
 
 					openNewRepairModal() {
 						this.newRepairForm.vehicle = this.activeVehicle.name;
+						this.newRepairForm.procedureReference = null;
 						this.newRepairForm.mileage = this.activeVehicle.odometer;
 						this.modals.newRepair = true;
 					},
@@ -4057,6 +4069,7 @@
 							category: this.newRepairForm.category || 'Maintenance',
 							cost: Number(this.newRepairForm.cost) || 0,
 							notes: this.newRepairForm.notes || '',
+							procedureReferences: this.newRepairForm.procedureReference ? [JSON.parse(JSON.stringify(this.newRepairForm.procedureReference))] : [],
 							attachments: [],
 							history: []
 						};
@@ -4187,6 +4200,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					knowledgeBaseForProject(project) { const v=this.vehicles.find(x=>String(x.id)===String(project?.vehicleId)); return v ? this.knowledgeBase.filter(k=>k.vehicle===v.name || (v.id==='subaru-crosstrek' && k.vehicle==='2019 Subaru Crosstrek Limited')) : []; },
 					projectHasProcedure(project,id) { return (project?.procedures||[]).some(p=>p.id===id); },
 					projectProcedureUrl(procedure) { const path=procedure?.sourcePath||''; return path.startsWith('http') ? path : this.manualLink(path); },
+					procedureReferenceLabel(reference) { return reference?.sourceLabel || 'Factory service manual'; },
 					async attachProjectProcedure(project,id) { const kb=this.knowledgeBase.find(k=>k.id===id); if(!kb||this.projectHasProcedure(project,id))return; if(!this.knowledgeBaseForProject(project).some(k=>k.id===id))return; project.procedures.push({id:kb.id,title:kb.title,category:kb.category,engine:kb.engine,interval:kb.interval,sourceLabel:kb.sourceLabel,sourcePath:kb.sourcePath,attachedAt:new Date().toISOString()}); await this.saveToStorage(); },
 					async detachProjectProcedure(project,id) { project.procedures=(project.procedures||[]).filter(p=>p.id!==id); await this.saveToStorage(); },
 					async addProjectTask(project) { const name=this.projectTaskDraft.trim(); if(!name||!project)return; project.tasks.push({id:'task-'+Date.now(),name,done:false,dependencies:[],plannedHours:0,hourlyRate:0}); this.projectTaskDraft=''; project.completion=this.projectCompletion(project); this.syncProjectMaintenancePlan(project); await this.saveToStorage(); },
@@ -4402,6 +4416,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							this.newRepairForm.vehicle = kb.vehicle;
 							this.newRepairForm.serviceTitle = kb.title;
 							this.newRepairForm.notes = kb.steps.join('\n');
+							this.newRepairForm.procedureReference = { id: kb.id, title: kb.title, category: kb.category, engine: kb.engine, interval: kb.interval, sourceLabel: kb.sourceLabel, sourcePath: kb.sourcePath, attachedAt: new Date().toISOString() };
 							this.modals.newRepair = true;
 						}
 					},

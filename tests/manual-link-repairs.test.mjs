@@ -72,6 +72,12 @@ test("legacy SEO suffixes are removed after the page filename", () => {
   assert.equal(result.kind, "redirect");
   assert.equal(result.key, `${scionPrefix}81.html`);
 
+  const commaSuffix = resolveScionPageKey(
+    `${scionPrefix}1228.html, Cooling and Exhaust/Cooling System/Radiator Cap/`,
+  );
+  assert.equal(commaSuffix.kind, "redirect");
+  assert.equal(commaSuffix.key, `${scionPrefix}158.html`);
+
   const existingPage = resolveScionPageKey(
     `${scionPrefix}1617.html/Management/Tune-up/`,
   );

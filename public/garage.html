@@ -505,13 +505,13 @@
 					<!-- Next Scheduled Maintenance -->
 					<div class="glass-panel p-4 mb-4 border border-amber-500/30">
 						<div class="flex items-center justify-between gap-3 mb-3">
-							<div><h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">Next Scheduled Maintenance</h3><p class="text-[10px] text-zinc-500 mt-1">Next non-overdue item not in the history-reconciliation archive</p></div>
+							<div><h3 class="text-xs font-bold uppercase tracking-wider text-amber-300">Next Scheduled Maintenance</h3><p class="text-[10px] text-zinc-500 mt-1">Nearest upcoming factory interval; low-confidence estimates need service-history confirmation</p></div>
 							<button @click="currentTab = 'predictive'" class="text-xs font-bold text-amber-400">View Schedule →</button>
 						</div>
 						<template x-if="nextScheduledMaintenance">
 							<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-								<div class="min-w-0"><span class="inline-flex text-[9px] font-bold uppercase px-2 py-1 rounded border" :class="getStatusBadgeClass(nextScheduledMaintenance.status)" x-text="nextScheduledMaintenance.status"></span><h4 class="text-base font-bold text-white mt-2" x-text="nextScheduledMaintenance.serviceName"></h4><p class="text-xs text-zinc-400 mt-1" x-text="nextScheduledMaintenance.remainingMiles.toLocaleString() + ' miles remaining • estimated ' + nextScheduledMaintenance.nextDueDate"></p><p class="text-[10px] text-zinc-500 mt-1" x-text="nextScheduledMaintenance.confidence + ' confidence · ' + (nextScheduledMaintenance.basis === 'mileage' ? 'mileage-based' : 'time-based')"></p></div>
-								<div class="text-right"><div class="text-xl font-black font-mono text-amber-300" x-text="nextScheduledMaintenance.nextDueMileage.toLocaleString()"></div><div class="text-[9px] uppercase text-zinc-500">Due at miles</div></div>
+								<div class="min-w-0"><span class="inline-flex text-[9px] font-bold uppercase px-2 py-1 rounded border" :class="getStatusBadgeClass(nextScheduledMaintenance.status)" x-text="nextScheduledMaintenance.status"></span><h4 class="text-base font-bold text-white mt-2" x-text="nextScheduledMaintenance.serviceName"></h4><p class="text-xs text-zinc-400 mt-1" x-text="nextScheduledMaintenance.remainingMiles.toLocaleString() + ' miles remaining • estimated ' + nextScheduledMaintenance.nextDueDate"></p><p class="text-[10px] text-zinc-500 mt-1" x-text="nextScheduledMaintenance.confidence + ' confidence · ' + (nextScheduledMaintenance.hasHistory ? (nextScheduledMaintenance.basis === 'mileage' ? 'mileage-based' : 'time-based') : 'service history unconfirmed')"></p></div>
+								<div class="text-right"><div class="text-xl font-black font-mono text-amber-300" x-text="nextScheduledMaintenance.nextDueMileage.toLocaleString()"></div><div class="text-[9px] uppercase text-zinc-500">Due at miles</div><button x-show="nextScheduledMaintenance.knowledgeBaseId" @click="openKnowledgeBaseProcedure(nextScheduledMaintenance.knowledgeBaseId)" class="mt-2 text-[10px] font-bold text-amber-400 hover:text-amber-300">View procedure →</button></div>
 							</div>
 						</template>
 						<template x-if="!nextScheduledMaintenance">
@@ -3132,12 +3132,29 @@
 					],
 
 					schedules: [
-						{ id: 'oil', serviceName: 'Synthetic Oil & Filter Change', intervalMiles: 5000, intervalDays: 180, terms: ['oil', 'oil filter', 'synthetic oil'] },
-						{ id: 'tires', serviceName: 'Tire Rotation & Brake Inspection', intervalMiles: 7500, intervalDays: 180, terms: ['tire', 'brake inspection', 'rotation'] },
-						{ id: 'air_filter', serviceName: 'Engine Air Filter Replacement', intervalMiles: 15000, intervalDays: 365, terms: ['engine air filter', 'air filter'] },
-						{ id: 'cabin_filter', serviceName: 'Cabin Air Filter Replacement', intervalMiles: 15000, intervalDays: 365, terms: ['cabin filter', 'cabin air filter'] },
-						{ id: 'spark_plugs', serviceName: 'Spark Plug Replacement', intervalMiles: 30000, intervalDays: 1095, terms: ['spark plug', 'spark plugs'] },
-						{ id: 'trans_fluid', serviceName: 'Transmission Fluid Flush', intervalMiles: 45000, intervalDays: 1095, terms: ['transmission fluid', 'transmission flush'] }
+						// Scion xB schedule. Keep these entries isolated from the Subaru schedule below.
+						{ id: 'oil', vehicleId: 'scion-xb', serviceName: 'Synthetic Oil & Filter Change', intervalMiles: 5000, intervalDays: 180, terms: ['oil', 'oil filter', 'synthetic oil'], knowledgeBaseId: 'kb-scion-oil-filter' },
+						{ id: 'tires', vehicleId: 'scion-xb', serviceName: 'Tire Rotation & Brake Inspection', intervalMiles: 7500, intervalDays: 180, terms: ['tire', 'brake inspection', 'rotation'], knowledgeBaseId: 'kb-scion-tire-rotation' },
+						{ id: 'air_filter', vehicleId: 'scion-xb', serviceName: 'Engine Air Filter Replacement', intervalMiles: 15000, intervalDays: 365, terms: ['engine air filter', 'air filter'] },
+						{ id: 'cabin_filter', vehicleId: 'scion-xb', serviceName: 'Cabin Air Filter Replacement', intervalMiles: 15000, intervalDays: 365, terms: ['cabin filter', 'cabin air filter'] },
+						{ id: 'spark_plugs', vehicleId: 'scion-xb', serviceName: 'Spark Plug Replacement', intervalMiles: 30000, intervalDays: 1095, terms: ['spark plug', 'spark plugs'], knowledgeBaseId: 'kb-scion-spark-plugs' },
+						{ id: 'trans_fluid', vehicleId: 'scion-xb', serviceName: 'Transmission Fluid Flush', intervalMiles: 45000, intervalDays: 1095, terms: ['transmission fluid', 'transmission flush'] },
+
+						// 2019 Crosstrek schedule: intervals follow the 2019 U.S. Warranty & Maintenance Booklet
+						// and the owner-manual tire-rotation guidance. Where owner-facing recommendations
+						// conflict with the booklet, the earlier interval is used for planning.
+						{ id: 'subaru_oil', vehicleId: 'subaru-crosstrek', serviceName: 'Engine Oil & Filter Replacement', intervalMiles: 6000, intervalDays: 183, terms: ['synthetic oil', 'engine oil', 'oil filter'], knowledgeBaseId: 'kb-subaru-oil-filter' },
+						{ id: 'subaru_tires', vehicleId: 'subaru-crosstrek', serviceName: 'Tire Rotation & Inspection', intervalMiles: 7500, intervalDays: 365, terms: ['tire rotation', 'tire inspection', 'rotation'], knowledgeBaseId: 'kb-subaru-tire-rotation' },
+						{ id: 'subaru_cabin_filter', vehicleId: 'subaru-crosstrek', serviceName: 'Cabin A/C Filter Replacement', intervalMiles: 12000, intervalDays: 365, terms: ['cabin filter', 'cabin air filter', 'cabin a/c filter'], knowledgeBaseId: 'kb-subaru-cabin-filter' },
+						{ id: 'subaru_annual_inspection', vehicleId: 'subaru-crosstrek', serviceName: 'Annual Brake, Axle & Chassis Inspection', intervalMiles: 12000, intervalDays: 365, terms: ['annual brake', 'brake axle chassis inspection'], knowledgeBaseId: 'kb-subaru-annual-brake-chassis-inspection' },
+						{ id: 'subaru_30k_inspection', vehicleId: 'subaru-crosstrek', serviceName: '30,000-Mile Drive Belt, Fuel, Cooling & Wheel-Bearing Inspection', intervalMiles: 30000, intervalDays: 913, terms: ['30,000-mile inspection', '30k inspection'], knowledgeBaseId: 'kb-subaru-30k-inspection' },
+						{ id: 'subaru_brake_fluid', vehicleId: 'subaru-crosstrek', serviceName: 'Brake Fluid Replacement', intervalMiles: 30000, intervalDays: 913, terms: ['brake fluid replacement', 'brake fluid'], knowledgeBaseId: 'kb-subaru-brake-fluid' },
+						{ id: 'subaru_air_filter', vehicleId: 'subaru-crosstrek', serviceName: 'Engine Air Cleaner Element Replacement', intervalMiles: 30000, intervalDays: 913, terms: ['engine air filter', 'air cleaner element'], knowledgeBaseId: 'kb-subaru-air-cleaner' },
+						{ id: 'subaru_fuel_filter', vehicleId: 'subaru-crosstrek', serviceName: 'Fuel Filter Replacement', intervalMiles: 45000, intervalDays: 1096, terms: ['fuel filter replacement', 'fuel filter'], knowledgeBaseId: 'kb-subaru-fuel-filter' },
+						{ id: 'subaru_spark_plugs', vehicleId: 'subaru-crosstrek', serviceName: 'Spark Plug Replacement', intervalMiles: 60000, intervalDays: 1826, terms: ['spark plug replacement', 'spark plugs'], knowledgeBaseId: 'kb-subaru-spark-plugs' },
+						{ id: 'subaru_cvt_inspection', vehicleId: 'subaru-crosstrek', serviceName: 'TR580 CVT Fluid Inspection', intervalMiles: 30000, intervalDays: 913, terms: ['cvt fluid inspection', 'tr580 cvt'], knowledgeBaseId: 'kb-subaru-cvt-fluid' },
+						{ id: 'subaru_front_diff_inspection', vehicleId: 'subaru-crosstrek', serviceName: 'Front Differential Gear Oil Inspection', intervalMiles: 30000, intervalDays: 913, terms: ['front differential gear oil', 'front differential inspection'], knowledgeBaseId: 'kb-subaru-front-differential' },
+						{ id: 'subaru_rear_diff_inspection', vehicleId: 'subaru-crosstrek', serviceName: 'Rear Differential Gear Oil Inspection', intervalMiles: 30000, intervalDays: 913, terms: ['rear differential gear oil', 'rear differential inspection'], knowledgeBaseId: 'kb-subaru-rear-differential' }
 					],
 
 					logs: [
@@ -3656,7 +3673,7 @@
 						const today = new Date(), odometer = Number(vehicle.odometer)||0;
 						let dailyMiles = 28;
 						if (logs.length >= 2) { const first=logs[0], last=logs[logs.length-1]; const days=Math.max(1,(new Date(last.date||today)-new Date(first.date||today))/86400000); const distance=Math.max(0,Number(last.mileage)-Number(first.mileage)); if(distance>0) dailyMiles=Math.max(5,Math.min(150,distance/days)); }
-						const computed = this.schedules.map(sch => {
+						const computed = this.schedules.filter(sch => !sch.vehicleId || sch.vehicleId === vehicle.id).map(sch => {
 							const terms=(sch.terms||[sch.serviceName.split(' ')[0]]).map(x=>x.toLowerCase());
 							const matched=logs.filter(l=>terms.some(t=>(l.serviceType||'').toLowerCase().includes(t)));
 							const lastLog=matched[matched.length-1], hasHistory=!!lastLog;
@@ -3673,7 +3690,7 @@
 							let status='Green'; if(dueByMileage||dueByDate)status='Red'; else if(dueSoonMileage||dueSoonDate)status='Orange'; else if(remainingMiles<=1500||remainingDaysByDate<=90)status='Yellow';
 							const useMileage=dueByMileage||(!dueByDate&&daysToMileage<=remainingDaysByDate);
 							const projectedDate=useMileage&&remainingMiles>0?new Date(today.getTime()+daysToMileage*86400000):nextDueByDate;
-							return {id:sch.id,serviceName:sch.serviceName,intervalMiles:sch.intervalMiles,intervalDays:sch.intervalDays,lastPerformedMileage:hasHistory?Number(lastLog.mileage):null,lastPerformedDate:hasHistory?lastLog.date:null,nextDueMileage,remainingMiles,remainingDays:Math.min(daysToMileage||Infinity,remainingDaysByDate),remainingDaysByDate,urgencyScore,status,nextDueDate:projectedDate.toLocaleDateString(),dueDateISO:projectedDate.toISOString().split('T')[0],dailyMiles:Math.round(dailyMiles*10)/10,confidence:hasHistory?(matched.length>=2?'High':'Medium'):'Low',basis:useMileage?'mileage':'time',hasHistory,matchedCount:matched.length};
+							return {id:sch.id,serviceName:sch.serviceName,knowledgeBaseId:sch.knowledgeBaseId||null,intervalMiles:sch.intervalMiles,intervalDays:sch.intervalDays,lastPerformedMileage:hasHistory?Number(lastLog.mileage):null,lastPerformedDate:hasHistory?lastLog.date:null,nextDueMileage,remainingMiles,remainingDays:Math.min(daysToMileage||Infinity,remainingDaysByDate),remainingDaysByDate,urgencyScore,status,nextDueDate:projectedDate.toLocaleDateString(),dueDateISO:projectedDate.toISOString().split('T')[0],dailyMiles:Math.round(dailyMiles*10)/10,confidence:hasHistory?(matched.length>=2?'High':'Medium'):'Low',basis:useMileage?'mileage':'time',hasHistory,matchedCount:matched.length};
 						});
 						return (includeArchived ? computed : computed.filter(item => !this.isMaintenanceArchived(vehicle.id, item.id))).sort((a,b)=>b.urgencyScore-a.urgencyScore);
 					},
@@ -3835,6 +3852,12 @@
 					toggleKnowledgeBaseCard(id) {
 						if (this.kbExpandedIds.includes(id)) this.kbExpandedIds = this.kbExpandedIds.filter(value => value !== id);
 						else this.kbExpandedIds = [...this.kbExpandedIds, id];
+					},
+					openKnowledgeBaseProcedure(id) {
+						if (!id || !this.activeVehicleKnowledgeBase.some(item => item.id === id)) return;
+						this.kbSearchQuery = '';
+						this.kbExpandedIds = [...new Set([...this.kbExpandedIds, id])];
+						this.currentTab = 'kb';
 					},
 					isKnowledgeBaseExpanded(id) {
 						return this.kbExpandedIds.includes(id);

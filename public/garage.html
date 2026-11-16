@@ -615,6 +615,10 @@
 													class="text-sm font-bold text-white mt-1"
 													x-text="proj.title"
 												></h4>
+												<div class="mt-1 flex flex-wrap items-center gap-2 text-[10px]">
+													<span :class="projectHealth(proj).tone" x-text="projectHealth(proj).label"></span>
+													<span x-show="projectOverBudget(proj)" class="text-rose-400">Over budget</span>
+												</div>
 											</div>
 											<span
 												class="text-xs font-mono font-bold text-emerald-400"
@@ -629,6 +633,7 @@
 												:style="`width: ${proj.completion}%`"
 											></div>
 										</div>
+										<div class="text-[10px] text-zinc-400">Next: <span class="text-zinc-200" x-text="projectNextAction(proj)"></span></div>
 									</div>
 								</template>
 							</div>
@@ -2798,6 +2803,11 @@
 							<strong>Status:</strong>
 							<span x-text="selectedProject.status"></span>
 						</div>
+						<div class="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-1">
+							<div class="flex items-center justify-between gap-2"><strong class="text-zinc-300">Project health</strong><span :class="projectHealth(selectedProject).tone" class="font-bold" x-text="projectHealth(selectedProject).label"></span></div>
+							<div class="text-zinc-400">Next action: <span class="text-white" x-text="projectNextAction(selectedProject)"></span></div>
+							<div x-show="projectOverBudget(selectedProject)" class="text-rose-400 font-semibold">Actual costs are over the project budget.</div>
+						</div>
 						<div x-show="selectedProject.maintenancePlanId" class="text-amber-400"><strong>Maintenance:</strong> Linked</div>
 						<button x-show="!selectedProject.maintenancePlanId" @click="linkProjectToMaintenance(selectedProject)" class="w-full py-2 bg-amber-500/10 text-amber-400 font-bold rounded-xl border border-amber-500/30">🔧 Link to Maintenance Workflow</button>
 						<div x-show="selectedProject.partRequirements && selectedProject.partRequirements.length" class="pt-2">
@@ -4171,6 +4181,9 @@
 					},
 					syncProjectMaintenancePlan(project) { if(!project?.maintenancePlanId)return; const plan=this.maintenancePlans.find(item=>String(item.id)===String(project.maintenancePlanId)); if(!plan||['Cancelled','Completed'].includes(plan.status))return; const priorTasks=Array.isArray(plan.tasks)?plan.tasks:[]; plan.projectId=project.id; plan.title=project.title||plan.title; plan.priority=project.priority||plan.priority; plan.targetDate=project.dueDate||plan.targetDate||''; plan.tasks=(project.tasks||[]).map((task,index)=>{const prior=priorTasks.find(item=>String(item.projectTaskId||'')===String(task.id))||priorTasks.find(item=>!item.projectTaskId&&String(item.name||'')===String(task.name||''))||priorTasks[index]||{};return {...prior,name:task.name||'Project task',done:!!task.done,projectTaskId:task.id||null,dependencies:Array.isArray(task.dependencies)?[...task.dependencies]:[]};}); plan.completion=this.projectCompletion(project); const estimate=this.projectPartsEstimate(project)+this.projectLaborEstimate(project); plan.estimatedMin=Math.max(0,estimate||Number(project.budget||0)); plan.estimatedMax=plan.estimatedMin; plan.actualCost=this.projectActualCost(project); if(project.status==='In Progress')plan.status='In Progress'; else if(project.status==='Planned'&&plan.status==='In Progress')plan.status='Planned'; plan.projectSyncedAt=new Date().toISOString(); },
 projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length ? Math.round(tasks.filter(t=>t.done).length/tasks.length*100) : Number(project?.completion||0); },
+					projectHealth(project) { if(!project || ['Completed','Cancelled'].includes(project.status))return {label:project?.status||'Inactive',tone:'text-zinc-400',kind:'inactive'}; const tasks=Array.isArray(project.tasks)?project.tasks:[]; const blocked=tasks.find(task=>!task.done&&!this.projectTaskDependenciesMet(project,task)); const today=new Date(); const todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-'); const due=String(project.dueDate||'').slice(0,10); if(blocked)return {label:'Blocked',tone:'text-amber-300',kind:'blocked'}; if(due&&due<todayKey)return {label:'Overdue',tone:'text-rose-400',kind:'overdue'}; if(due){const dueDate=new Date(due+'T00:00:00');const days=Math.round((dueDate-new Date(todayKey+'T00:00:00'))/86400000);if(days<=7)return {label:'Due soon',tone:'text-amber-300',kind:'due-soon'};} return {label:'On track',tone:'text-emerald-400',kind:'on-track'}; },
+					projectNextAction(project) { if(!project || ['Completed','Cancelled'].includes(project.status))return ''; const tasks=Array.isArray(project.tasks)?project.tasks:[]; const ready=tasks.find(task=>!task.done&&this.projectTaskDependenciesMet(project,task)); if(ready)return ready.name||'Complete next task'; const blocked=tasks.find(task=>!task.done); if(blocked){const dependency=(blocked.dependencies||[]).map(id=>tasks.find(task=>String(task.id)===String(id)&&!task.done)).find(Boolean);return dependency?'Unblock: '+(dependency.name||'prerequisite task'):'Resolve blocked task';} return tasks.length?'Verify project completion':'Add the first task'; },
+					projectOverBudget(project) { const budget=Number(project?.budget)||0; return budget>0&&this.projectActualCost(project)>budget; },
 					knowledgeBaseForProject(project) { const v=this.vehicles.find(x=>String(x.id)===String(project?.vehicleId)); return v ? this.knowledgeBase.filter(k=>k.vehicle===v.name || (v.id==='subaru-crosstrek' && k.vehicle==='2019 Subaru Crosstrek Limited')) : []; },
 					projectHasProcedure(project,id) { return (project?.procedures||[]).some(p=>p.id===id); },
 					projectProcedureUrl(procedure) { const path=procedure?.sourcePath||''; return path.startsWith('http') ? path : this.manualLink(path); },

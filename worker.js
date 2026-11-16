@@ -14,7 +14,10 @@ export default {
       const h = new Headers(); o.writeHttpMetadata(h);
       const ext = key.split(".").pop().toLowerCase();
       if (!h.get("content-type") && TYPES[ext]) h.set("content-type", TYPES[ext]);
-      h.set("etag", o.httpEtag); h.set("cache-control", "public, max-age=86400");
+      h.set("etag", o.httpEtag);
+      // Manual HTML can contain links to pages that change between corpus publishes.
+      // Never let a browser keep an old page for a day after its target is replaced.
+      h.set("cache-control", ext === "html" ? "no-store" : "public, max-age=86400");
       return new Response(req.method === "HEAD" ? null : o.body, { headers: h });
     }
     return env.ASSETS.fetch(req);

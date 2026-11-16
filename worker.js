@@ -9,6 +9,14 @@ export default {
       let key;
       try { key = "manuals/" + decodeURIComponent(u.pathname.slice(3)); } catch { return new Response("Bad path", { status: 400 }); }
       if (key.includes("..")) return new Response("Bad path", { status: 400 });
+      // Compatibility for a broken Scion manual cross-reference: the indexed
+      // Valve Clearance page is 1620.html; 4283.html is not present in the corpus.
+      const scionValveClearanceAlias = "manuals/scion-service-manual/2006 Scion xB L4-1.5L (1NZ-FE)/pages/4283.html";
+      if (key === scionValveClearanceAlias) {
+        const target = new URL(req.url);
+        target.pathname = target.pathname.replace(/pages\/4283\.html$/, "pages/1620.html");
+        return Response.redirect(target.toString(), 302);
+      }
       const o = await env.MANUALS.get(key);
       if (!o) return new Response("Not found", { status: 404 });
       const h = new Headers(); o.writeHttpMetadata(h);

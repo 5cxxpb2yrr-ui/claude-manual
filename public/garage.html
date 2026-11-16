@@ -1830,7 +1830,7 @@
 										<p class="text-xs leading-relaxed text-zinc-300" x-text="item.caution"></p>
 									</div>
 									<div class="flex flex-col sm:flex-row gap-2 pt-1">
-										<a :href="item.sourcePath" target="_blank" rel="noopener" class="flex-1 text-center rounded-xl border border-zinc-700 bg-zinc-900 hover:border-amber-500/50 text-zinc-200 py-3 text-xs font-semibold transition" x-text="'Factory manual: ' + item.sourceLabel"></a>
+										<a :href="manualLink(item.sourcePath)" target="_blank" rel="noopener" class="flex-1 text-center rounded-xl border border-zinc-700 bg-zinc-900 hover:border-amber-500/50 text-zinc-200 py-3 text-xs font-semibold transition" x-text="'Factory manual: ' + item.sourceLabel"></a>
 										<button class="btn-primary flex-1 py-3 text-xs font-bold" @click="initServiceFromKB(item.id)">Log Service Record</button>
 									</div>
 								</div>

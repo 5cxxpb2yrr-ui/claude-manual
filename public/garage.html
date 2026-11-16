@@ -855,7 +855,7 @@
 							<div class="glass-panel p-5 space-y-4">
 								<div class="flex justify-between gap-3"><div><span class="text-[10px] uppercase font-bold px-2 py-0.5 rounded border" :class="getStatusBadgeClass(item.status)" x-text="item.status"></span><h3 class="text-base font-bold text-white mt-2" x-text="item.serviceName"></h3><p class="text-xs text-zinc-400" x-text="(item.remainingMiles < 0 ? Math.abs(item.remainingMiles).toLocaleString() + ' mi overdue' : item.remainingMiles.toLocaleString() + ' mi remaining') + ' • due ' + item.nextDueDate"></p></div><div class="text-right text-xs text-zinc-400" x-text="item.confidence + ' confidence'"></div></div>
 								<div x-show="item.plan" class="bg-zinc-950 rounded-xl p-3 border border-purple-500/20"><div class="flex justify-between"><span class="text-[10px] uppercase font-bold text-purple-400">Plan</span><span class="text-[10px] text-zinc-400" x-text="item.plan?.status || 'Not Planned'"></span></div><div class="mt-2 text-xs text-white" x-text="(item.plan?.completion ?? 0) + '% complete'"></div><div class="h-1.5 bg-zinc-800 rounded-full mt-2 overflow-hidden"><div class="h-full bg-purple-500" :style="`width:${item.plan?.completion ?? 0}%`"></div></div></div>
-								<div class="flex gap-2 flex-wrap"><button x-show="!item.plan" @click="openMaintenancePlanner(item)" class="px-3 py-1.5 rounded-lg bg-amber-500 text-zinc-950 text-xs font-bold">Plan Service</button><button x-show="item.plan?.status === 'Planned'" @click="startMaintenancePlan(item.plan)" class="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-bold">Start Service</button><button x-show="['Parts Reserved','In Progress','Paused'].includes(item.plan?.status)" @click="openCompleteMaintenance(item.plan)" class="px-3 py-1.5 rounded-lg bg-emerald-500 text-zinc-950 text-xs font-bold">Complete</button><button x-show="item.plan?.status !== 'Completed'" @click="cancelMaintenancePlan(item.plan)" class="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold">Cancel</button></div>
+								<div class="flex gap-2 flex-wrap"><button x-show="!item.plan" @click="openMaintenancePlanner(item)" class="px-3 py-1.5 rounded-lg bg-amber-500 text-zinc-950 text-xs font-bold">Plan Service</button><button x-show="!item.plan?.projectId" @click="createProjectFromMaintenanceItem(item)" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold">＋ Create Project</button><button x-show="item.plan?.status === 'Planned'" @click="startMaintenancePlan(item.plan)" class="px-3 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-bold">Start Service</button><button x-show="['Parts Reserved','In Progress','Paused'].includes(item.plan?.status)" @click="openCompleteMaintenance(item.plan)" class="px-3 py-1.5 rounded-lg bg-emerald-500 text-zinc-950 text-xs font-bold">Complete</button><button x-show="item.plan?.status !== 'Completed'" @click="cancelMaintenancePlan(item.plan)" class="px-3 py-1.5 rounded-lg border border-zinc-700 text-zinc-300 text-xs font-bold">Cancel</button></div>
 							</div>
 						</template>
 					</div>
@@ -4391,6 +4391,45 @@
 							this.modals.newRepair = true;
 						}
 					},
+
+						async createProjectFromMaintenanceItem(item) {
+							if (!item || !this.activeVehicle) return;
+							const vehicle = this.vehicles.find(v => String(v.id) === String(this.activeVehicleId));
+							if (!vehicle) return;
+							let plan = item.plan || this.maintenancePlans.find(p => String(p.vehicleId) === String(vehicle.id) && String(p.scheduleId) === String(item.id) && !['Completed','Cancelled'].includes(p.status));
+							if (plan?.projectId) {
+								const linked = this.projects.find(p => String(p.id) === String(plan.projectId));
+								if (linked) { this.openProjectDetail(linked); return; }
+							}
+							const existing = this.projects.find(p => String(p.vehicleId) === String(vehicle.id) && (String(p.maintenanceScheduleId || '') === String(item.id) || (plan && String(p.maintenancePlanId || '') === String(plan.id))));
+							if (existing) {
+								if (plan) { plan.projectId = existing.id; existing.maintenancePlanId = plan.id; }
+								const savedExisting = await this.saveToStorage();
+								if (savedExisting) this.openProjectDetail(existing); else alert('The project link could not be saved. Try again.');
+								return;
+							}
+							const kbItems = this.knowledgeBaseForProject({ vehicleId: vehicle.id });
+							const normalize = value => String(value || '').toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, ' ').trim();
+							const serviceName = normalize(item.serviceName);
+							const procedure = kbItems.find(k => normalize(k.title) === serviceName) || kbItems.find(k => { const title = normalize(k.title); return title.length > 5 && (title.includes(serviceName) || serviceName.includes(title)); }) || null;
+							const priority = plan?.priority || (item.status === 'Red' ? 'High' : item.status === 'Orange' ? 'Medium' : 'Low');
+							const now = new Date().toISOString();
+							const taskSource = Array.isArray(plan?.tasks) && plan.tasks.length ? plan.tasks : (procedure?.steps || ['Acquire required parts', 'Perform scheduled maintenance', 'Verify completed work']).map(name => ({ name, done: false }));
+							const tasks = taskSource.map((task, index) => ({ id: task.id || 'task-' + (index + 1), name: typeof task === 'string' ? task : (task.name || 'Maintenance task'), done: !!task.done, plannedHours: Number(task.plannedHours) || 0, hourlyRate: Number(task.hourlyRate) || 0, dependsOn: Array.isArray(task.dependsOn) ? task.dependsOn : [] }));
+							const projectId = 'project-maint-' + vehicle.id + '-' + String(item.id).replace(/[^a-zA-Z0-9_-]/g, '-') + '-' + Date.now();
+							if (!plan) {
+								plan = { id: 'maint-' + Date.now(), vehicleId: vehicle.id, scheduleId: item.id, title: item.serviceName, priority, targetMileage: Number(item.nextDueMileage || vehicle.odometer || 0), targetDate: item.nextDueDate || '', estimatedMin: 0, estimatedMax: 0, actualCost: 0, status: 'Planned', notes: 'Created from the predictive maintenance schedule.', createdAt: now, startedAt: null, completedAt: null, tasks: tasks.map(t => ({ name: t.name, done: t.done })), parts: [] };
+								this.maintenancePlans.unshift(plan);
+							}
+							const procedureRef = procedure ? [{ id: procedure.id, title: procedure.title, category: procedure.category, engine: procedure.engine, interval: procedure.interval, sourceLabel: procedure.sourceLabel, sourcePath: procedure.sourcePath, attachedAt: now }] : [];
+							const estimate = Math.max(0, Number(plan.estimatedMax || plan.estimatedMin || 0));
+							const project = { id: projectId, vehicleId: vehicle.id, title: plan.title || item.serviceName, category: procedure?.category || 'Scheduled Maintenance', description: [plan.notes || '', procedure?.interval ? 'Factory interval: ' + procedure.interval : '', procedure ? 'Factory procedure attached: ' + procedure.sourceLabel : 'No matching curated factory procedure was found; add one from the project workspace if available.'].filter(Boolean).join('\n\n'), budget: estimate, actualCost: 0, status: plan.status === 'In Progress' || plan.status === 'Parts Reserved' ? 'In Progress' : 'Planned', priority, dueDate: plan.targetDate || item.nextDueDate || '', completion: 0, tasks, milestones: [], procedures: procedureRef, partRequirements: [], purchaseOrders: [], costEntries: [], attachments: [], maintenancePlanId: plan.id, maintenanceScheduleId: item.id, createdAt: now, updatedAt: now };
+							plan.projectId = project.id;
+							this.projects.unshift(project);
+							const saved = await this.saveToStorage();
+							if (saved) { this.openProjectDetail(project); }
+							else { alert('The project could not be saved. It remains in this session; try saving again.'); }
+						},
 
 						openMaintenancePlanner(item = null) {
 						const v = this.activeVehicle; if (!v) return;

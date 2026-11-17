@@ -24,8 +24,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .mt{margin-top:.75rem}.mb{margin-bottom:.75rem}.dim{color:var(--dim)}.num{font-family:ui-monospace,monospace;font-weight:700;white-space:nowrap}
 .metric{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--r);padding:.65rem;text-align:center}.metric .v{font-size:1.02rem;font-weight:750;margin-top:3px;font-family:ui-monospace,monospace}
 .progress{height:9px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden}.fill{height:100%;background:linear-gradient(90deg,var(--orange),var(--success));transition:width .3s}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;padding:4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r);margin-bottom:.9rem;position:sticky;top:calc(.4rem + env(safe-area-inset-top,0px));z-index:50;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
-.tabs button{background:none;border:0;color:var(--dim);font-size:.78rem;font-weight:700;padding:.6rem 0;border-radius:9px;cursor:pointer}.tabs button.on{background:rgba(255,107,53,.18);color:var(--orange)}
+.tabs{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;padding:4px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--r);margin-bottom:.9rem;position:sticky;top:calc(.4rem + env(safe-area-inset-top,0px));z-index:50;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.tabs button{background:none;border:0;color:var(--dim);font-size:.68rem;font-weight:700;padding:.6rem 0;border-radius:9px;cursor:pointer}.tabs button.on{background:rgba(255,107,53,.18);color:var(--orange)}
 .item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:.7rem 0;border-bottom:1px solid var(--border);cursor:pointer}.item:last-child{border-bottom:0}
 .item .sub{font-size:.68rem;color:var(--dim);margin-top:2px}.right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
 .gh{display:flex;justify-content:space-between;align-items:center;cursor:pointer;padding:.1rem 0}.gh b{font-size:.8rem;text-transform:uppercase;letter-spacing:.5px}
@@ -36,12 +36,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 .sheet{width:100%;max-width:560px;background:#151b2b;border:1px solid var(--border);border-radius:var(--xl) var(--xl) 0 0;padding:.8rem 1rem calc(1rem + env(safe-area-inset-bottom,0px));max-height:90vh;overflow-y:auto;animation:up .22s ease}
 @keyframes up{from{transform:translateY(40px);opacity:0}}.grab{width:40px;height:4px;border-radius:9px;background:rgba(255,255,255,.2);margin:0 auto .8rem}
 .calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-top:.75rem}.wd{text-align:center;font-size:.65rem;color:var(--dim);font-weight:700}
-.cell{aspect-ratio:1;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:8px;padding:4px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;font-size:.72rem;font-weight:700}
+.cell{min-height:58px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.04);border-radius:8px;padding:4px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;font-size:.72rem;font-weight:700}
 .cell.out{opacity:.2;pointer-events:none}.cell.today{background:rgba(0,233,233,.07);border-color:rgba(0,233,233,.3)}
 .dot{width:5px;height:5px;border-radius:50%;background:var(--amber);display:inline-block;margin:1px}
 .fab{position:fixed;right:1.1rem;bottom:calc(1.1rem + env(safe-area-inset-bottom,0px));width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--orange),var(--red));border:1px solid rgba(255,255,255,.2);box-shadow:0 8px 24px rgba(255,107,53,.3);z-index:2000;color:#fff;font-size:1.6rem;cursor:pointer}
 .menu{position:absolute;right:0;top:46px;background:#151b2b;border:1px solid var(--border);border-radius:var(--r);padding:4px;z-index:1600;min-width:190px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
 .menu button{display:block;width:100%;text-align:left;background:none;border:0;color:#fff;padding:.7rem .8rem;font-size:.85rem;border-radius:8px;cursor:pointer}.menu button:active{background:rgba(255,255,255,.08)}
+.cell .bal{font-size:.52rem;font-weight:700;text-align:right;font-family:ui-monospace,monospace;line-height:1}.neg{color:var(--red)}.pos{color:var(--success)}
+.bar{height:6px;background:rgba(255,255,255,.08);border-radius:9px;overflow:hidden;margin-top:5px}.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--orange),var(--success))}.sub{font-size:.68rem;color:var(--dim)}
 [v-cloak]{display:none!important}
 </style>
 </head>
@@ -50,12 +52,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 
  <div class="row mb" style="position:relative">
   <div><span class="label">Standalone Module</span><h1 class="title">Bills &amp; Payment Tracker</h1></div>
-  <button class="btn" @click="menu=!menu" aria-label="Menu">⋯</button>
+  <div class="actions"><button class="btn" @click="openDeck" aria-label="System deck">🧭 Deck</button><button class="btn" @click="menu=!menu" aria-label="Menu">⋯</button></div>
   <div v-if="menu" style="position:fixed;inset:0;z-index:1500" @click="menu=false"></div>
   <div v-if="menu" class="menu" @click="menu=false">
-   <button @click="exportData">⬇ Backup (JSON)</button>
+   <button @click="exportData">⬇ Backup (data only)</button>
+   <button @click="exportFull">⬇ Backup + documents</button>
    <button @click="$refs.file.click()">⬆ Restore backup</button>
    <button @click="exportCSV">📄 Payments CSV</button>
+   <button @click="editDeck">🔗 Set system deck link</button>
    <button @click="resetSample">↺ Load sample data</button>
   </div>
   <input ref="file" type="file" accept=".json,application/json" hidden @change="importData">
@@ -67,6 +71,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div class="progress" style="margin:8px 0 10px"><div class="fill" :style="{width:monthPct+'%'}"></div></div>
   <div class="grid">
    <div class="metric"><span class="label">Next 7 days</span><div class="v">{{fmt(next7)}}</div></div>
+   <div class="metric"><span class="label">Month-end balance</span><div class="v" :class="{neg:budget.end<0}">{{settings.income||settings.startBalance?fmt(budget.end):'—'}}</div></div>
+   <div class="metric"><span class="label">Assets</span><div class="v pos">{{fmt(totalAssets)}}</div></div>
    <div class="metric"><span class="label">Total debt</span><div class="v">{{fmt(totalDebt)}}</div></div>
   </div>
  </div>
@@ -117,6 +123,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div v-if="!billGroups.length" class="glass dim" style="text-align:center">No matching records.</div>
  </div>
 
+ <!-- DEBT -->
+ <div v-if="tab==='debt'">
+  <div class="glass">
+   <div class="grid mb">
+    <div class="metric"><span class="label">Total owed</span><div class="v">{{fmt(totalDebt)}}</div></div>
+    <div class="metric"><span class="label">Monthly payments</span><div class="v">{{fmt(debtMonthly)}}</div></div>
+    <div class="metric"><span class="label">Debt-free</span><div class="v">{{plan.label}}</div></div>
+    <div class="metric"><span class="label">Interest left</span><div class="v">{{fmt(plan.interest)}}</div></div>
+   </div>
+   <div class="grid mb"><select class="input" v-model="strategy"><option value="avalanche">Avalanche · highest APR</option><option value="snowball">Snowball · smallest balance</option></select><input class="input" type="number" inputmode="decimal" placeholder="Extra $/month" v-model.number="extra"></div>
+   <div v-if="extra>0&&!plan.never" class="sub mb pos">Extra saves {{fmt(base.interest-plan.interest)}} in interest and {{base.months-plan.months}} months</div>
+   <button class="btn primary" style="width:100%" @click="openBill(-2)">＋ Add Affirm loan</button>
+  </div>
+  <div v-for="g in debtGroups" :key="g.name" class="glass">
+   <div class="row mb"><b style="font-size:.8rem;text-transform:uppercase">{{g.name}} ({{g.items.length}})</b><span class="num">{{fmt(g.total)}}</span></div>
+   <div v-for="b in g.items" :key="b.id" class="item" @click="selected=b">
+    <div style="flex:1;min-width:0"><strong>{{b.name}}</strong><div class="sub">{{debtLine(b)}}</div><div class="bar"><i :style="{width:paydown(b)+'%'}"></i></div></div>
+    <div class="right"><span class="num">{{fmt(b.currentBalance)}}</span><span class="sub">{{fmt(b.paymentAmount)}} · {{(b.docs||[]).length?'📎'+b.docs.length:'no docs'}}</span></div>
+   </div>
+  </div>
+  <div v-if="!debtGroups.length" class="glass dim" style="text-align:center">No debts yet.</div>
+ </div>
+
  <!-- HISTORY -->
  <div v-if="tab==='history'" class="glass">
   <select class="input mb" v-model="historyFilter"><option value="all">All items</option><option v-for="b in bills" :value="b.id">{{b.name}}</option></select>
@@ -129,12 +158,50 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
  </div>
 
  <!-- CALENDAR -->
+ <div v-if="tab==='budget'" class="glass">
+  <div class="gh" @click="budgetOpen=!budgetOpen"><b>{{budgetOpen?'▾':'▸'}} Budget &amp; income</b><span class="num dim">{{settings.income?fmt(settings.income)+' · '+settings.incFreq:'set up'}}</span></div>
+  <div v-if="budgetOpen" class="mt">
+   <div class="grid mb"><div><label class="label">Paycheck (net)</label><input class="input" type="number" inputmode="decimal" step=".01" v-model.number="settings.income" @change="save"></div>
+    <div><label class="label">Frequency</label><select class="input" v-model="settings.incFreq" @change="save"><option value="weekly">Weekly</option><option value="biweekly">Biweekly</option><option value="semimonthly">15th &amp; last day</option><option value="monthly">Monthly</option></select></div></div>
+   <div class="grid mb"><div><label class="label">Next pay date</label><input class="input" type="date" v-model="settings.incStart" @change="save"></div>
+    <div><label class="label">Balance this morning</label><input class="input" type="number" inputmode="decimal" step=".01" v-model.number="settings.startBalance" @change="save"></div></div>
+   <div class="sub mb">Running balances start from this balance. Bills already paid today are excluded.</div>
+  </div>
+  <div class="grid mt">
+   <div class="metric"><span class="label">Income · month</span><div class="v">{{fmt(budget.inc)}}</div></div>
+   <div class="metric"><span class="label">Bills · month</span><div class="v">{{fmt(budget.bills)}}</div></div>
+   <div class="metric"><span class="label">Left over</span><div class="v" :class="budget.left<0?'neg':'pos'">{{fmt(budget.left)}}</div></div>
+   <div class="metric"><span class="label">Lowest · 60 days</span><div class="v" :class="{neg:budget.lo&&budget.lo.bal<0}">{{budget.lo&&(settings.income||settings.startBalance)?fmt(budget.lo.bal):'—'}}</div><div class="sub">{{budget.lo&&(settings.income||settings.startBalance)?fmtDate(parseDate(budget.lo.k)):''}}</div></div>
+  </div>
+  <div class="mt"><div v-for="c in budget.cats" :key="c.k" style="margin-bottom:.55rem"><div class="row" style="font-size:.78rem"><span>{{c.k}}</span><span class="num">{{fmt(c.v)}}</span></div><div class="bar"><i :style="{width:Math.min(100,c.v/(budget.inc||budget.bills||1)*100)+'%'}"></i></div></div></div>
+ </div>
+ <div v-if="tab==='budget'" class="glass">
+  <div class="row mb"><div><span class="label">Forecast</span><h2 class="title">One-off &amp; variable</h2></div><button class="btn primary sm" @click="openOO(null)">＋ Add</button></div>
+  <div v-for="o in ooSorted" :key="o.id" class="item" @click="openOO(o)"><div><strong>{{o.name}}</strong><div class="sub">{{o.date}} · {{o.repeat==='once'?'one-time':o.repeat}}</div></div><span class="num" :class="o.kind==='in'?'pos':'neg'">{{o.kind==='in'?'+':'-'}}{{fmt(o.amount)}}</span></div>
+  <div v-if="!oneoffs.length" class="sub">Add overtime, bonuses, refunds, repairs or weekly spending to see them in the running balance.</div>
+ </div>
+ <div v-if="tab==='budget'" class="glass">
+  <div class="gh" @click="payOpen=!payOpen"><b>{{payOpen?'▾':'▸'}} Paycheck calculator</b><span class="num pos">{{fmt(paycheck.net)}}</span></div>
+  <div class="grid mt"><div class="metric"><span class="label">Gross</span><div class="v">{{fmt(paycheck.g)}}</div></div><div class="metric"><span class="label">Net to checking</span><div class="v pos">{{fmt(paycheck.net)}}</div></div></div>
+  <div class="mt"><div v-for="r in payRows" :key="r[0]" class="row sub" style="padding:3px 0"><span>{{r[0]}}</span><span class="num">{{fmt(r[1])}}</span></div></div>
+  <div v-if="payOpen" class="mt">
+   <div class="grid mb"><div><label class="label">Pay mode</label><select class="input" v-model="pay.SETTINGS.mode" @change="save"><option value="flat">Flat gross</option><option value="hours">Hours &amp; rates</option></select></div>
+    <div><label class="label">Filing status</label><select class="input" v-model="pay.SETTINGS.filingStatus" @change="save"><option value="MFJ">Married jointly</option><option value="HOH">Head of household</option><option value="SINGLE">Single</option></select></div></div>
+   <div v-for="sec in paySecs" :key="sec[1]" class="mb">
+    <div class="gh" @click="$set(payCol,sec[1],!payCol[sec[1]])"><b style="font-size:.72rem" class="dim">{{payCol[sec[1]]?'▸':'▾'}} {{sec[0]}}</b></div>
+    <div v-if="!payCol[sec[1]]" class="grid" style="margin-top:6px">
+     <template v-for="(v,k) in pay[sec[1]]"><div v-if="typeof v==='number'" :key="k"><label class="label">{{lbl(k)}}</label><input class="input" type="number" inputmode="decimal" step="any" v-model.number="pay[sec[1]][k]" @change="save"></div></template>
+    </div>
+   </div>
+   <button class="btn success" style="width:100%" @click="usePay">Use {{fmt(paycheck.net)}} as forecast paycheck (biweekly)</button>
+  </div>
+ </div>
  <div v-if="tab==='calendar'" class="glass">
   <div class="row"><h2 class="title">{{calendarTitle}}</h2><div class="actions"><button class="btn" @click="month(-1)">◀</button><button class="btn" @click="month(1)">▶</button></div></div>
   <div class="calendar">
    <div v-for="d in ['S','M','T','W','T','F','S']" class="wd">{{d}}</div>
    <div v-for="(c,i) in calendarCells" :key="i" class="cell" :class="{out:!c.inMonth,today:c.isToday}" @click="dayDetail=c">
-    <div>{{c.day}}</div><div><span v-for="b in c.bills.slice(0,4)" class="dot"></span></div>
+    <div>{{c.day}}</div><div><span v-for="b in c.bills.slice(0,4)" class="dot"></span><span v-if="c.inc" class="dot" style="background:var(--success)"></span><span v-if="c.oo" class="dot" style="background:var(--purple)"></span></div><div v-if="c.bal!==null&&(settings.income||settings.startBalance)" class="bal" :class="{neg:c.bal<0}">{{short(c.bal)}}</div>
    </div>
   </div>
  </div>
@@ -157,6 +224,14 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
    <div class="progress" style="margin-top:6px"><div class="fill" :style="{width:paydown(selected)+'%'}"></div></div>
   </div>
   <div class="actions mb"><button class="btn primary" @click="editSelected">✏ Edit</button><button class="btn success" @click="openPayment(selected)">{{selected.type==='asset'?'＋ Deposit':'💵 Pay'}}</button></div>
+  <div v-if="selected.type==='account'" class="sub mb">{{debtLine(selected)}}</div>
+  <div v-if="selected.lender||selected.purchaseDate||selected.notes" class="sub mb">{{selected.lender}}<span v-if="selected.purchaseDate"> · purchased {{selected.purchaseDate}}</span><span v-if="selected.notes"> · {{selected.notes}}</span></div>
+  <div class="mb">
+   <div class="row"><span class="label">Documents ({{(selected.docs||[]).length}})</span>
+    <div class="actions"><select class="input" style="height:34px;font-size:.75rem;padding:0 .4rem" v-model="docKind"><option>Receipt</option><option>Finance agreement</option><option>Statement</option><option>Other</option></select><button class="btn sm" @click="$refs.doc.click()">＋ Attach</button></div></div>
+   <input ref="doc" type="file" multiple accept="image/*,application/pdf,.pdf,.doc,.docx" hidden @change="addDocs">
+   <div v-for="d in selected.docs" :key="d.id" class="item" style="cursor:default"><div @click="openDoc(d)" style="cursor:pointer;min-width:0"><strong style="word-break:break-all">{{d.name}}</strong><div class="sub">{{d.kind}} · {{kb(d.size)}} · {{d.added}}</div></div><button class="btn danger sm" @click="delDoc(d)">✕</button></div>
+  </div>
   <span class="label">History</span>
   <div v-for="p in selectedHistory" :key="p.id" class="item" style="cursor:default"><div><strong class="num">{{fmt(p.amount)}}</strong><div class="sub">{{p.paymentDate}}</div></div><span :class="['status',p.status]">{{p.status}}</span></div>
   <div v-if="!selectedHistory.length" class="dim" style="padding:.6rem 0;font-size:.8rem">No payments yet.</div>
@@ -175,8 +250,12 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div v-if="form.frequency==='monthly'" class="mb"><label class="label">Due day of month</label><input class="input" type="number" min="1" max="31" v-model.number="form.day"></div>
   <div v-else class="mb"><label class="label">First due date</label><input class="input" type="date" v-model="form.startDate"></div>
   <div v-if="form.frequency==='custom'" class="grid mb"><div><label class="label">Every</label><input class="input" type="number" min="1" v-model.number="form.interval"></div><div><label class="label">Unit</label><select class="input" v-model="form.intervalUnit"><option value="days">Days</option><option value="weeks">Weeks</option><option value="months">Months</option></select></div></div>
-  <div v-if="form.type!=='bill'" class="grid mb"><div><label class="label">Current balance</label><input class="input" type="number" inputmode="decimal" step=".01" v-model.number="form.currentBalance"></div><div><label class="label">Starting balance</label><input class="input" type="number" inputmode="decimal" step=".01" v-model.number="form.startingBalance"></div></div>
+  <div v-if="form.type!=='bill'" class="grid mb"><div><label class="label">Current balance</label><input class="input" type="number" inputmode="decimal" step=".01" v-model.number="form.currentBalance"></div><div><label class="label">{{form.type==='account'?'Original amount':'Starting balance'}}</label><input class="input" type="number" inputmode="decimal" step=".01" v-model.number="form.startingBalance"></div></div>
   <div v-if="form.type==='account'" class="grid mb"><div><label class="label">APR %</label><input class="input" type="number" step=".01" v-model.number="form.apr"></div><div><label class="label">Minimum payment</label><input class="input" type="number" step=".01" v-model.number="form.minimumPayment"></div></div>
+  <div v-if="form.type==='account'" class="grid mb"><div><label class="label">Lender</label><input class="input" v-model="form.lender" placeholder="Affirm"></div><div><label class="label">Purchase date</label><input class="input" type="date" v-model="form.purchaseDate"></div></div>
+  <div v-if="form.type==='account'" class="grid mb"><div><label class="label">Term (payments)</label><input class="input" type="number" min="0" inputmode="numeric" v-model.number="form.termMonths"></div><div><label class="label">Payments left</label><input class="input" type="number" min="0" inputmode="numeric" v-model.number="form.paymentsLeft"></div></div>
+  <button v-if="form.type==='account'" class="btn sm mb" style="width:100%" @click="calcBal">Calculate balance from payments left</button>
+  <div class="mb"><label class="label">Notes</label><input class="input" v-model="form.notes" placeholder="Merchant, loan #, terms…"></div>
   <div v-if="form.type!=='bill'" class="mb"><label class="label">Account number (last 4)</label><input class="input" v-model="form.accountNumber" placeholder="****4321"></div>
   <label style="display:flex;align-items:center;gap:8px;margin-bottom:1rem;color:var(--dim);font-size:.8rem"><input type="checkbox" v-model="form.skipped"> Skip this item</label>
   <div class="actions"><button class="btn" @click="editIndex=null">Cancel</button><button class="btn primary" @click="saveBill">Save</button></div>
@@ -191,12 +270,25 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
   <div class="actions"><button class="btn" @click="paymentItem=null">Cancel</button><button class="btn success" @click="submitPayment">Submit</button></div>
  </div></div>
 
+ <!-- ONE-OFF SHEET -->
+ <div v-if="ooForm" class="ov" @click="ooForm=null"><div class="sheet" @click.stop>
+  <div class="grab"></div><h2 class="title mb">{{ooForm.isNew?'Add':'Edit'}} one-off / variable</h2>
+  <div class="grid mb"><div><label class="label">Type</label><select class="input" v-model="ooForm.kind"><option value="out">Expense</option><option value="in">Income</option></select></div><div><label class="label">Amount</label><input class="input" type="number" inputmode="decimal" step=".01" v-model.number="ooForm.amount"></div></div>
+  <div class="mb"><label class="label">Name</label><input class="input" v-model="ooForm.name" placeholder="Overtime, tax refund, groceries…"></div>
+  <div class="grid mb"><div><label class="label">Date</label><input class="input" type="date" v-model="ooForm.date"></div><div><label class="label">Repeats</label><select class="input" v-model="ooForm.repeat"><option value="once">One time</option><option value="weekly">Weekly</option><option value="biweekly">Biweekly</option><option value="monthly">Monthly</option></select></div></div>
+  <div class="actions"><button v-if="!ooForm.isNew" class="btn danger" @click="delOO">Delete</button><button class="btn" @click="ooForm=null">Cancel</button><button class="btn primary" @click="saveOO">Save</button></div>
+ </div></div>
+
  <!-- DAY SHEET -->
  <div v-if="dayDetail" class="ov" @click="dayDetail=null"><div class="sheet" @click.stop>
   <div class="grab"></div>
   <h2 class="title mb">{{dayLabel(dayDetail.date)}}</h2>
+  <div v-if="fcDay(dayDetail.date)&&(settings.income||settings.startBalance)" class="mb">
+   <div v-if="fcDay(dayDetail.date).inc" class="row"><span>Income</span><strong class="num pos">+{{fmt(fcDay(dayDetail.date).inc)}}</strong></div>
+   <div class="row"><span class="dim">Balance after</span><strong class="num" :class="{neg:fcDay(dayDetail.date).bal<0}">{{fmt(fcDay(dayDetail.date).bal)}}</strong></div></div>
   <div v-for="b in dayDetail.bills" :key="b.id" class="item" @click="dayDetail=null;selected=b"><div><strong>{{b.name}}</strong><div class="sub">{{b.category}}</div></div><span class="num">{{fmt(b.paymentAmount)}}</span></div>
-  <div v-if="!dayDetail.bills.length" class="dim" style="text-align:center;padding:1rem">Nothing scheduled.</div>
+  <div v-for="o in (fcDay(dayDetail.date)||{oo:[]}).oo" :key="o.id" class="item" style="cursor:default"><div><strong>{{o.name}}</strong><div class="sub">One-off / variable</div></div><span class="num" :class="o.kind==='in'?'pos':'neg'">{{o.kind==='in'?'+':'-'}}{{fmt(o.amount)}}</span></div>
+  <div v-if="!dayDetail.bills.length&&!(fcDay(dayDetail.date)||{oo:[]}).oo.length" class="dim" style="text-align:center;padding:1rem">Nothing scheduled.</div>
  </div></div>
 </div>
 
@@ -208,6 +300,9 @@ const iso=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); // lo
 const addDays=(d,n)=>{const x=new Date(d);x.setDate(x.getDate()+n);return x};
 const dim=(y,m)=>new Date(y,m+1,0).getDate();
 const r2=n=>Math.round(n*100)/100;
+const idb=()=>new Promise((ok,no)=>{const r=indexedDB.open('bills-docs',1);r.onupgradeneeded=()=>r.result.createObjectStore('f');r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)});
+const idbTx=(mode,fn)=>idb().then(db=>new Promise((ok,no)=>{const t=db.transaction('f',mode),q=fn(t.objectStore('f'));t.oncomplete=()=>ok(q&&q.result);t.onerror=()=>no(t.error)}));
+const idbPut=(k,v)=>idbTx('readwrite',s=>s.put(v,k)),idbGet=k=>idbTx('readonly',s=>s.get(k)),idbDel=k=>idbTx('readwrite',s=>s.delete(k)).catch(()=>{});
 function seed(){
  const m=(id,name,day,amt,cat)=>({id,type:'bill',name,day,paymentAmount:amt,category:cat,frequency:'monthly',skipped:false});
  return[m('b1','LSPA Nathan',1,65,'Other'),m('b2','LSPA Lillian',1,32.5,'Other'),m('b3','City of Lagrange',1,60,'Utilities'),
@@ -220,19 +315,47 @@ function seed(){
 }
 function norm(b){b=Object.assign({type:'bill',frequency:'monthly',day:1,skipped:false},b);
  b.type=b.type||'bill';b.paymentAmount=Number(b.paymentAmount!=null?b.paymentAmount:b.amount)||0;delete b.amount;
- if(!b.category)b.category=b.type==='account'?'Debt':b.type==='asset'?'Savings':'Other';return b}
+ if(!b.category)b.category=b.type==='account'?'Debt':b.type==='asset'?'Savings':'Other';b.docs=b.docs||[];b.termMonths=Number(b.termMonths)||0;b.paymentsLeft=Number(b.paymentsLeft)||0;b.lender=b.lender||'';b.purchaseDate=b.purchaseDate||'';b.notes=b.notes||'';return b}
 
 document.addEventListener('DOMContentLoaded',()=>new Vue({
  el:'#app',
  data:{
-  tab:'upcoming',tabList:[['upcoming','Upcoming'],['bills','Bills'],['history','History'],['calendar','Calendar']],
-  cats:CATS,bills:seed().map(norm),payments:[],search:'',filterType:'all',historyFilter:'all',collapsed:{},menu:false,
+  tab:'upcoming',tabList:[['upcoming','Due'],['bills','Bills'],['debt','Debt'],['budget','Budget'],['calendar','Calendar'],['history','History']],
+  cats:CATS,bills:seed().map(norm),payments:[],settings:{income:0,incFreq:'biweekly',incStart:iso(new Date()),startBalance:0,deckUrl:''},budgetOpen:true,strategy:'avalanche',extra:0,docKind:'Receipt',payOpen:true,payCol:{SETTINGS:true,PRE_TAX:true,AFTER_TAX:true},oneoffs:[],ooForm:null,
+  paySecs:[['Earnings','PAY'],['Pre-tax deductions','PRE_TAX'],['After-tax deductions','AFTER_TAX'],['Tax settings','SETTINGS']],
+  pay:{SETTINGS:{mode:'flat',filingStatus:'MFJ',jobs:1,childrenUnder17:2,extraFederal:0,payPeriods:26,georgiaRate:.0499,socialSecurityWageBase:176100,socialSecurityRate:.062,medicareRate:.0145,southernDeposit:150},
+   PAY:{regularHours:0,regularRate:41.64,overtimeHours:0,overtimeRate:20.82,doubleTimeHours:12,doubleTimeRate:83.28,holidayHours:0,holidayRate:41.64,otherEarnings:0,bonus:0,flatGross:3497.76},
+   PRE_TAX:{health:52.59,cancer:32.10,specialHealth:19.92,personalAccident:24.24,retirement401k:0,healthcareFSA:126.93},
+   AFTER_TAX:{retirementLoan:35.76,dependentLife:2.33,optionalLife:48,optionalChild:0.42,optionalSpouse:15.23,gtli:8.58}},search:'',filterType:'all',historyFilter:'all',collapsed:{},menu:false,
   editIndex:null,form:{},selected:null,paymentItem:null,dayDetail:null,paymentForm:{amount:0,date:'',notes:''},
   monthCursor:new Date(new Date().getFullYear(),new Date().getMonth(),1)
  },
  computed:{
-  anySheet(){return !!(this.selected||this.editIndex!==null||this.paymentItem||this.dayDetail)},
-  ob(){return this.bills.filter(b=>!b.skipped&&b.type!=='asset')},
+  anySheet(){return !!(this.selected||this.editIndex!==null||this.paymentItem||this.dayDetail||this.ooForm)},
+  ob(){return this.bills.filter(b=>!b.skipped&&b.type!=='asset'&&!this.ended(b))},
+  ooSorted(){return this.oneoffs.slice().sort((a,b)=>a.date.localeCompare(b.date))},
+  paycheck(){const P=this.pay,S=P.SETTINGS,E=P.PAY,n=v=>Math.max(0,parseFloat(String(v).replace(/[$,\s]/g,''))||0);
+   const g=S.mode==='flat'?n(E.flatGross):n(E.regularHours)*n(E.regularRate)+n(E.overtimeHours)*n(E.overtimeRate)+n(E.doubleTimeHours)*n(E.doubleTimeRate)+n(E.holidayHours)*n(E.holidayRate)+n(E.otherEarnings)+n(E.bonus);
+   const pre=Object.values(P.PRE_TAX).reduce((a,b)=>a+n(b),0),aft=Object.values(P.AFTER_TAX).reduce((a,b)=>a+n(b),0),pp=Number(S.payPeriods)||26,f=S.filingStatus;
+   const ti=Math.max(0,(g-pre)*pp-(f==='MFJ'?32200:f==='HOH'?24150:16100));
+   const br=f==='MFJ'?[[24800,.1],[96000,.12],[218400,.22],[393550,.24],[498300,.32],[750000,.35],[Infinity,.37]]:f==='HOH'?[[17700,.1],[67400,.12],[108050,.22],[206700,.24],[263950,.32],[658350,.35],[Infinity,.37]]:[[12400,.1],[50400,.12],[105700,.22],[201775,.24],[256225,.32],[640600,.35],[Infinity,.37]];
+   let prev=0,tax=0;for(const b of br){tax+=Math.max(0,Math.min(ti,b[0])-prev)*b[1];if(ti<=b[0])break;prev=b[0]}
+   let fed=Math.max(0,(tax-Math.min(n(S.childrenUnder17)*2200,tax))/pp)+n(S.extraFederal);if(S.jobs!==1&&f==='MFJ')fed*=1.5;
+   const ga=Math.max(0,(g-pre)-1153.85-n(S.childrenUnder17)*82.19)*S.georgiaRate,fica=Math.min(g,S.socialSecurityWageBase)*S.socialSecurityRate+g*S.medicareRate;
+   const total=Math.max(0,g-fed-ga-fica-pre-aft),dep=Math.min(total,n(S.southernDeposit)),net=total-dep;return{g,fed,ga,fica,pre,aft,total,dep,net,annual:net*pp,monthly:net*pp/12}},
+  payRows(){const p=this.paycheck;return[['Federal tax',p.fed],['GA tax',p.ga],['FICA',p.fica],['Pre-tax deductions',p.pre],['After-tax deductions',p.aft],['Total net',p.total],['Second account deposit',p.dep],['Annual net (checking)',p.annual],['Avg monthly (checking)',p.monthly]]},
+  totalAssets(){return this.bills.filter(b=>b.type==='asset').reduce((s,b)=>s+(Number(b.currentBalance)||0),0)},
+  debtMonthly(){return this.bills.filter(b=>b.type==='account'&&!b.skipped&&(Number(b.currentBalance)||0)>0).reduce((s,b)=>s+(this.monthlyEq(b)||Number(b.minimumPayment)||0),0)},
+  plan(){return this.sim(Number(this.extra)||0,this.strategy)},
+  base(){return this.sim(0,this.strategy)},
+  debtGroups(){const d=this.bills.filter(b=>b.type==='account'),a=b=>/affirm/i.test((b.lender||'')+b.name),g=[['Affirm',d.filter(a)],['Other debt',d.filter(b=>!a(b))]];return g.filter(x=>x[1].length).map(x=>({name:x[0],items:x[1].slice().sort((p,q)=>(p.currentBalance||0)-(q.currentBalance||0)),total:x[1].reduce((s,b)=>s+(Number(b.currentBalance)||0),0)}))},
+  fc(){const t=this.today(),c=this.monthCursor,max=new Date(Math.max(addDays(new Date(c.getFullYear(),c.getMonth()+1,1),14),addDays(t,60))),fl=this.bills.filter(b=>!b.skipped&&b.paymentAmount>0&&!this.ended(b)),m={},cnt={};let bal=Number(this.settings.startBalance)||0;
+   for(let d=t,i=0;d<=max;d=addDays(d,1),i++){const inc=this.incomeOn(d)?Number(this.settings.income):0,items=fl.filter(b=>{if(!this.dueOn(b,d)||(i===0&&['paid','overpaid'].includes((this.cycleStatus(b)||{}).class)))return false;if(b.type==='account'&&b.paymentsLeft>0){cnt[b.id]=(cnt[b.id]||0)+1;return cnt[b.id]<=b.paymentsLeft}return true}),
+    oo=this.oneoffs.filter(o=>this.ooOn(o,d)),oi=oo.filter(o=>o.kind==='in').reduce((s,o)=>s+o.amount,0),out=items.reduce((s,b)=>s+b.paymentAmount,0)+oo.filter(o=>o.kind!=='in').reduce((s,o)=>s+o.amount,0);bal=r2(bal+inc+oi-out);m[iso(d)]={bal,inc:inc+oi,out,items,oo}}return m},
+  budget(){const t=new Date(),y=t.getFullYear(),mo=t.getMonth(),n=dim(y,mo),cat={};let inc=0,lo=null;
+   for(let d=1;d<=n;d++){const dt=new Date(y,mo,d);if(this.incomeOn(dt))inc+=Number(this.settings.income);this.ob.forEach(b=>{if(this.dueOn(b,dt))cat[b.category]=(cat[b.category]||0)+b.paymentAmount});this.oneoffs.forEach(o=>{if(this.ooOn(o,dt)){if(o.kind==='in')inc+=o.amount;else cat['One-off']=(cat['One-off']||0)+o.amount}})}
+   Object.keys(this.fc).slice(0,60).forEach(k=>{if(!lo||this.fc[k].bal<lo.bal)lo={k,bal:this.fc[k].bal}});
+   const bills=Object.keys(cat).reduce((s,k)=>s+cat[k],0);return{inc,bills,left:inc-bills,lo,end:(this.fc[iso(new Date(y,mo,n))]||{}).bal||0,cats:Object.keys(cat).sort((a,b)=>cat[b]-cat[a]).map(k=>({k,v:cat[k]}))}},
   monthName(){return new Date().toLocaleString('en-US',{month:'long'})},
   monthDue(){const t=new Date(),n=dim(t.getFullYear(),t.getMonth());let s=0;for(let d=1;d<=n;d++){const dt=new Date(t.getFullYear(),t.getMonth(),d);this.ob.forEach(b=>{if(this.dueOn(b,dt))s+=b.paymentAmount})}return s},
   monthPaid(){const k=iso(new Date()).slice(0,7);return this.payments.filter(p=>p.status!=='reversed'&&String(p.paymentDate).slice(0,7)===k&&(this.bills.find(b=>b.id===p.accountId)||{}).type!=='asset').reduce((s,p)=>s+Number(p.amount||0),0)},
@@ -248,9 +371,45 @@ document.addEventListener('DOMContentLoaded',()=>new Vue({
   selectedHistory(){return this.selected?this.payments.filter(p=>p.accountId===this.selected.id).sort((a,b)=>new Date(b.paymentDate)-new Date(a.paymentDate)):[]},
   calendarTitle(){return this.monthCursor.toLocaleString('en-US',{month:'long',year:'numeric'})},
   calendarCells(){const y=this.monthCursor.getFullYear(),m=this.monthCursor.getMonth(),start=new Date(y,m,1-new Date(y,m,1).getDay()),out=[],t=this.today();
-   for(let i=0;i<42;i++){const d=addDays(start,i);out.push({date:d,day:d.getDate(),inMonth:d.getMonth()===m,isToday:d.getTime()===t.getTime(),bills:this.ob.filter(b=>this.dueOn(b,d))})}return out}
+   for(let i=0;i<42;i++){const d=addDays(start,i);out.push({date:d,day:d.getDate(),inMonth:d.getMonth()===m,isToday:d.getTime()===t.getTime(),bills:this.ob.filter(b=>this.dueOn(b,d)),inc:(this.fc[iso(d)]||{}).inc||0,oo:((this.fc[iso(d)]||{}).oo||[]).length,bal:this.fc[iso(d)]?this.fc[iso(d)].bal:null})}return out}
  },
  methods:{
+  deckFix(u){u=String(u||'').trim();return u&&!/^https?:\/\//i.test(u)?'https://'+u:u},
+  openDeck(){let u=this.settings.deckUrl;if(!u){u=this.deckFix(prompt('Paste your System Deck link (https://…)'));if(!u)return;this.settings.deckUrl=u;this.save()}window.open(u,'_blank','noopener')},
+  editDeck(){const u=prompt('System Deck link (leave blank to clear)',this.settings.deckUrl||'');if(u===null)return;this.settings.deckUrl=this.deckFix(u);this.save()},
+  lbl(k){return k.replace(/([A-Z])/g,' $1').replace(/^./,c=>c.toUpperCase())},
+  ended(b){return b.type==='account'&&((b.termMonths>0&&b.paymentsLeft<=0)||((Number(b.currentBalance)||0)<=.005&&(Number(b.startingBalance)||0)>0))},
+  termPayoff(b){const n=Number(b.paymentsLeft)||0,nd=this.nextDue(b);if(n<=0||!nd)return null;const f=b.frequency;let d;if(f==='weekly')d=addDays(nd,7*(n-1));else if(f==='biweekly')d=addDays(nd,14*(n-1));else d=new Date(nd.getFullYear(),nd.getMonth()+n-1,nd.getDate());return d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})},
+  calcBal(){const f=this.form,n=Number(f.paymentsLeft)||0,p=Number(f.paymentAmount)||0,r=(Number(f.apr)||0)/1200,pv=k=>r?p*(1-Math.pow(1+r,-k))/r:p*k;if(!n||!p){alert('Enter the payment amount and payments left first.');return}f.currentBalance=r2(pv(n));if(f.termMonths&&!Number(f.startingBalance))f.startingBalance=r2(pv(f.termMonths))},
+  ooOn(o,d){const t=new Date(d.getFullYear(),d.getMonth(),d.getDate()),s=this.parseDate(o.date);if(!o.repeat||o.repeat==='once')return iso(t)===o.date;if(t<s)return false;return this.dueOn({frequency:o.repeat,day:s.getDate(),startDate:o.date},t)},
+  openOO(o){this.ooForm=o?Object.assign({isNew:false},o):{isNew:true,id:'oo-'+Date.now(),kind:'out',name:'',amount:0,date:iso(new Date()),repeat:'once'}},
+  saveOO(){const f=Object.assign({},this.ooForm);if(!String(f.name||'').trim()||!(Number(f.amount)>0)){alert('Enter a name and an amount.');return}f.amount=Number(f.amount);delete f.isNew;const i=this.oneoffs.findIndex(x=>x.id===f.id);if(i<0)this.oneoffs.push(f);else this.$set(this.oneoffs,i,f);this.ooForm=null;this.save()},
+  delOO(){this.oneoffs=this.oneoffs.filter(x=>x.id!==this.ooForm.id);this.ooForm=null;this.save()},
+  usePay(){this.settings.income=r2(this.paycheck.net);this.settings.incFreq='biweekly';this.save();alert('Forecast paycheck set to '+this.fmt(this.settings.income)+' biweekly. Set your next pay date in Budget & income.')},
+  hydrate(x){if(Array.isArray(x.oneoffs))this.oneoffs=x.oneoffs;if(x.pay)Object.keys(x.pay).forEach(k=>this.pay[k]=Object.assign({},this.pay[k],x.pay[k]))},
+  short(v){const a=Math.abs(v);return (v<0?'-':'')+(a>=1000?(a/1000).toFixed(1)+'k':Math.round(a))},
+  fcDay(d){return this.fc[iso(d)]},
+  kb(n){return n>1048576?(n/1048576).toFixed(1)+' MB':Math.max(1,Math.round(n/1024))+' KB'},
+  incomeOn(d){const s=this.settings;if(!(Number(s.income)>0))return false;const t=new Date(d.getFullYear(),d.getMonth(),d.getDate()),dm=dim(t.getFullYear(),t.getMonth());
+   if(s.incFreq==='semimonthly')return t.getDate()===15||t.getDate()===dm;
+   const st=s.incStart?this.parseDate(s.incStart):this.today();if(s.incFreq==='monthly')return t.getDate()===Math.min(st.getDate(),dm);
+   return this.dueOn({frequency:s.incFreq,startDate:s.incStart||iso(this.today())},t)},
+  sim(extra,strat){const ds=this.bills.filter(b=>b.type==='account'&&!b.skipped).map(b=>({id:b.id,bal:Number(b.currentBalance)||0,r:(Number(b.apr)||0)/1200,pm:this.monthlyEq(b)||Number(b.minimumPayment)||0}));
+   ds.forEach(d=>d.live=d.bal>.005);
+   const ord=ds.slice().sort(strat==='snowball'?(a,b)=>a.bal-b.bal:(a,b)=>b.r-a.r||a.bal-b.bal),t=new Date(),lab=m=>new Date(t.getFullYear(),t.getMonth()+m,1).toLocaleDateString('en-US',{month:'short',year:'numeric'}),by={};let m=0,interest=0;
+   ds.forEach(d=>{if(!d.live)by[d.id]={left:0,label:'now'}});
+   while(m<600&&ds.some(d=>d.bal>.005)){m++;let pool=extra;
+    ds.forEach(d=>{if(d.bal<=.005){if(d.live)pool+=d.pm;return}const i=d.bal*d.r;d.bal+=i;interest+=i;const p=Math.min(d.pm,d.bal);d.bal-=p;pool+=d.pm-p});
+    ord.forEach(d=>{if(d.bal>.005&&pool>0){const p=Math.min(pool,d.bal);d.bal-=p;pool-=p}});
+    ds.forEach(d=>{if(d.bal<=.005&&!by[d.id])by[d.id]={left:m,label:lab(m)}})}
+   const never=ds.some(d=>d.bal>.005);return{months:m,interest:r2(interest),never,by,label:never?'Never':m?lab(m):'None'}},
+  debtLine(b){const p=this.plan.by[b.id],bal=Number(b.currentBalance)||0,tp=this.termPayoff(b);return (Number(b.apr)||0)+'% APR · '+(this.ended(b)||bal<=.005?'paid off':tp?b.paymentsLeft+(b.termMonths?' of '+b.termMonths:'')+' payments left · last '+tp:p?p.left+' payments left · payoff '+p.label:'payment too low to pay off')},
+  async addDocs(e){const it=this.selected;if(!it)return;for(const f of e.target.files){const id='doc-'+Date.now()+Math.random().toString(36).slice(2,6);try{await idbPut(id,f);it.docs.push({id,name:f.name,type:f.type,size:f.size,kind:this.docKind,added:iso(new Date())})}catch(err){alert('Could not store '+f.name+': '+err.message)}}e.target.value='';this.save()},
+  openDoc(d){const w=window.open('','_blank');idbGet(d.id).then(b=>{if(!b){if(w)w.close();alert('File not found on this device. Restore a backup that includes documents.');return}const u=URL.createObjectURL(b);if(w)w.location=u;else{const a=document.createElement('a');a.href=u;a.download=d.name;a.click()}})},
+  delDoc(d){if(!confirm('Remove '+d.name+'?'))return;idbDel(d.id);this.selected.docs=this.selected.docs.filter(x=>x.id!==d.id);this.save()},
+  async exportFull(){this.save();const files={},rd=b=>new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(b)});
+   for(const b of this.bills)for(const d of b.docs||[]){const bl=await idbGet(d.id);if(bl)files[d.id]=await rd(bl)}
+   this.download(JSON.stringify({app:'Bills & Payment Tracker',version:2,exportedAt:new Date().toISOString(),bills:this.bills,payments:this.payments,settings:this.settings,oneoffs:this.oneoffs,pay:this.pay,docFiles:files}),'bills-full-backup-'+iso(new Date())+'.json','application/json')},
   fmt(v){return '$'+(Number(v)||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})},
   today(){const n=new Date();return new Date(n.getFullYear(),n.getMonth(),n.getDate())},
   parseDate(s){const p=String(s).split('-').map(Number);return new Date(p[0],p[1]-1,p[2])},
@@ -281,14 +440,14 @@ document.addEventListener('DOMContentLoaded',()=>new Vue({
    if(paid<=0)return{label:'Unpaid',class:'unpaid'};if(paid<due-.005)return{label:'Partial',class:'partial'};if(paid>due+.005)return{label:'Overpaid',class:'overpaid'};return{label:'Paid',class:'paid'}
   },
   lastPaymentText(b){const p=this.payments.filter(x=>x.accountId===b.id&&x.status!=='reversed').sort((a,c)=>new Date(c.paymentDate)-new Date(a.paymentDate))[0];return p?this.fmt(p.amount)+' · '+p.paymentDate:'None'},
-  paydown(b){const s=Number(b.startingBalance)||Number(b.currentBalance)||0,c=Number(b.currentBalance)||0;return s?Math.max(0,Math.min(100,Math.round((s-c)/s*100))):0},
-  blank(){return{id:'item-'+Date.now(),type:'bill',category:'Other',name:'',day:1,paymentAmount:0,minimumPayment:0,currentBalance:0,startingBalance:0,apr:0,accountNumber:'',skipped:false,frequency:'monthly',startDate:iso(new Date()),interval:1,intervalUnit:'months'}},
-  openBill(i){this.editIndex=i;this.form=i===-1?this.blank():Object.assign({startDate:iso(new Date()),interval:1,intervalUnit:'months'},this.bills[i])},
+  paydown(b){if(b.termMonths>0)return Math.max(0,Math.min(100,Math.round((b.termMonths-(b.paymentsLeft||0))/b.termMonths*100)));const s=Number(b.startingBalance)||Number(b.currentBalance)||0,c=Number(b.currentBalance)||0;return s?Math.max(0,Math.min(100,Math.round((s-c)/s*100))):0},
+  blank(){return{id:'item-'+Date.now(),type:'bill',category:'Other',lender:'',purchaseDate:'',notes:'',docs:[],termMonths:0,paymentsLeft:0,name:'',day:1,paymentAmount:0,minimumPayment:0,currentBalance:0,startingBalance:0,apr:0,accountNumber:'',skipped:false,frequency:'monthly',startDate:iso(new Date()),interval:1,intervalUnit:'months'}},
+  openBill(i){this.editIndex=i===-2?-1:i;this.form=i<0?Object.assign(this.blank(),i===-2?{type:'account',category:'Debt',lender:'Affirm'}:{}):Object.assign({startDate:iso(new Date()),interval:1,intervalUnit:'months',lender:'',purchaseDate:'',notes:'',docs:[],termMonths:0,paymentsLeft:0},this.bills[i])},
   saveBill(){const r=Object.assign({},this.form);if(!String(r.name||'').trim()){alert('Please enter a name.');return}
-   ['paymentAmount','minimumPayment','currentBalance','startingBalance','apr'].forEach(k=>r[k]=Number(r[k])||0);r.day=Math.min(31,Math.max(1,Number(r.day)||1));r.interval=Number(r.interval)||1;
+   ['paymentAmount','minimumPayment','currentBalance','startingBalance','apr','termMonths','paymentsLeft'].forEach(k=>r[k]=Number(r[k])||0);r.day=Math.min(31,Math.max(1,Number(r.day)||1));r.interval=Number(r.interval)||1;
    if(this.editIndex===-1)this.bills.push(r);else this.$set(this.bills,this.editIndex,r);this.editIndex=null;this.save()},
   editSelected(){const i=this.bills.findIndex(x=>x.id===this.selected.id);this.selected=null;this.openBill(i)},
-  deleteSelected(){if(!confirm('Delete this record? Its payment history is kept (shown as "Deleted item").'))return;const id=this.selected.id;this.bills=this.bills.filter(x=>x.id!==id);this.selected=null;this.save()},
+  deleteSelected(){if(!confirm('Delete this record? Its payment history is kept (shown as "Deleted item").'))return;(this.selected.docs||[]).forEach(d=>idbDel(d.id));const id=this.selected.id;this.bills=this.bills.filter(x=>x.id!==id);this.selected=null;this.save()},
   openPayment(item){this.selected=null;this.paymentItem=item;this.paymentForm={amount:Number(item.paymentAmount)||0,date:iso(new Date()),notes:''}},
   submitPayment(){
    const item=this.bills.find(x=>x.id===this.paymentItem.id),amt=Number(this.paymentForm.amount),date=this.paymentForm.date;if(!item||!amt||!date)return;
@@ -296,25 +455,25 @@ document.addEventListener('DOMContentLoaded',()=>new Vue({
    if(item.type==='account'){if(item.apr>0)interest=r2(before*Number(item.apr)/1200);principal=Math.max(0,r2(amt-interest));after=r2(before-principal)} // interest no longer reduces balance
    else if(item.type==='asset')after=r2(before+amt);
    if(item.type!=='bill')item.currentBalance=after;
-   const due=item.paymentAmount,status=due&&amt<due-.005?'partial':due&&amt>due+.005?'overpaid':'paid';
-   this.payments.unshift({id:'pay-'+Date.now(),accountId:item.id,paymentDate:date,amount:amt,balanceBefore:before,balanceAfter:after,principal,interest,notes:this.paymentForm.notes,status});
+   const dec=item.type==='account'&&item.paymentsLeft>0?1:0;if(dec)item.paymentsLeft--;const due=item.paymentAmount,status=due&&amt<due-.005?'partial':due&&amt>due+.005?'overpaid':'paid';
+   this.payments.unshift({id:'pay-'+Date.now(),accountId:item.id,paymentDate:date,amount:amt,balanceBefore:before,balanceAfter:after,principal,interest,notes:this.paymentForm.notes,status,dec});
    this.paymentItem=null;this.save()
   },
   reversePayment(id){const p=this.payments.find(x=>x.id===id);if(!p||p.status==='reversed'||!confirm('Undo this payment?'))return;const it=this.bills.find(x=>x.id===p.accountId);
    if(it&&it.type==='account')it.currentBalance=r2((Number(it.currentBalance)||0)+(p.balanceBefore-p.balanceAfter));
    if(it&&it.type==='asset')it.currentBalance=r2((Number(it.currentBalance)||0)-(p.balanceAfter-p.balanceBefore));
-   p.status='reversed';this.save()},
+   if(p.dec&&it)it.paymentsLeft=(it.paymentsLeft||0)+1;p.status='reversed';this.save()},
   month(n){this.monthCursor=new Date(this.monthCursor.getFullYear(),this.monthCursor.getMonth()+n,1)},
-  save(){try{localStorage.setItem(KEY,JSON.stringify({version:1,savedAt:new Date().toISOString(),bills:this.bills,payments:this.payments}))}catch(e){console.warn(e)}},
-  load(){try{const x=JSON.parse(localStorage.getItem(KEY));if(x){if(Array.isArray(x.bills))this.bills=x.bills.map(norm);if(Array.isArray(x.payments))this.payments=x.payments}}catch(e){console.warn(e)}},
+  save(){try{localStorage.setItem(KEY,JSON.stringify({version:1,savedAt:new Date().toISOString(),bills:this.bills,payments:this.payments,settings:this.settings,oneoffs:this.oneoffs,pay:this.pay}))}catch(e){console.warn(e)}},
+  load(){try{const x=JSON.parse(localStorage.getItem(KEY));if(x){if(Array.isArray(x.bills))this.bills=x.bills.map(norm);if(Array.isArray(x.payments))this.payments=x.payments;if(x.settings)this.settings=Object.assign(this.settings,x.settings);this.hydrate(x)}}catch(e){console.warn(e)}},
   resetSample(){if(!confirm('Replace ALL current data with the sample data?'))return;this.bills=seed().map(norm);this.payments=[];this.save()},
-  exportData(){this.save();this.download(JSON.stringify({app:'Bills & Payment Tracker',version:1,exportedAt:new Date().toISOString(),bills:this.bills,payments:this.payments},null,2),'bills-payment-backup-'+iso(new Date())+'.json','application/json')},
+  exportData(){this.save();this.download(JSON.stringify({app:'Bills & Payment Tracker',version:1,exportedAt:new Date().toISOString(),bills:this.bills,payments:this.payments,settings:this.settings,oneoffs:this.oneoffs,pay:this.pay},null,2),'bills-payment-backup-'+iso(new Date())+'.json','application/json')},
   importData(e){const f=e.target.files&&e.target.files[0];if(!f)return;const r=new FileReader();
-   r.onload=ev=>{try{const x=JSON.parse(ev.target.result);if(!Array.isArray(x.bills))throw Error('Invalid backup');if(!confirm('Replace ALL current data with this backup?'))return;this.bills=x.bills.map(norm);this.payments=Array.isArray(x.payments)?x.payments:[];this.save();alert('Backup restored.')}catch(err){alert('Could not import backup: '+err.message)}finally{e.target.value=''}};r.readAsText(f)},
+   r.onload=ev=>{try{const x=JSON.parse(ev.target.result);if(!Array.isArray(x.bills))throw Error('Invalid backup');if(!confirm('Replace ALL current data with this backup?'))return;this.bills=x.bills.map(norm);this.payments=Array.isArray(x.payments)?x.payments:[];if(x.settings)this.settings=Object.assign(this.settings,x.settings);this.hydrate(x);if(x.docFiles)Object.keys(x.docFiles).forEach(k=>fetch(x.docFiles[k]).then(r=>r.blob()).then(b=>idbPut(k,b)));this.save();alert('Backup restored.')}catch(err){alert('Could not import backup: '+err.message)}finally{e.target.value=''}};r.readAsText(f)},
   exportCSV(){let c='Date,Account,Amount,Principal,Interest,Before,After,Status,Notes\n';this.payments.forEach(p=>{c+=`"${p.paymentDate}","${this.itemName(p.accountId).replace(/"/g,'""')}",${p.amount},${p.principal},${p.interest},${p.balanceBefore},${p.balanceAfter},"${p.status}","${(p.notes||'').replace(/"/g,'""')}"\n`});this.download(c,'payment-history-'+iso(new Date())+'.csv','text/csv;charset=utf-8')},
   download(data,name,type){const a=document.createElement('a'),u=URL.createObjectURL(new Blob([data],{type}));a.href=u;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),1000)}
  },
- mounted(){this.load()}
+ mounted(){this.load();try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}}
 }));
 </script>
 </body>

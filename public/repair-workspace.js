@@ -140,6 +140,8 @@ function groupTorque(torque){
    association={component:"Brake Line",fastener:"Brake line fitting",evidence,associationSource:"Procedure step explicitly identifies brake-line connection"};
   else if(/install (?:the )?(?:rear|front) wheel|wheel nuts?|lug nuts?/i.test(evidence))
    association={component:"Wheel",fastener:"Wheel nuts",evidence,associationSource:"Procedure step identifies wheel installation"};
+  else if(/PULLEY WRENCH PIN SET/i.test(evidence)&&/\bV[- ]BELTS?\b/i.test(evidence))
+   association={component:"Water Pump Pulley",fastener:"Pulley mounting fastener",evidence,associationSource:"Pulley holding tool and belt-installation sequence identify the pulley fastener"};
   else {
    const parts=matchParts(evidence).filter(p=>p.category!=="Consumable");
    const fastener=/\b(bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?|fittings?)\b/i.exec(evidence);

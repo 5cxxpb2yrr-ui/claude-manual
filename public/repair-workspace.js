@@ -246,6 +246,7 @@ content.querySelector("#rw-lines").innerHTML=lines||'<div class="muted">Cart is 
 return {vehicle,procedure:title,source:frame.src,items:items.map(p=>({id:p.id,name:p.name,relationship:p.relationship,confidence:p.confidence,oem:p.oem})),tools,torqueSpecs,torque:torqueSpecs.flatMap(group=>group.values.map(value=>({...value,context:group.context}))),warnings:facts.warnings};
 };
 snapshot();
+content.addEventListener("change",e=>{if(e.target.matches("[data-part],[data-tool],[data-torque]"))snapshot();});
 content.querySelector("#rw-save").onclick=()=>{all[key]=snapshot();save(all);alert("Repair cart saved on this device.");};
 content.querySelector("#rw-export").onclick=()=>{const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="repair-cart.json";a.click();URL.revokeObjectURL(url);};
 content.querySelector("#rw-clear").onclick=()=>{content.querySelectorAll("[data-part],[data-tool],[data-torque]").forEach(x=>x.checked=false);snapshot();};

@@ -23,7 +23,6 @@ export default {
       headers.set("cache-control", "no-store");
       headers.set("x-robots-tag", "noindex, nofollow");
       headers.set("x-lifeos-preview", "claude-manual-feature-branch");
-    headers.set("x-robots-tag", "noindex, nofollow");
       return new Response(request.method === "HEAD" ? null : source.body, {
         status: source.status,
         headers
@@ -35,6 +34,7 @@ export default {
     const response = await fetch(upstreamRequest);
     const headers = new Headers(response.headers);
     headers.set("x-lifeos-preview", "claude-manual-feature-branch");
+    headers.set("x-robots-tag", "noindex, nofollow");
 
     if (url.pathname.startsWith("/m/") &&
         (headers.get("content-type") || "").includes("text/html") &&

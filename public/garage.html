@@ -1178,6 +1178,7 @@
 										class="text-xs font-bold text-white"
 										x-text="proj.title"
 									></h4>
+									<div class="flex items-center gap-1.5 text-[10px] text-amber-300" x-text="vehicleNameForProject(proj)"></div>
 									<div class="text-[11px] font-mono flex justify-between text-zinc-400">
 										<span
 											>Budget: $<span
@@ -1249,6 +1250,7 @@
 												class="text-xs font-bold text-white"
 												x-text="proj.title"
 											></h4>
+											<div class="flex items-center gap-1.5 text-[10px] text-amber-300" x-text="vehicleNameForProject(proj)"></div>
 											<div
 												class="text-[11px] font-mono flex justify-between text-zinc-400"
 											>
@@ -2580,6 +2582,7 @@
 					<h3 class="text-base font-bold text-white">
 						Create Relational Project Notebook
 					</h3>
+					<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"><span class="text-zinc-400">Vehicle</span><div class="font-bold text-amber-300" x-text="activeVehicle?.name || 'Select a vehicle first'"></div></div>
 					<div class="space-y-3 text-xs">
 						<div>
 							<label class="block text-zinc-400 mb-1"
@@ -2831,6 +2834,7 @@
 						</button>
 					</div>
 					<div class="space-y-1 text-zinc-300">
+						<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 mb-2"><div class="text-[10px] uppercase tracking-wider text-zinc-400">Vehicle</div><div class="text-sm font-bold text-amber-300" x-text="vehicleNameForProject(selectedProject)"></div></div>
 						<div>
 							<strong>Status:</strong>
 							<span x-text="selectedProject.status"></span>
@@ -3572,6 +3576,7 @@
 					manualLink(hash) {
 						return this.manualLibrary.base + '/manuals.html' + this.manualBackParam() + '#' + hash;
 					},
+					vehicleNameForProject(project) { return this.vehicles.find(item=>String(item.id)===String(project?.vehicleId))?.name || "Vehicle not linked"; },
 					manualProjectLink(project) { const v=this.vehicles.find(item=>String(item.id)===String(project?.vehicleId)); const info=v&&this.manualLibrary.vehicles[v.id]; return info?this.manualLink('/veh/'+info.idx+'/rep'):this.manualLink('/'); },
 					repairCartManualLink(cart) { return this.manualLibrary.base+'/manuals.html'+this.manualBackParam()+(String(cart?.route||'').startsWith('#')?cart.route:'#'+String(cart?.route||'/')); },
 					repairCartsForProject(project) { return this.repairCartLinks.filter(cart=>String(cart.projectId)===String(project?.id)); },

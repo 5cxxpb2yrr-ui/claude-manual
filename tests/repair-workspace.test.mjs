@@ -16,6 +16,9 @@ test("repair workspace module parses as valid JavaScript", () => {
 
 test("manual viewer exposes the repair workspace from procedure pages", () => {
   assert.match(html, /data-repair-workspace/);
+  assert.match(html, /T\("rep","Repair Cart"\)/);
+  assert.match(html, /lifeos\.repair\.projects\.v1/);
+  assert.match(html, /\/garage\?vehicleId=/);
   assert.match(html, /src="\/repair-workspace\.js" defer/);
 });
 
@@ -31,6 +34,9 @@ test("engine is importable without a browser and keeps carts local", () => {
   assert.equal(typeof Engine.toRelationships, "function");
   const source = readFileSync(script, "utf8");
   assert.match(source, /lifeos\.repair\.carts\.v1/);
+  assert.match(source, /lifeos\.repair\.projects\.v1/);
+  assert.match(source, /projectTitle/);
+  assert.match(source, /route:location\.hash/);
   assert.match(source, /Stored in this browser only/);
   assert.match(source, /Export JSON/);
 });

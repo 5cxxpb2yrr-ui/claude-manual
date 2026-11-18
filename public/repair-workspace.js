@@ -96,19 +96,33 @@ const u=raw.toLowerCase().replace(/[^a-z]/g,"");
 if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
 if(u.startsWith("ft"))return "ft·lbf";if(u.startsWith("in"))return "in·lbf";return "N·m";
 }
+const TORQUE_TO_NM={"N·m":1,"kgf·cm":0.0980665,"kgf·m":9.80665,"ft·lbf":1.355817948,"in·lbf":0.112984829};
 function extractTorque(text){
-const out=[];String(text).split("\n").forEach((line,lineIndex)=>{TORQUE_RE.lastIndex=0;let m;
-while((m=TORQUE_RE.exec(line)))out.push({value:Number(m[1]),unit:normalizeTorqueUnit(m[2]),context:line.trim().slice(0,180),lineIndex});
+const lines=String(text).split("\n"),out=[];
+lines.forEach((line,lineIndex)=>{TORQUE_RE.lastIndex=0;let m;
+while((m=TORQUE_RE.exec(line))){
+const start=Math.max(0,lineIndex-2),end=Math.min(lines.length,lineIndex+3);
+out.push({value:Number(m[1]),unit:normalizeTorqueUnit(m[2]),context:line.trim().slice(0,180),nearbyContext:lines.slice(start,end).join(" ").replace(/\\s+/g," ").trim().slice(0,420),lineIndex});
+}
 });return out;
 }
 function groupTorque(torque){
 const groups=new Map();
 torque.forEach(item=>{
 const key=item.lineIndex+":"+item.context;
-if(!groups.has(key))groups.set(key,{id:"torque-"+groups.size,context:item.context,values:[]});
+if(!groups.has(key)){
+const lineParts=matchParts(item.context),fastener=/\\b(bolt|bolts|nut|nuts|screw|screws|stud|studs|plug|fastener)\\b/i.test(item.context);
+const association=lineParts.length===1&&fastener?{component:lineParts[0].name,fastener:"Fastener named on torque line"}:null;
+groups.set(key,{id:"torque-"+groups.size,context:item.context,nearbyContext:item.nearbyContext,association,values:[]});
+}
 groups.get(key).values.push({value:item.value,unit:item.unit});
 });
-return [...groups.values()];
+return [...groups.values()].map(group=>{
+const converted=group.values.map(v=>v.value*(TORQUE_TO_NM[v.unit]||1));
+const min=Math.min(...converted),max=Math.max(...converted);
+const consistent=converted.length<2||((max-min)/Math.max((max+min)/2,0.0001)<=0.05);
+return {...group,consistent,selectable:Boolean(group.association&&consistent),reviewReason:!consistent?"Conflicting unit conversions":!group.association?"Fastener/component is not identified on the torque line":""};
+});
 }
 function extractWarnings(lines){
 const out=[];
@@ -220,7 +234,7 @@ return '<label class="item"><input type="checkbox" data-part="'+esc(p.id)+'" '+(
 }).join("");
 const toolRows=facts.toolDetails.map(t=>'<label class="item"><input type="checkbox" data-tool="'+esc(t.id)+'" '+(selectedTools.has(t.id)?"checked":"")+'><span>'+esc(t.name)+'</span></label>').join("");
 const refs=facts.toolReferences.map(x=>'<div class="line">Manual tool reference: <b>'+esc(x.reference)+'</b></div>').join("");
-const torque=(facts.torqueSpecs||[]).map(group=>'<label class="item"><input type="checkbox" data-torque="'+esc(group.id)+'" '+(selectedTorque.has(group.id)?"checked":"")+'><span><b>'+esc(group.values.map(x=>x.value+" "+x.unit).join(" · "))+'</b><br><span class="muted">'+esc(group.context)+'</span></span></label>').join("");
+const torque=(facts.torqueSpecs||[]).map(group=>'<label class="item"><input type="checkbox" data-torque="'+esc(group.id)+'" '+(group.selectable&&selectedTorque.has(group.id)?"checked":"")+' '+(group.selectable?"":"disabled")+'><span><b>'+esc(group.values.map(x=>x.value+" "+x.unit).join(" · "))+'</b><br><span class="muted">'+esc(group.association?group.association.component+" · "+group.association.fastener:"Unassigned torque")+'</span><br><span class="muted">'+esc(group.nearbyContext||group.context)+'</span><br><span class="muted">'+esc(group.selectable?"Fastener association and units passed basic checks":"Not selectable: "+group.reviewReason)+'</span></span></label>').join("");
 const warnings=facts.warnings.map(x=>'<div class="line"><b>'+esc(x.type)+'</b> '+esc(x.text)+'</div>').join("");
 content.innerHTML='<h3>Parts and service targets</h3><div class="muted">Required means the procedure explicitly calls for replacement. Service targets are components being worked on, not proof that a new part is needed. Review evidence before adding items to the cart.</div><div class="grid">'+(rows||'<div class="muted">No catalog matches found.</div>')+'</div><h3>Tools</h3><div class="grid">'+(toolRows||'<div class="muted">No catalog tool matches found.</div>')+'</div>'+refs+'<h3>Torque specifications</h3>'+(torque||'<div class="muted">No torque values detected.</div>')+'<h3>Warnings and notes</h3>'+(warnings||'<div class="muted">No explicit warning or note labels detected.</div>')+(facts.requiresCalibration?'<div class="line">EyeSight-related calibration language detected. Verify the exact calibration procedure and equipment requirements before returning the vehicle to service.</div>':"")+'<div class="cart"><h3>Repair cart</h3><div id="rw-lines"></div><p class="muted">Stored in this browser only. No account or server sync.</p><button class="primary" id="rw-save">Save cart</button> <button id="rw-export">Export JSON</button> <button id="rw-clear">Clear</button></div>';
 const snapshot=()=>{

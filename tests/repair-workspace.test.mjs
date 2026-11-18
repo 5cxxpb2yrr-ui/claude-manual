@@ -96,3 +96,25 @@ test("torque parser supports OEM unit variants", () => {
   const torque = Engine.extractTorque("9.0 N·m (92 kgf·cm, 80 in·lbf)\n37 ft. lbs.");
   assert.deepEqual(torque.map(x => x.unit), ["N·m", "kgf·cm", "in·lbf", "ft·lbf"]);
 });
+
+test("torque cart eligibility requires an explicit fastener association and consistent units", () => {
+  const supported = Engine.extractProcedure(`
+    <h1>Water Pump: Service and Repair</h1>
+    <p>Water pump bolts torque: 11 Nm (112 kgf-cm, 8 ft. lbs.)</p>`);
+  assert.equal(supported.torqueSpecs[0].association.component, "Water Pump");
+  assert.equal(supported.torqueSpecs[0].consistent, true);
+  assert.equal(supported.torqueSpecs[0].selectable, true);
+
+  const unassigned = Engine.extractProcedure(`
+    <h1>Oil Filter: Service and Repair</h1>
+    <p>Torque: 17.2 Nm (175 kgf-cm, 13 ft. lbs.)</p>`);
+  assert.equal(unassigned.torqueSpecs[0].association, null);
+  assert.equal(unassigned.torqueSpecs[0].selectable, false);
+
+  const inconsistent = Engine.extractProcedure(`
+    <h1>Front Axle: Service and Repair</h1>
+    <p>Front axle nut torque: 132 Nm (350 kgf-cm, 97 ft. lbs.)</p>`);
+  assert.equal(inconsistent.torqueSpecs[0].consistent, false);
+  assert.equal(inconsistent.torqueSpecs[0].selectable, false);
+  assert.match(inconsistent.torqueSpecs[0].reviewReason, /Conflicting unit conversions/);
+});

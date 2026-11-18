@@ -149,8 +149,8 @@ const PRIORITY={required:5,recommended:4,target:3,consumable:2,mention:1};
 function requiredCueForPart(line,part){
 return part.aliases.some(alias=>{
 const partPattern="(^|[^a-z0-9])"+escapeRegex(alias)+"(?=$|[^a-z0-9])";
-const before=new RegExp("\b(always replace|must be replaced|replace(?:d|ment)?|renew|install a new|discard and replace|do not reuse)\b[^.;,]{0,14}"+partPattern,"i");
-const after=new RegExp(partPattern+"[^.;,]{0,14}\b(must be replaced|should be replaced|is replaced|was replaced)\b","i");
+const before=new RegExp("\\b(always replace|must be replaced|replace(?:d|ment)?|renew|install a new|discard and replace|do not reuse)\\b[^.;,]{0,14}"+partPattern,"i");
+const after=new RegExp(partPattern+"[^.;,]{0,14}\\b(must be replaced|should be replaced|is replaced|was replaced)\\b","i");
 return before.test(line)||after.test(line);
 });
 }

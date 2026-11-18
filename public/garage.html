@@ -3572,7 +3572,7 @@
 					manualLink(hash) {
 						return this.manualLibrary.base + '/manuals.html' + this.manualBackParam() + '#' + hash;
 					},
-					manualProjectLink(project) { const v=this.vehicles.find(item=>String(item.id)===String(project?.vehicleId)); const info=v&&this.manualLibrary.vehicles[v.id]; return info?this.manualLink('veh/'+info.idx+'/rep'):this.manualLink('/'); },
+					manualProjectLink(project) { const v=this.vehicles.find(item=>String(item.id)===String(project?.vehicleId)); const info=v&&this.manualLibrary.vehicles[v.id]; return info?this.manualLink('/veh/'+info.idx+'/rep'):this.manualLink('/'); },
 					repairCartManualLink(cart) { return this.manualLibrary.base+'/manuals.html'+this.manualBackParam()+(String(cart?.route||'').startsWith('#')?cart.route:'#'+String(cart?.route||'/')); },
 					repairCartsForProject(project) { return this.repairCartLinks.filter(cart=>String(cart.projectId)===String(project?.id)); },
 					refreshRepairCartLinks() { try { const saved=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'); this.repairCartLinks=Object.entries(saved).map(([cartKey,cart])=>({...cart,cartKey})).filter(cart=>cart&&cart.projectId); } catch { this.repairCartLinks=[]; } },

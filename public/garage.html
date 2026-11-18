@@ -1178,6 +1178,7 @@
 										class="text-xs font-bold text-white"
 										x-text="proj.title"
 									></h4>
+									<div class="flex items-center gap-1.5 text-[10px] text-amber-300" x-text="vehicleNameForProject(proj)"></div>
 									<div class="text-[11px] font-mono flex justify-between text-zinc-400">
 										<span
 											>Budget: $<span
@@ -1249,6 +1250,7 @@
 												class="text-xs font-bold text-white"
 												x-text="proj.title"
 											></h4>
+											<div class="flex items-center gap-1.5 text-[10px] text-amber-300" x-text="vehicleNameForProject(proj)"></div>
 											<div
 												class="text-[11px] font-mono flex justify-between text-zinc-400"
 											>
@@ -2580,6 +2582,7 @@
 					<h3 class="text-base font-bold text-white">
 						Create Relational Project Notebook
 					</h3>
+					<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"><span class="text-zinc-400">Vehicle</span><div class="font-bold text-amber-300" x-text="activeVehicle?.name || 'Select a vehicle first'"></div></div>
 					<div class="space-y-3 text-xs">
 						<div>
 							<label class="block text-zinc-400 mb-1"
@@ -2831,6 +2834,7 @@
 						</button>
 					</div>
 					<div class="space-y-1 text-zinc-300">
+						<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 mb-2"><div class="text-[10px] uppercase tracking-wider text-zinc-400">Vehicle</div><div class="text-sm font-bold text-amber-300" x-text="vehicleNameForProject(selectedProject)"></div></div>
 						<div>
 							<strong>Status:</strong>
 							<span x-text="selectedProject.status"></span>
@@ -2842,6 +2846,7 @@
 						</div>
 						<div x-show="selectedProject.maintenancePlanId" class="text-amber-400"><strong>Maintenance:</strong> Linked</div>
 						<button x-show="!selectedProject.maintenancePlanId" @click="linkProjectToMaintenance(selectedProject)" class="w-full py-2 bg-amber-500/10 text-amber-400 font-bold rounded-xl border border-amber-500/30">🔧 Link to Maintenance Workflow</button>
+						<div class="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2"><div class="flex items-center justify-between gap-2"><strong class="text-zinc-300">Manual & repair cart</strong><a :href="manualProjectLink(selectedProject)" target="_blank" rel="noopener" class="text-amber-400 font-bold">Open in Manual Explorer ↗</a></div><template x-for="cart in repairCartsForProject(selectedProject)" :key="cart.cartKey"><a :href="repairCartManualLink(cart)" target="_blank" rel="noopener" class="block rounded-lg border border-zinc-800 p-2 hover:border-amber-500/50"><span class="block text-white font-semibold" x-text="cart.procedure || 'Saved procedure'"></span><span class="block text-[10px] text-zinc-400" x-text="(cart.items || []).length + ' parts · ' + (cart.tools || []).length + ' tools · ' + (cart.torqueSpecs || []).length + ' torque groups'"></span></a></template><div x-show="!repairCartsForProject(selectedProject).length" class="text-[11px] text-zinc-500">No manual procedure carts linked yet. Open a procedure in Manual Explorer, choose this project, and save the cart.</div></div>
 						<div x-show="selectedProject.partRequirements && selectedProject.partRequirements.length" class="pt-2">
 							<strong class="text-zinc-400">Parts:</strong>
 							<template x-for="part in (selectedProject.partRequirements || [])" :key="part.id">
@@ -3052,6 +3057,7 @@
 					analyticsPeriod: '12m',
 					analyticsVehicleId: 'all',
 					activeVehicleId: 'scion-xb',
+					repairCartLinks: [],
 					sortOrder: 'desc',
 					smartQuery: '',
 					timelineSearch: '',
@@ -3570,6 +3576,12 @@
 					manualLink(hash) {
 						return this.manualLibrary.base + '/manuals.html' + this.manualBackParam() + '#' + hash;
 					},
+					vehicleNameForProject(project) { return this.vehicles.find(item=>String(item.id)===String(project?.vehicleId))?.name || "Vehicle not linked"; },
+					manualProjectLink(project) { const v=this.vehicles.find(item=>String(item.id)===String(project?.vehicleId)); const info=v&&this.manualLibrary.vehicles[v.id]; return info?this.manualLink('/veh/'+info.idx+'/rep'):this.manualLink('/'); },
+					repairCartManualLink(cart) { return this.manualLibrary.base+'/manuals.html'+this.manualBackParam()+(String(cart?.route||'').startsWith('#')?cart.route:'#'+String(cart?.route||'/')); },
+					repairCartsForProject(project) { return this.repairCartLinks.filter(cart=>String(cart.projectId)===String(project?.id)); },
+					refreshRepairCartLinks() { try { const saved=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'); this.repairCartLinks=Object.entries(saved).map(([cartKey,cart])=>({...cart,cartKey})).filter(cart=>cart&&cart.projectId); } catch { this.repairCartLinks=[]; } },
+					publishRepairProjectIndex() { try { localStorage.setItem('lifeos.repair.projects.v1',JSON.stringify((this.projects||[]).map(project=>({id:project.id,vehicleId:project.vehicleId,title:project.title,status:project.status,category:project.category,createdAt:project.createdAt,updatedAt:project.updatedAt})))); } catch(error) { console.warn('Repair project index could not be published',error); } },
 
 					openManualSearch(q) {
 						const t = String(q || '').trim();
@@ -3934,6 +3946,8 @@
 
 
 					async initApp() {
+				const deepLink=new URLSearchParams(location.search),requestedVehicle=deepLink.get('vehicleId'),requestedProject=deepLink.get('projectId'),createProject=deepLink.get('newProject')==='1';
+				window.addEventListener('storage',event=>{if(event.key==='lifeos.repair.carts.v1')this.refreshRepairCartLinks();});
 				window.addEventListener('resize',()=>this.isMobileView=window.innerWidth<768);
 				// Deep link: yourapp.html#specs opens the Specs tab (used by the Manual Explorer's "Back" link)
 				const goHash=()=>{const h=location.hash.replace('#','').toLowerCase();if(h==='specs'||h==='profile')this.currentTab='profile';};
@@ -3956,9 +3970,13 @@
 								this.hydrateAttachments();
 							}
 							this.applyGarageSetupAdjustments();
+							if(requestedVehicle&&this.vehicles.some(v=>String(v.id)===String(requestedVehicle)))this.activeVehicleId=requestedVehicle;
 							if (!this.activeVehicleId || !this.activeVehicle) this.activeVehicleId = this.vehicles[0]?.id;
 							await this.saveToStorage();
+							this.refreshRepairCartLinks();
 							await this.runDatabaseHealthCheck();
+							if(requestedProject){const project=this.projects.find(p=>String(p.id)===String(requestedProject));if(project){this.currentTab='projects';this.openProjectDetail(project);}}
+							else if(createProject){this.currentTab='projects';this.newProjectForm={...this.newProjectForm,title:'Repair Project',category:'Repair',description:'Repair work linked to this vehicle.'};this.modals.newProject=true;}
 							if (source === 'legacy-localstorage' && this.garageDB) localStorage.setItem('motornote_pro_migration_complete', new Date().toISOString());
 						} catch (error) {
 							console.error('Garage initialization failed', error?.name || 'Error', error?.message || error, error?.stack || '');
@@ -4031,6 +4049,7 @@
 						} else {
 							await new Promise((resolve, reject) => { const tx = this.garageDB.transaction('state', 'readwrite'); tx.objectStore('state').put({ key: 'current', value: state }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed')); });
 						}
+						this.publishRepairProjectIndex();
 						this.lastSavedAt = state.savedAt;
 						this.saveState = 'saved';
 						return true;
@@ -4333,7 +4352,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					async completeProjectAndRecordService(project) { if(!project || !this.projectReadyToComplete(project))return; const f=this.projectCompletionForm,vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)),mileage=Number(f.mileage); if(!vehicle || !f.verified || !f.date || !Number.isFinite(mileage) || mileage<0){alert('Confirm the work, date, and a valid odometer reading.');return;} const existing=this.logs.find(log=>String(log.projectId||'')===String(project.id)); if(existing){project.maintenanceLogId=existing.id;project.status='Completed';project.completion=100;project.completedAt=project.completedAt||new Date().toISOString();await this.saveToStorage();this.modals.projectCompletion=false;this.modals.projectDetail=false;return;} const now=new Date().toISOString(),cost=this.projectActualCost(project),plan=this.maintenancePlans.find(item=>String(item.id)===String(project.maintenancePlanId)); const log={id:'project-service-'+project.id,projectId:project.id,maintenancePlanId:plan?.id||null,vehicleId:vehicle.id,vehicle:vehicle.name,mileage,date:f.date,serviceType:project.title||'Completed vehicle project',category:'Maintenance',cost,notes:String(f.notes||'').trim(),attachments:[],history:[],projectCategory:project.category||'General',procedureReferences:(project.procedures||[]).map(item=>({id:item.id,title:item.title,sourceLabel:item.sourceLabel,sourcePath:item.sourcePath})),projectAttachmentIds:(project.attachments||[]).map(item=>item.id),projectCostEntryIds:(project.costEntries||[]).map(item=>item.id)}; this.logs.unshift(log); project.status='Completed';project.completion=100;project.completedAt=now;project.maintenanceLogId=log.id;project.actualCost=cost;project.updatedAt=now; if(mileage>Number(vehicle.odometer||0))vehicle.odometer=mileage; if(plan && plan.status!=='Cancelled'){plan.status='Completed';plan.completedAt=now;plan.completion=100;plan.actualCost=cost;plan.tasks=(plan.tasks||[]).map(task=>({...task,done:true}));} const saved=await this.saveToStorage(); if(saved){this.modals.projectCompletion=false;this.modals.projectDetail=false;this.selectedProject=project;this.selectedMaintenancePlan=plan||null;}else{alert('The service record could not be saved. The project is still open; try confirming again.');} },
 					async saveProjectWorkspace(project) { if(!project)return; const canonical=this.projects.find(item=>String(item.id)===String(project.id)); const target=canonical||project; if(target!==project){ Object.assign(target,project); } if(!Array.isArray(target.partRequirements))target.partRequirements=[]; if(!Array.isArray(target.purchaseOrders))target.purchaseOrders=[]; if(!Array.isArray(target.costEntries))target.costEntries=[]; target.completion=this.projectCompletion(target); target.updatedAt=new Date().toISOString(); target.budget=Math.max(0,Number(target.budget)||0); target.actualCost=this.projectActualCost(target); this.syncProjectMaintenancePlan(target); const saved=await this.saveToStorage(); if(saved){this.selectedProject=target;this.modals.projectDetail=false;} else {alert('Project could not be saved. Your project remains open; try saving again.');} },
 
-						saveNewProject() {
+						async saveNewProject() {
 							const p = {
 								id: 'project-' + Date.now(),
 								vehicleId: this.activeVehicleId,
@@ -4353,9 +4372,10 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 								updatedAt: new Date().toISOString()
 							};
 							this.projects.push(p);
-							this.saveToStorage();
+							const saved = await this.saveToStorage();
 							this.newProjectForm = { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' };
 							this.modals.newProject = false;
+							if(saved)this.openProjectDetail(p);else alert('Project could not be saved. It remains in this session; try saving again.');
 						},
 
 					deleteProjectRecord(id) {

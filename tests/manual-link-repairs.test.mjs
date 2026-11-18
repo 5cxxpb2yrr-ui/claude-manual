@@ -15,7 +15,7 @@ test("all audited missing Scion IDs have an explicit disposition", () => {
     610, 726, 775,
     1226, 1227, 1228, 1229, 1230, 1231, 1232, 1233, 1234, 1235, 1236,
     ...Array.from({ length: 30 }, (_, index) => 1265 + index),
-    1369, 4238, 4248, 4266, 4274, 4276, 5970, 5972, 6056, 6379, 6735, 6759,
+    1369, 4238, 4248, 4266, 4274, 4276, 4280, 5970, 5972, 6056, 6379, 6735, 6759,
   ];
 
   const dispositionIds = [
@@ -45,6 +45,7 @@ test("verified equivalents resolve to existing indexed Scion pages", () => {
     4248: 1623,
     4274: 1636,
     4276: 1630,
+    4280: 6546,
     5972: 1613,
     6379: 1614,
     6735: 1631,

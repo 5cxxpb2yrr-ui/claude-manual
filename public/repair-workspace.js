@@ -94,64 +94,63 @@ if(re.test(work)){found.set(x.part.id,x.part);work=work.replace(re,m=>" ".repeat
 });
 return [...found.values()];
 }
-const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.\-•]?\s*m|kgf\s*[·.\-•]?\s*(?:m|cm)|(?:ft|in|inch)\s*[·.\-•]?\s*(?:lbf?|lbs?))(?![a-z])/gi;
+const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.\-•]?\s*m|kgf\s*[·.\-•]?\s*(?:m|cm)|ft\s*[·.\-•]?\s*(?:lbf?|lbs?)|in(?:ch)?\s*[·.\-•]?\s*(?:lbf?|lbs?))(?![a-z])/gi;
 function normalizeTorqueUnit(raw){
-const u=raw.toLowerCase().replace(/[^a-z]/g,"");
-if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
-if(u.startsWith("ft"))return "ft·lbf";
-if(u.startsWith("in")||u.startsWith("inch"))return "in·lbf";
-return "N·m";
+ const u=raw.toLowerCase().replace(/[^a-z]/g,"");
+ if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
+ if(u.startsWith("ft"))return "ft·lbf";
+ if(u.startsWith("in"))return "in·lbf";
+ return "N·m";
 }
 const TORQUE_TO_NM={"N·m":1,"kgf·cm":0.0980665,"kgf·m":9.80665,"ft·lbf":1.355817948,"in·lbf":0.112984829};
-function extractTorque(text){
-const lines=String(text).split("\n"),out=[];
-lines.forEach((line,lineIndex)=>{TORQUE_RE.lastIndex=0;let m;
-while((m=TORQUE_RE.exec(line))){
-const start=Math.max(0,lineIndex-2),end=Math.min(lines.length,lineIndex+3);
-out.push({value:Number(m[1].replace(/,/g,"")),unit:normalizeTorqueUnit(m[2]),matchIndex:m.index,context:line.trim().slice(0,240),nearbyContext:lines.slice(start,end).join(" ").replace(/\s+/g," ").trim().slice(0,600),lineIndex});
+function stepContext(text,index){
+ const before=text.slice(0,index);
+ const markers=[...before.matchAll(/(?:^|\s)(?:\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,}|[a-z]\)\s+)/g)];
+ const start=markers.length?markers[markers.length-1].index:Math.max(0,index-280);
+ const after=text.slice(index);
+ const next=/(?:\s+\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,}|\s+[a-z]\)\s+)/.exec(after);
+ const end=next?index+next.index:Math.min(text.length,index+360);
+ return text.slice(start,end).replace(/\s+/g," ").trim();
 }
-});return out;
+function extractTorque(text){
+ const source=String(text),out=[];TORQUE_RE.lastIndex=0;let m;
+ while((m=TORQUE_RE.exec(source))){
+  const lineStart=source.lastIndexOf("\n",m.index)+1,lineEnd=source.indexOf("\n",m.index);
+  const line=source.slice(lineStart,lineEnd<0?source.length:lineEnd);
+  out.push({value:Number(m[1].replace(/,/g,"")),unit:normalizeTorqueUnit(m[2]),matchIndex:m.index,context:line.trim().slice(0,360),nearbyContext:stepContext(source,m.index),lineIndex:source.slice(0,m.index).split("\n").length-1});
+ }
+ return out;
 }
 function groupTorque(torque){
-const groups=[];
-torque.forEach(item=>{
+ const groups=[];
+ torque.forEach(item=>{
   let group=groups[groups.length-1];
-  if(item.unit==="N·m"||!group||group.lineIndex!==item.lineIndex){
-    group={id:"torque-"+groups.length,lineIndex:item.lineIndex,startIndex:item.matchIndex,context:item.context,nearbyContext:item.nearbyContext,values:[]};
-    groups.push(group);
+  if(item.unit==="N·m"||!group||group.stepContext!==item.nearbyContext){
+   group={id:"torque-"+groups.length,lineIndex:item.lineIndex,startIndex:item.matchIndex,context:item.context,nearbyContext:item.nearbyContext,stepContext:item.nearbyContext,values:[]};
+   groups.push(group);
   }
   group.values.push({value:item.value,unit:item.unit});
-});
-return groups.map(group=>{
- const evidence=group.nearbyContext||group.context;
- const stepMarker=/(?:\b\d+\.\s+|\b[a-z]\)\s+)/gi;
- let source=group.context,last=null,m;
- stepMarker.lastIndex=0;
- while((m=stepMarker.exec(group.context))&&m.index<group.startIndex)last={index:m.index,end:stepMarker.lastIndex};
- if(!last){
-   source=evidence;
-   stepMarker.lastIndex=0;
-   while((m=stepMarker.exec(evidence)))last={index:m.index,end:stepMarker.lastIndex};
- }
- const scoped=last?source.slice(last.end).trim():group.context;
- const scope=scoped||group.context;
- let association=null;
- if(/\bconnect the brake line|brake line fitting|brake pipe\b/i.test(scope))
-   association={component:"Brake Line",fastener:"Brake line fitting",evidence:scope,associationSource:"Procedure step explicitly identifies brake-line connection"};
- else if(/\bwheel brake cylinder|brake wheel cylinder\b/i.test(scope)&&/\bbolt\b/i.test(scope))
-   association={component:"Wheel Brake Cylinder",fastener:"Bolt",evidence:scope,associationSource:"Procedure step explicitly identifies wheel brake cylinder bolt"};
- else if(/\binstall (?:the )?(?:rear|front) wheel\b|\bwheel nuts?\b|\blug nuts?\b/i.test(scope))
-   association={component:"Wheel",fastener:"Wheel nuts",evidence:scope,associationSource:"Procedure step identifies wheel installation"};
- else {
-   const fastenerMatch=/\b(bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?)\b/i.exec(scope);
-   const component=matchParts(scope).find(p=>p.category!=="Consumable");
-   if(component&&fastenerMatch)association={component:component.name,fastener:fastenerMatch[1].replace(/s$/i,""),evidence:scope,associationSource:"Nearby procedure text"};
- }
- const converted=group.values.map(v=>v.value*(TORQUE_TO_NM[v.unit]||1));
- const min=Math.min(...converted),max=Math.max(...converted);
- const consistent=converted.length<2||((max-min)/Math.max((max+min)/2,0.0001)<=0.05);
- return {...group,association,consistent,selectable:Boolean(association&&consistent),reviewReason:!consistent?"Conflicting unit conversions":!association?"Fastener/component is not identified in the procedure step":""};
-});
+ });
+ return groups.map(group=>{
+  const evidence=group.stepContext||group.nearbyContext||group.context;
+  let association=null;
+  if(/wheel brake cylinder|brake wheel cylinder/i.test(evidence)&&/\bbolt\b/i.test(evidence))
+   association={component:"Wheel Brake Cylinder",fastener:"Bolt",evidence,associationSource:"Procedure step explicitly identifies wheel brake cylinder bolt"};
+  else if(/connect the brake line|brake line fitting|brake pipe/i.test(evidence))
+   association={component:"Brake Line",fastener:"Brake line fitting",evidence,associationSource:"Procedure step explicitly identifies brake-line connection"};
+  else if(/install (?:the )?(?:rear|front) wheel|wheel nuts?|lug nuts?/i.test(evidence))
+   association={component:"Wheel",fastener:"Wheel nuts",evidence,associationSource:"Procedure step identifies wheel installation"};
+  else {
+   const parts=matchParts(evidence).filter(p=>p.category!=="Consumable");
+   const fastener=/\b(bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?|fittings?)\b/i.exec(evidence);
+   const component=parts.find(p=>p.category!=="Consumable");
+   if(component&&fastener)association={component:component.name,fastener:fastener[1].replace(/s$/i,""),evidence,associationSource:"Identified from the same procedure step"};
+  }
+  const converted=group.values.map(v=>v.value*(TORQUE_TO_NM[v.unit]||1));
+  const min=Math.min(...converted),max=Math.max(...converted);
+  const consistent=converted.length<2||((max-min)/Math.max((max+min)/2,0.0001)<=0.05);
+  return {...group,association,consistent,selectable:Boolean(association&&consistent),reviewReason:!consistent?"Conflicting unit conversions":!association?"Fastener/component is not identified in the procedure step":""};
+ });
 }
 function extractWarnings(lines){
 function extractWarnings(lines){
@@ -240,7 +239,7 @@ const save=x=>{try{localStorage.setItem(STORE,JSON.stringify(x));}catch(e){alert
 function mount(){
 if(document.getElementById("repair-workspace"))return;
 const style=document.createElement("style");
-style.textContent="#repair-workspace{position:fixed;inset:0;z-index:99999;background:#050910d9;display:none;align-items:flex-end;justify-content:center;padding:12px}#repair-workspace.open{display:flex}#repair-workspace .rw-panel{width:min(820px,100%);max-height:92dvh;overflow:auto;background:#111923;color:#edf4ff;border:1px solid #34465b;border-radius:20px;padding:18px;box-shadow:0 20px 80px #000b}#repair-workspace .rw-head{display:flex;justify-content:space-between;align-items:center;gap:12px}#repair-workspace h2{margin:0;font-size:20px}#repair-workspace h3{font-size:14px;color:#ffb066;margin:16px 0 8px}#repair-workspace .muted{color:#9aacc1;font-size:12px}#repair-workspace .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}#repair-workspace .item{border:1px solid #2c3d51;background:#172333;border-radius:12px;padding:10px;display:flex;gap:9px;font-size:13px}#repair-workspace .item input[type="checkbox"]{appearance:auto;-webkit-appearance:checkbox;width:18px;height:18px;min-width:18px;flex:0 0 18px;margin:2px 4px 0 0;accent-color:#ff8a1f;cursor:pointer;pointer-events:auto;position:relative;z-index:1}#repair-workspace .item label{cursor:pointer;pointer-events:auto}#repair-workspace .item input[type="checkbox"]:disabled{cursor:not-allowed;opacity:.45}#repair-workspace button{background:#223247;color:#f3f7ff;border:1px solid #3b526d;border-radius:10px;padding:9px 12px}#repair-workspace button.primary{background:#ff8a1f;color:#15191f;font-weight:800}#repair-workspace .line{padding:8px 0;border-bottom:1px solid #28394c;font-size:13px}#repair-workspace .cart{background:#0b121c;border:1px solid #293a4d;border-radius:12px;padding:12px}@media(max-width:540px){#repair-workspace{padding:0}#repair-workspace .rw-panel{border-radius:20px 20px 0 0;max-height:94dvh;padding:16px}#repair-workspace .grid{grid-template-columns:1fr}}";
+style.textContent="#repair-workspace{position:fixed;inset:0;z-index:99999;background:#050910d9;display:none;align-items:flex-end;justify-content:center;padding:12px}#repair-workspace.open{display:flex}#repair-workspace .rw-panel{width:min(820px,100%);max-height:92dvh;overflow:auto;background:#111923;color:#edf4ff;border:1px solid #34465b;border-radius:20px;padding:18px;box-shadow:0 20px 80px #000b}#repair-workspace .rw-head{display:flex;justify-content:space-between;align-items:center;gap:12px}#repair-workspace h2{margin:0;font-size:20px}#repair-workspace h3{font-size:14px;color:#ffb066;margin:16px 0 8px}#repair-workspace .muted{color:#9aacc1;font-size:12px}#repair-workspace .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}#repair-workspace .item{border:1px solid #2c3d51;background:#172333;border-radius:12px;padding:10px;display:flex;gap:9px;font-size:13px}#repair-workspace .item input[type=checkbox]{appearance:auto;-webkit-appearance:checkbox;width:18px;height:18px;min-width:18px;flex:0 0 18px;margin:2px 4px 0 0;accent-color:#ff8a1f;cursor:pointer;pointer-events:auto;position:relative;z-index:1}#repair-workspace .item label{cursor:pointer;pointer-events:auto}#repair-workspace .item input[type=checkbox]:disabled{cursor:not-allowed;opacity:.45}#repair-workspace button{background:#223247;color:#f3f7ff;border:1px solid #3b526d;border-radius:10px;padding:9px 12px}#repair-workspace button.primary{background:#ff8a1f;color:#15191f;font-weight:800}#repair-workspace .line{padding:8px 0;border-bottom:1px solid #28394c;font-size:13px}#repair-workspace .cart{background:#0b121c;border:1px solid #293a4d;border-radius:12px;padding:12px}@media(max-width:540px){#repair-workspace{padding:0}#repair-workspace .rw-panel{border-radius:20px 20px 0 0;max-height:94dvh;padding:16px}#repair-workspace .grid{grid-template-columns:1fr}}";
 document.head.append(style);const shell=document.createElement("div");shell.id="repair-workspace";
 shell.innerHTML='<section class="rw-panel" role="dialog" aria-modal="true"><div class="rw-head"><div><h2>Repair Workspace</h2><div class="muted" id="rw-sub"></div></div><button id="rw-close">Close</button></div><div id="rw-content"></div></section>';
 document.body.append(shell);shell.addEventListener("click",e=>{if(e.target===shell||e.target.id==="rw-close")shell.classList.remove("open");});

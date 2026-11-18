@@ -3971,7 +3971,7 @@
 							this.refreshRepairCartLinks();
 							await this.runDatabaseHealthCheck();
 							if(requestedProject){const project=this.projects.find(p=>String(p.id)===String(requestedProject));if(project){this.currentTab='projects';this.openProjectDetail(project);}}
-							else if(createProject){this.currentTab='projects';this.newProjectForm={...this.newProjectForm,title:'',description:''};this.modals.newProject=true;}
+							else if(createProject){this.currentTab='projects';this.newProjectForm={...this.newProjectForm,title:'Repair Project',category:'Repair',description:'Repair work linked to this vehicle.'};this.modals.newProject=true;}
 							if (source === 'legacy-localstorage' && this.garageDB) localStorage.setItem('motornote_pro_migration_complete', new Date().toISOString());
 						} catch (error) {
 							console.error('Garage initialization failed', error?.name || 'Error', error?.message || error, error?.stack || '');

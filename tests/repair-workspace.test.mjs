@@ -134,3 +134,14 @@ test("torque cart eligibility requires an explicit fastener association and cons
   assert.equal(inconsistent.torqueSpecs[0].selectable, false);
   assert.match(inconsistent.torqueSpecs[0].reviewReason, /Conflicting unit conversions/);
 });
+
+
+test("unassigned torque can be manually assigned to a component and fastener in the repair workspace", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /data-torque-component/);
+  assert.match(source, /data-torque-fastener/);
+  assert.match(source, /Assign component/);
+  assert.match(source, /Choose fastener/);
+  assert.match(source, /User-assigned in Repair Workspace/);
+  assert.match(source, /savedTorque/);
+});

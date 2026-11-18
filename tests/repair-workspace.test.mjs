@@ -113,6 +113,14 @@ test("torque cart eligibility requires an explicit fastener association and cons
   assert.equal(nearby.torqueSpecs[0].association.component, "Water Pump");
   assert.equal(nearby.torqueSpecs[0].selectable, true);
 
+  const pulleyToolContext = Engine.extractProcedure(`
+    <h1>Water Pump Pulley: Installation</h1>
+    <p>ST2: PULLEY WRENCH PIN SET (18334AA020)</p>
+    <p>Tightening torque: 14 N.m (1.4 kgf-m, 10.3 ft-lb)</p>
+    <p>Install the V-belts.</p>`);
+  assert.equal(pulleyToolContext.torqueSpecs[0].association.component, "Water Pump Pulley");
+  assert.equal(pulleyToolContext.torqueSpecs[0].selectable, true);
+
   const unassigned = Engine.extractProcedure(`
     <h1>Oil Filter: Service and Repair</h1>
     <p>Torque: 17.2 Nm (175 kgf-cm, 13 ft. lbs.)</p>`);

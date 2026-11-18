@@ -147,6 +147,29 @@ test("unassigned torque can be manually assigned to a component and fastener in 
 });
 
 
+test("rear wheel brake cylinder torque values inherit their own procedure-step associations and split into separate specs", () => {
+  const facts = Engine.extractProcedure(`
+    <h1>REAR WHEEL BRAKE CYLINDER ASSEMBLY LH</h1>
+    <p>3. INSTALL REAR WHEEL BRAKE CYLINDER ASSEMBLY LH a) Install the wheel brake cylinder with the bolt. Torque: 9.8 Nm (100 kgf-cm, 87 inch lbs.) b) Using SST, connect the brake line. SST 09023-00101</p>
+    <p>Torque: 15 Nm (155 kgf-cm, 11 ft. lbs.) without SST 14 Nm (143 kgf-cm, 10 ft. lbs.) with SST HINT: Use a torque wrench with a fulcrum length of 30 cm (11.81 inch).</p>
+    <p>18. CHECK FOR BRAKE FLUID LEAKAGE 19. INSTALL REAR WHEEL Torque: 103 Nm (1,050 kgf-cm, 76 ft. lbs.)</p>`);
+  assert.equal(facts.torqueSpecs.length, 4);
+  assert.deepEqual(facts.torqueSpecs.map(x => x.values[0]), [
+    {value:9.8,unit:"N·m"},
+    {value:15,unit:"N·m"},
+    {value:14,unit:"N·m"},
+    {value:103,unit:"N·m"}
+  ]);
+  assert.deepEqual(facts.torqueSpecs.map(x => [x.association?.component,x.association?.fastener]), [
+    ["Wheel Brake Cylinder","Bolt"],
+    ["Brake Line","Brake line fitting"],
+    ["Brake Line","Brake line fitting"],
+    ["Wheel","Wheel nuts"]
+  ]);
+  assert.ok(facts.torqueSpecs.every(x => x.consistent && x.selectable));
+  assert.equal(facts.torqueSpecs[3].values.find(x => x.unit==="kgf·cm").value,1050);
+});
+
 test("manual torque assignment choices are restricted to components and fasteners on the active page", () => {
   const facts = Engine.extractProcedure(`<h1>Water Pump: Service and Repair</h1><p>Remove the water pump.</p><p>Remove the two water pump bolts.</p><p>Tightening torque: 11 Nm (112 kgf-cm, 8 ft. lbs.)</p>`);
   const options = Engine.torqueAssignmentOptions(facts);

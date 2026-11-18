@@ -19,6 +19,13 @@ test("manual viewer exposes the repair workspace from procedure pages", () => {
   assert.match(html, /src="\/repair-workspace\.js" defer/);
 });
 
+test("repair workspace reads the manual through the same-origin route instead of iframe DOM access", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /fetch\(pageUrl\.href,\{credentials:"same-origin",cache:"no-store"\}\)/);
+  assert.match(source, /new DOMParser\(\)\.parseFromString\(pageHtml,"text\/html"\)/);
+  assert.doesNotMatch(source, /frame&&frame\.contentDocument/);
+});
+
 test("engine is importable without a browser and keeps carts local", () => {
   assert.equal(typeof Engine.extractProcedure, "function");
   assert.equal(typeof Engine.toRelationships, "function");

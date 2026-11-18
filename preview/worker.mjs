@@ -1,6 +1,8 @@
 const UPSTREAM = "https://claude-manual.phillipstg.workers.dev";
 const SOURCE = "https://raw.githubusercontent.com/5cxxpb2yrr-ui/claude-manual/feat/compact-repair-engine-integration/public";
 const OVERRIDES = {
+  "/garage": { file: "garage.html", type: "text/html; charset=utf-8" },
+  "/garage.html": { file: "garage.html", type: "text/html; charset=utf-8" },
   "/manuals.html": { file: "manuals.html", type: "text/html; charset=utf-8" },
   "/repair-workspace.js": { file: "repair-workspace.js", type: "text/javascript; charset=utf-8" }
 };

@@ -106,6 +106,14 @@ const RECOMMENDED=/\b(recommend\w*|should (?:also )?be replaced|at the same time
 const ACTION=/\b(fill|refill|drain|apply|add|bleed|use|coat|pour|lubricate)\b/i;
 const TARGET_ACTION=/\b(remove|install|disconnect|inspect|measure|adjust|clean|check)\b/i;
 const PRIORITY={required:5,recommended:4,target:3,consumable:2,mention:1};
+function requiredCueForPart(line,part){
+return part.aliases.some(alias=>{
+const partPattern="(^|[^a-z0-9])"+escapeRegex(alias)+"(?=$|[^a-z0-9])";
+const before=new RegExp("\\b(always replace|must be replaced|replace(?:d|ment)?|renew|install a new|discard and replace|do not reuse)\\b[^.;,]{0,14}"+partPattern,"i");
+const after=new RegExp(partPattern+"[^.;,]{0,14}\\b(must be replaced|should be replaced|is replaced|was replaced)\\b","i");
+return before.test(line)||after.test(line);
+});
+}
 function extractProcedure(html,context){
 context=context||{};const h1=/<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html),tt=/<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html);
 const title=context.title||strip(h1?h1[1]:tt?tt[1]:"")||"Manual procedure";
@@ -128,7 +136,7 @@ matchParts(line).forEach(part=>{
 const ev=cue=>({text:line.slice(0,180),cue});
 if(part.category==="Consumable")add(part,"consumable",ACTION.test(line)?0.86:0.62,ev("consumable"),oem);
 else if(RECOMMENDED.test(line))add(part,"recommended",0.72,ev("recommended"),oem);
-else if(REQUIRED.test(line))add(part,"required",0.84,ev("required"),oem);
+else if(requiredCueForPart(line,part))add(part,"required",0.84,ev("required"),oem);
 else if(titleIds.has(part.id)&&TARGET_ACTION.test(line))add(part,"target",0.86,ev("target"),oem);
 else add(part,"mention",0.35,ev("mention"),oem);
 });

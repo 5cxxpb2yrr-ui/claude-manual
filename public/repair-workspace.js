@@ -118,7 +118,7 @@ if(!match)continue;
 const label=match[1].toUpperCase(),parts=[match[2].trim()];
 for(let j=i+1;j<Math.min(lines.length,i+5);j++){
 const line=lines[j].trim();
-if(!line||/^\s*(WARNING|CAUTION|NOTICE|NOTE)\s*:/i.test(line)||/^[A-Z][A-Z0-9 /()-]{3,}$/.test(line))break;
+if(!line||/^\s*(WARNING|CAUTION|NOTICE|NOTE)\s*:/i.test(line)||/^(REMOVAL|INSTALLATION|INSPECTION|ADJUSTMENT|PREPARATION|DISASSEMBLY|REASSEMBLY|REPAIR|SERVICE|NOTICE|CAUTION|WARNING|NOTE)(?:\b|\s*:)/i.test(line))break;
 parts.push(line);
 }
 const message=parts.filter(Boolean).join(" ").trim();

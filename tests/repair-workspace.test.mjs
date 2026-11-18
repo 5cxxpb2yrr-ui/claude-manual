@@ -106,6 +106,13 @@ test("torque cart eligibility requires an explicit fastener association and cons
   assert.equal(supported.torqueSpecs[0].consistent, true);
   assert.equal(supported.torqueSpecs[0].selectable, true);
 
+  const nearby = Engine.extractProcedure(`
+    <h1>Water Pump: Service and Repair</h1>
+    <p>Tighten the water pump bolts in the specified sequence.</p>
+    <p>Torque: 11 Nm (112 kgf-cm, 8 ft. lbs.)</p>`);
+  assert.equal(nearby.torqueSpecs[0].association.component, "Water Pump");
+  assert.equal(nearby.torqueSpecs[0].selectable, true);
+
   const unassigned = Engine.extractProcedure(`
     <h1>Oil Filter: Service and Repair</h1>
     <p>Torque: 17.2 Nm (175 kgf-cm, 13 ft. lbs.)</p>`);

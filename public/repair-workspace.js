@@ -111,7 +111,7 @@ const groups=new Map();
 torque.forEach(item=>{
 const key=item.lineIndex+":"+item.context;
 if(!groups.has(key)){
-const lineText=item.context.toLowerCase(),lineParts=CATALOG.filter(part=>part.aliases.some(alias=>lineText.includes(alias))),fastener=/\\b(bolt|bolts|nut|nuts|screw|screws|stud|studs|plug|fastener)\\b/i.test(item.context);
+const lineText=item.context.toLowerCase(),lineParts=CATALOG.filter(part=>part.aliases.some(alias=>lineText.includes(alias))),fastener=/\b(bolt|bolts|nut|nuts|screw|screws|stud|studs|plug|fastener)\b/i.test(item.context);
 const association=lineParts.length===1&&fastener?{component:lineParts[0].name,fastener:"Fastener named on torque line"}:null;
 groups.set(key,{id:"torque-"+groups.size,context:item.context,nearbyContext:item.nearbyContext,association,values:[]});
 }

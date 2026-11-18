@@ -8,6 +8,9 @@ const OVERRIDES = {
 export default {
   async fetch(request) {
     const url = new URL(request.url);
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Preview is read-only", { status: 405, headers: { "allow": "GET, HEAD" } });
+    }
     const override = OVERRIDES[url.pathname];
 
     if (override && (request.method === "GET" || request.method === "HEAD")) {
@@ -18,7 +21,9 @@ export default {
       const headers = new Headers(source.headers);
       headers.set("content-type", override.type);
       headers.set("cache-control", "no-store");
+      headers.set("x-robots-tag", "noindex, nofollow");
       headers.set("x-lifeos-preview", "claude-manual-feature-branch");
+    headers.set("x-robots-tag", "noindex, nofollow");
       return new Response(request.method === "HEAD" ? null : source.body, {
         status: source.status,
         headers

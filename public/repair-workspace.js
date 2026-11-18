@@ -245,9 +245,19 @@ document.head.append(style);const shell=document.createElement("div");shell.id="
 shell.innerHTML='<section class="rw-panel" role="dialog" aria-modal="true"><div class="rw-head"><div><h2>Repair Workspace</h2><div class="muted" id="rw-sub"></div></div><button id="rw-close">Close</button></div><div id="rw-content"></div></section>';
 document.body.append(shell);shell.addEventListener("click",e=>{if(e.target===shell||e.target.id==="rw-close")shell.classList.remove("open");});
 }
-function openWorkspace(){
-const frame=document.getElementById("fr"),doc=frame&&frame.contentDocument;
-if(!doc||!doc.body){alert("Manual page is not ready yet.");return;}
+async function openWorkspace(){
+const frame=document.getElementById("fr");
+if(!frame){alert("Open a manual procedure page first.");return;}
+let doc;
+try{
+const pageUrl=new URL(frame.getAttribute("src")||frame.src,location.href);
+if(pageUrl.origin!==location.origin)throw new Error("The manual page is outside the preview origin.");
+const response=await fetch(pageUrl.href,{credentials:"same-origin",cache:"no-store"});
+if(!response.ok)throw new Error("Manual page request failed ("+response.status+").");
+const pageHtml=await response.text();
+doc=new DOMParser().parseFromString(pageHtml,"text/html");
+if(!doc.body)throw new Error("The manual page returned no readable content.");
+}catch(error){alert("Could not open Repair Workspace: "+error.message);return;}
 mount();const title=doc.querySelector("h1")?.innerText||doc.title||"Manual procedure";
 const facts=extractProcedure(doc.documentElement.outerHTML,{title});
 const key=location.hash.replace(/^#\/v\//,"").replace(/[^a-z0-9/_-]/gi,"-")||frame.src;

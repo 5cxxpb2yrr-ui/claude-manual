@@ -153,7 +153,6 @@ function groupTorque(torque){
  });
 }
 function extractWarnings(lines){
-function extractWarnings(lines){
 const out=[];
 for(let i=0;i<lines.length;i++){
 const match=/^\s*(WARNING|CAUTION|NOTICE|NOTE)\s*:\s*(.*)$/i.exec(lines[i]);

@@ -30,7 +30,11 @@ const CATALOG=[
 ["starter","Starter Motor","Electrical",["starter motor","starter"],[]],
 ["brake-pad","Brake Pads","Brakes",["brake pad","disc brake pad"],["brake-rotor","brake-fluid","caliper-hardware"]],
 ["brake-rotor","Brake Rotor","Brakes",["brake rotor","brake disc","disc rotor"],[]],
-["brake-caliper","Brake Caliper","Brakes",["brake caliper","caliper"],["brake-fluid"]],\n["wheel-brake-cylinder","Wheel Brake Cylinder","Brakes",["wheel brake cylinder","brake wheel cylinder"],["brake-fluid"]],\n["brake-line","Brake Line","Brakes",["brake line","brake pipe"],[]],\n["wheel","Wheel","Suspension",["rear wheel","front wheel","wheel assembly"],["wheel-nut"]],\n["wheel-nut","Wheel Nut","Suspension",["wheel nut","wheel nuts","lug nut","lug nuts"],[]],
+["brake-caliper","Brake Caliper","Brakes",["brake caliper","caliper"],["brake-fluid"]],
+["wheel-brake-cylinder","Wheel Brake Cylinder","Brakes",["wheel brake cylinder","brake wheel cylinder"],["brake-fluid"]],
+["brake-line","Brake Line","Brakes",["brake line","brake pipe"],[]],
+["wheel","Wheel","Suspension",["rear wheel","front wheel","wheel assembly"],["wheel-nut"]],
+["wheel-nut","Wheel Nut","Suspension",["wheel nut","wheel nuts","lug nut","lug nuts"],[]],
 ["caliper-hardware","Caliper Hardware Kit","Brakes",["caliper hardware","pad clip","anti-rattle"],[]],
 ["wheel-bearing","Wheel Bearing","Suspension",["wheel bearing","hub bearing","hub unit","hub assembly"],["axle-nut"]],
 ["axle-nut","Axle Nut","Suspension",["axle nut","axle shaft nut","lock nut"],[]],
@@ -90,63 +94,58 @@ if(re.test(work)){found.set(x.part.id,x.part);work=work.replace(re,m=>" ".repeat
 });
 return [...found.values()];
 }
-const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.\-•]?\s*m|kgf\s*[·.\-•]?\s*(?:m|cm)|ft\s*[·.\-•]?\s*(?:lbf?|lbs?)|in(?:ch)?\s*[·.\-•]?\s*(?:lbf?|lbs?))(?![a-z])/gi;
+const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.\-•]?\s*m|kgf\s*[·.\-•]?\s*(?:m|cm)|(?:ft|in|inch)\s*[·.\-•]?\s*(?:lbf?|lbs?))(?![a-z])/gi;
 function normalizeTorqueUnit(raw){
- const u=raw.toLowerCase().replace(/[^a-z]/g,"");
- if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
- if(u.startsWith("ft"))return "ft·lbf";
- if(u.startsWith("in"))return "in·lbf";
- return "N·m";
+const u=raw.toLowerCase().replace(/[^a-z]/g,"");
+if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
+if(u.startsWith("ft"))return "ft·lbf";
+if(u.startsWith("in")||u.startsWith("inch"))return "in·lbf";
+return "N·m";
 }
 const TORQUE_TO_NM={"N·m":1,"kgf·cm":0.0980665,"kgf·m":9.80665,"ft·lbf":1.355817948,"in·lbf":0.112984829};
-function stepContext(text,index){
- const before=text.slice(0,index);
- const markers=[...before.matchAll(/(?:^|\s)(?:\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,}|[a-z]\)\s+)/g)];
- const start=markers.length?markers[markers.length-1].index:Math.max(0,index-260);
- const after=text.slice(index);
- const next=/(?:\s+\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,}|\s+[a-z]\)\s+)/.exec(after);
- const end=next?index+next.index:Math.min(text.length,index+300);
- return text.slice(start,end).replace(/\s+/g," ").trim();
-}
 function extractTorque(text){
- const source=String(text),out=[];TORQUE_RE.lastIndex=0;let m;
- while((m=TORQUE_RE.exec(source))){
-  const lineStart=source.lastIndexOf("\n",m.index)+1,lineEnd=source.indexOf("\n",m.index);
-  const line=source.slice(lineStart,lineEnd<0?source.length:lineEnd);
-  out.push({value:Number(m[1].replace(/,/g,"")),unit:normalizeTorqueUnit(m[2]),matchIndex:m.index,context:line.trim().slice(0,240),nearbyContext:stepContext(source,m.index),lineIndex:source.slice(0,m.index).split("\n").length-1});
- }
- return out;
+const lines=String(text).split("\n"),out=[];
+lines.forEach((line,lineIndex)=>{TORQUE_RE.lastIndex=0;let m;
+while((m=TORQUE_RE.exec(line))){
+const start=Math.max(0,lineIndex-2),end=Math.min(lines.length,lineIndex+3);
+out.push({value:Number(m[1].replace(/,/g,"")),unit:normalizeTorqueUnit(m[2]),matchIndex:m.index,context:line.trim().slice(0,240),nearbyContext:lines.slice(start,end).join(" ").replace(/\s+/g," ").trim().slice(0,600),lineIndex});
+}
+});return out;
 }
 function groupTorque(torque){
- const groups=[];
- torque.forEach(item=>{
+const groups=[];
+torque.forEach(item=>{
   let group=groups[groups.length-1];
-  if(item.unit==="N·m"||!group||group.stepContext!==item.nearbyContext){
-   group={id:"torque-"+groups.length,lineIndex:item.lineIndex,startIndex:item.matchIndex,context:item.context,nearbyContext:item.nearbyContext,stepContext:item.nearbyContext,values:[]};
-   groups.push(group);
+  if(item.unit==="N·m"||!group||group.lineIndex!==item.lineIndex){
+    group={id:"torque-"+groups.length,lineIndex:item.lineIndex,startIndex:item.matchIndex,context:item.context,nearbyContext:item.nearbyContext,values:[]};
+    groups.push(group);
   }
   group.values.push({value:item.value,unit:item.unit});
- });
- return groups.map(group=>{
-  const evidence=group.stepContext||group.nearbyContext||group.context;
-  let association=null;
-  if(/wheel brake cylinder|brake wheel cylinder/i.test(evidence)&&/\bbolt\b/i.test(evidence))
-   association={component:"Wheel Brake Cylinder",fastener:"Bolt",evidence,associationSource:"Procedure step explicitly identifies wheel brake cylinder bolt"};
-  else if(/connect the brake line|brake line fitting|brake pipe/i.test(evidence))
-   association={component:"Brake Line",fastener:"Brake line fitting",evidence,associationSource:"Procedure step explicitly identifies brake-line connection"};
-  else if(/install (?:the )?(?:rear|front) wheel|wheel nuts?|lug nuts?/i.test(evidence))
-   association={component:"Wheel",fastener:"Wheel nuts",evidence,associationSource:"Procedure step identifies wheel installation"};
-  else {
-   const parts=matchParts(evidence).filter(p=>p.category!=="Consumable");
-   const fastener=/\b(bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?|fittings?)\b/i.exec(evidence);
-   const component=parts.find(p=>p.category!=="Consumable");
-   if(component&&fastener)association={component:component.name,fastener:fastener[1].replace(/s$/i,""),evidence,associationSource:"Identified from the same procedure step"};
-  }
-  const converted=group.values.map(v=>v.value*(TORQUE_TO_NM[v.unit]||1));
-  const min=Math.min(...converted),max=Math.max(...converted);
-  const consistent=converted.length<2||((max-min)/Math.max((max+min)/2,0.0001)<=0.05);
-  return {...group,association,consistent,selectable:Boolean(association&&consistent),reviewReason:!consistent?"Conflicting unit conversions":!association?"Fastener/component is not identified in the procedure step":""};
- });
+});
+return groups.map(group=>{
+ const evidence=group.nearbyContext||group.context;
+ const boundary=/(?:^|\s)(?:\d+\.\s|[a-z]\)\s)/gi;
+ let prior=-1,next=group.context.length,bm;
+ while((bm=boundary.exec(group.context))){if(bm.index<group.startIndex)prior=bm.index+bm[0].length;else if(bm.index>group.startIndex){next=bm.index;break;}}
+ const scoped=group.context.slice(prior>=0?prior:Math.max(0,group.startIndex-140),next).trim()||group.context;
+ const allContext=evidence+" "+scoped;
+ let association=null;
+ if(/\bwheel brake cylinder|brake wheel cylinder\b/i.test(allContext)&&/\bbolt\b/i.test(allContext))
+   association={component:"Wheel Brake Cylinder",fastener:"Bolt",evidence:scoped,associationSource:"Procedure step explicitly identifies wheel brake cylinder bolt"};
+ else if(/\bconnect the brake line|brake line fitting|brake pipe\b/i.test(allContext))
+   association={component:"Brake Line",fastener:"Brake line fitting",evidence:scoped,associationSource:"Procedure step explicitly identifies brake-line connection"};
+ else if(/\binstall (?:the )?(?:rear|front) wheel\b|\bwheel nuts?\b|\blug nuts?\b/i.test(allContext))
+   association={component:"Wheel",fastener:"Wheel nuts",evidence:scoped,associationSource:"Procedure step identifies wheel installation"};
+ else {
+   const fastenerMatch=/\b(bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?)\b/i.exec(scoped);
+   const component=matchParts(allContext).find(p=>p.category!=="Consumable");
+   if(component&&fastenerMatch)association={component:component.name,fastener:fastenerMatch[1].replace(/s$/i,""),evidence:scoped,associationSource:"Nearby procedure text"};
+ }
+ const converted=group.values.map(v=>v.value*(TORQUE_TO_NM[v.unit]||1));
+ const min=Math.min(...converted),max=Math.max(...converted);
+ const consistent=converted.length<2||((max-min)/Math.max((max+min)/2,0.0001)<=0.05);
+ return {...group,association,consistent,selectable:Boolean(association&&consistent),reviewReason:!consistent?"Conflicting unit conversions":!association?"Fastener/component is not identified in the procedure step":""};
+});
 }
 function extractWarnings(lines){
 function extractWarnings(lines){

@@ -101,7 +101,7 @@ const lines=String(text).split("\n"),out=[];
 lines.forEach((line,lineIndex)=>{TORQUE_RE.lastIndex=0;let m;
 while((m=TORQUE_RE.exec(line))){
 const start=Math.max(0,lineIndex-2),end=Math.min(lines.length,lineIndex+3);
-out.push({value:Number(m[1].replace(/,/g,"")),unit:normalizeTorqueUnit(m[2]),context:line.trim().slice(0,180),nearbyContext:lines.slice(start,end).join(" ").replace(/\\s+/g," ").trim().slice(0,420),lineIndex});
+out.push({value:Number(m[1].replace(/,/g,"")),unit:normalizeTorqueUnit(m[2]),matchIndex:m.index,context:line.trim().slice(0,180),nearbyContext:lines.slice(start,end).join(" ").replace(/\\s+/g," ").trim().slice(0,420),lineIndex});
 }
 });return out;
 }
@@ -112,14 +112,17 @@ torque.forEach(item=>{
   // Each N·m value starts a distinct specification; following kgf/imperial values
   // belong to that specification until the next N·m value.
   if(item.unit==="N·m"||!group||group.lineIndex!==item.lineIndex){
-    group={id:"torque-"+groups.length,lineIndex:item.lineIndex,context:item.context,nearbyContext:item.nearbyContext,values:[]};
+    group={id:"torque-"+groups.length,lineIndex:item.lineIndex,startIndex:item.matchIndex,context:item.context,nearbyContext:item.nearbyContext,values:[]};
     groups.push(group);
   }
   group.values.push({value:item.value,unit:item.unit});
 });
 return groups.map(group=>{
  const evidence=group.nearbyContext||group.context;
- const scoped=(group.context.match(/(?:^|\\s)(?:[a-z]\\)|\\d+\\.)?\\s*[^.]*?(?:Torque:|Tightening torque:)[^.]*/i)||[])[0]||group.context;
+ const boundary=/(?:^|\\s)(?:\\d+\\.\\s|[a-z]\\)\\s)/gi;
+ let prior=-1,next=group.context.length,bm;
+ while((bm=boundary.exec(group.context))){if(bm.index<group.startIndex)prior=bm.index+bm[0].length;else if(bm.index>group.startIndex){next=bm.index;break;}}
+ const scoped=group.context.slice(prior>=0?prior:Math.max(0,group.startIndex-110),next).trim()||group.context;
  const nearbyParts=matchParts(evidence+" "+scoped);
  const has=(re)=>re.test(evidence+" "+scoped);
  let association=null;

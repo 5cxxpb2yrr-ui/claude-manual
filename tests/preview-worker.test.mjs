@@ -13,6 +13,8 @@ test("preview Worker parses as valid JavaScript", () => {
 });
 
 test("preview overrides only the feature-branch viewer and repair module", () => {
+  assert.match(worker, /"\/garage"/);
+  assert.match(worker, /file: "garage\.html"/);
   assert.match(worker, /"\/manuals\.html"/);
   assert.match(worker, /"\/repair-workspace\.js"/);
   assert.match(worker, /feat\/compact-repair-engine-integration\/public/);

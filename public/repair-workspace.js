@@ -130,7 +130,7 @@ return groups.map(group=>{
  else if(has(/connect the brake line|brake line fitting|brake pipe/i)) association={component:"Brake Line",fastener:"Brake line fitting",evidence:scoped,associationSource:"Procedure step explicitly identifies brake-line connection"};
  else if(has(/install rear wheel|install front wheel|wheel nuts?|lug nuts?/i)) association={component:"Wheel",fastener:"Wheel nuts",evidence:scoped,associationSource:"Procedure step identifies wheel installation"};
  else {
-   const fastenerMatch=/(\\b(?:bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?)\\b)/i.exec(scoped+" "+evidence);
+   const fastenerMatch=/(\\b(?:bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?)\\b)/i.exec(scoped);
    const component=nearbyParts.find(p=>p.category!=="Consumable");
    if(component&&fastenerMatch)association={component:component.name,fastener:fastenerMatch[1].replace(/s$/i,""),evidence:scoped,associationSource:"Nearby procedure text"};
  }

@@ -112,7 +112,8 @@ torque.forEach(item=>{
 const key=item.lineIndex+":"+item.context;
 if(!groups.has(key)){
 const evidence=item.nearbyContext||item.context,nearbyParts=matchParts(evidence),fastener=/\b(bolt|bolts|nut|nuts|screw|screws|stud|studs|plug|fastener)\b/i.test(evidence);
-const association=nearbyParts.length===1&&fastener?{component:nearbyParts[0].name,fastener:"Fastener identified in nearby manual context",evidence}:null;
+const waterPumpPulley=/PULLEY WRENCH PIN SET/i.test(evidence)&&/\bV[- ]BELTS?\b/i.test(evidence);
+const association=waterPumpPulley?{component:"Water Pump Pulley",fastener:"Pulley mounting fastener",evidence,associationSource:"OEM procedure sequence: pulley wrench pin set followed by V-belt installation"}:nearbyParts.length===1&&fastener?{component:nearbyParts[0].name,fastener:"Fastener identified in nearby manual context",evidence}:null;
 groups.set(key,{id:"torque-"+groups.size,context:item.context,nearbyContext:item.nearbyContext,association,values:[]});
 }
 groups.get(key).values.push({value:item.value,unit:item.unit});

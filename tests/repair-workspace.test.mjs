@@ -101,6 +101,7 @@ test("torque cart eligibility requires an explicit fastener association and cons
   const supported = Engine.extractProcedure(`
     <h1>Water Pump: Service and Repair</h1>
     <p>Water pump bolts torque: 11 Nm (112 kgf-cm, 8 ft. lbs.)</p>`);
+  assert.ok(supported.torqueSpecs[0].association, JSON.stringify(supported.torqueSpecs));
   assert.equal(supported.torqueSpecs[0].association.component, "Water Pump");
   assert.equal(supported.torqueSpecs[0].consistent, true);
   assert.equal(supported.torqueSpecs[0].selectable, true);

@@ -33,3 +33,10 @@ test("Garage inline JavaScript remains syntactically valid", () => {
     assert.equal(result.status, 0, result.stderr || result.stdout);
   }
 });
+
+test("Kanban cards and project modals identify their associated vehicle", () => {
+  assert.equal((html.match(/vehicleNameForProject\(proj\)/g) || []).length, 2);
+  assert.match(html, /vehicleNameForProject\(selectedProject\)/);
+  assert.match(html, /activeVehicle\?\.name \|\| 'Select a vehicle first'/);
+  assert.match(html, /vehicleNameForProject\(project\)/);
+});

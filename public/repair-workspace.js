@@ -97,9 +97,34 @@ if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
 if(u.startsWith("ft"))return "ft·lbf";if(u.startsWith("in"))return "in·lbf";return "N·m";
 }
 function extractTorque(text){
-const out=[];String(text).split("\n").forEach(line=>{TORQUE_RE.lastIndex=0;let m;
-while((m=TORQUE_RE.exec(line)))out.push({value:Number(m[1]),unit:normalizeTorqueUnit(m[2]),context:line.trim().slice(0,180)});
+const out=[];String(text).split("\n").forEach((line,lineIndex)=>{TORQUE_RE.lastIndex=0;let m;
+while((m=TORQUE_RE.exec(line)))out.push({value:Number(m[1]),unit:normalizeTorqueUnit(m[2]),context:line.trim().slice(0,180),lineIndex});
 });return out;
+}
+function groupTorque(torque){
+const groups=new Map();
+torque.forEach(item=>{
+const key=item.lineIndex+":"+item.context;
+if(!groups.has(key))groups.set(key,{id:"torque-"+groups.size,context:item.context,values:[]});
+groups.get(key).values.push({value:item.value,unit:item.unit});
+});
+return [...groups.values()];
+}
+function extractWarnings(lines){
+const out=[];
+for(let i=0;i<lines.length;i++){
+const match=/^\s*(WARNING|CAUTION|NOTICE|NOTE)\s*:\s*(.*)$/i.exec(lines[i]);
+if(!match)continue;
+const label=match[1].toUpperCase(),parts=[match[2].trim()];
+for(let j=i+1;j<Math.min(lines.length,i+5);j++){
+const line=lines[j].trim();
+if(!line||/^\s*(WARNING|CAUTION|NOTICE|NOTE)\s*:/i.test(line)||/^[A-Z][A-Z0-9 /()-]{3,}$/.test(line))break;
+parts.push(line);
+}
+const message=parts.filter(Boolean).join(" ").trim();
+if(message)out.push({type:label,text:message});
+}
+return out.slice(0,30);
 }
 const REQUIRED=/\b(always replace|must be replaced|replace(?:d|ment)?|renew|install a new|discard and replace|do not reuse)\b/i;
 const RECOMMENDED=/\b(recommend\w*|should (?:also )?be replaced|at the same time|also replace|consider replacing)\b/i;
@@ -149,10 +174,11 @@ const toolDetails=TOOLS.filter(t=>t.re.test(text)).map(t=>({id:t.id,name:t.name}
 const toolReferences=[];let m;const sst=/\bSST\s+([A-Z0-9-]+(?:\s*\([^)]*\))?)/gi;
 while((m=sst.exec(text)))toolReferences.push({tool:"special-service-tool",reference:m[1].trim()});
 const oil=/OIL FILTER WRENCH\s*\(([^)]+)\)/gi;while((m=oil.exec(text)))toolReferences.push({tool:"oil-filter-wrench",reference:m[1].trim()});
-const warnings=lines.filter(l=>/\b(WARNING|CAUTION|NOTICE|NOTE)\s*:/i.test(l)).map(l=>l.slice(0,240)).slice(0,30);
+const warnings=extractWarnings(lines);
 const isEyesight=/eyesight|stereo camera/i.test(title+" "+text),requiresCalibration=isEyesight&&/\bcalibrat/i.test(text);
 const requiredTools=requiresCalibration&&(/\bSSM\s?-?4\b|select monitor/i.test(text))?["subaru-ssm4"]:[];
-return {procedureId,title,parts,tools:toolDetails.map(t=>t.id),toolDetails,toolReferences,torque:extractTorque(text),warnings,requiresCalibration,requiredTools};
+const torque=extractTorque(text);
+return {procedureId,title,parts,tools:toolDetails.map(t=>t.id),toolDetails,toolReferences,torque,torqueSpecs:groupTorque(torque),warnings,requiresCalibration,requiredTools};
 }
 function toRelationships(facts,minConfidence){
 minConfidence=minConfidence===undefined?0.6:minConfidence;
@@ -186,15 +212,16 @@ const vehicle=small.split("•").slice(1).join("•").trim()||"Selected vehicle"
 const cart=all[key]||{vehicle,procedure:title,items:[],tools:[]},selected=new Set((cart.items||[]).map(x=>x.id)),selectedTools=new Set(cart.tools||[]);
 const shell=document.getElementById("repair-workspace"),content=shell.querySelector("#rw-content");
 shell.querySelector("#rw-sub").textContent=title+" · "+vehicle;
-const rows=facts.parts.map(p=>{
+const visibleParts=facts.parts.filter(p=>p.relationship!== "mention" || p.confidence>=0.6);
+const rows=visibleParts.map(p=>{
 const evidence=(p.evidence||[]).slice(0,3).map(x=>esc(x.text)).join(" · ");
 const oem=(p.oem||[]).map(x=>esc(x.manufacturer+" "+x.partNumber)).join(", ");
 return '<label class="item"><input type="checkbox" data-part="'+esc(p.id)+'" '+(selected.has(p.id)?"checked":"")+'><span><b>'+esc(p.name)+'</b><br><span class="muted">'+esc(p.relationship)+' · '+Math.round(p.confidence*100)+'% confidence'+(oem?" · "+oem:"")+'</span><br><span class="muted">'+evidence+'</span></span></label>';
 }).join("");
 const toolRows=facts.toolDetails.map(t=>'<label class="item"><input type="checkbox" data-tool="'+esc(t.id)+'" '+(selectedTools.has(t.id)?"checked":"")+'><span>'+esc(t.name)+'</span></label>').join("");
 const refs=facts.toolReferences.map(x=>'<div class="line">Manual tool reference: <b>'+esc(x.reference)+'</b></div>').join("");
-const torque=facts.torque.map(x=>'<div class="line"><b>'+esc(x.value+" "+x.unit)+'</b> — '+esc(x.context)+'</div>').join("");
-const warnings=facts.warnings.map(x=>'<div class="line">'+esc(x)+'</div>').join("");
+const torque=(facts.torqueSpecs||[]).map(group=>'<div class="line"><b>'+esc(group.values.map(x=>x.value+" "+x.unit).join(" · "))+'</b><br><span class="muted">'+esc(group.context)+'</span></div>').join("");
+const warnings=facts.warnings.map(x=>'<div class="line"><b>'+esc(x.type)+'</b> '+esc(x.text)+'</div>').join("");
 content.innerHTML='<h3>Parts and service targets</h3><div class="muted">Required means the procedure explicitly calls for replacement. Service targets are components being worked on, not proof that a new part is needed. Review evidence before adding items to the cart.</div><div class="grid">'+(rows||'<div class="muted">No catalog matches found.</div>')+'</div><h3>Tools</h3><div class="grid">'+(toolRows||'<div class="muted">No catalog tool matches found.</div>')+'</div>'+refs+'<h3>Torque specifications</h3>'+(torque||'<div class="muted">No torque values detected.</div>')+'<h3>Warnings and notes</h3>'+(warnings||'<div class="muted">No explicit warning or note labels detected.</div>')+(facts.requiresCalibration?'<div class="line">EyeSight-related calibration language detected. Verify the exact calibration procedure and equipment requirements before returning the vehicle to service.</div>':"")+'<div class="cart"><h3>Repair cart</h3><div id="rw-lines"></div><p class="muted">Stored in this browser only. No account or server sync.</p><button class="primary" id="rw-save">Save cart</button> <button id="rw-export">Export JSON</button> <button id="rw-clear">Clear</button></div>';
 const snapshot=()=>{
 const items=Array.from(content.querySelectorAll("[data-part]:checked")).map(el=>facts.parts.find(p=>p.id===el.dataset.part)).filter(Boolean);

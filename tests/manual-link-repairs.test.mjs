@@ -45,6 +45,7 @@ test("verified equivalents resolve to existing indexed Scion pages", () => {
     4248: 1623,
     4274: 1636,
     4276: 1630,
+    4280: 6546,
     5972: 1613,
     6379: 1614,
     6735: 1631,

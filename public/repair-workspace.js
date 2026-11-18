@@ -124,22 +124,28 @@ torque.forEach(item=>{
 });
 return groups.map(group=>{
  const evidence=group.nearbyContext||group.context;
- const boundary=/(?:^|\s)(?:\d+\.\s|[a-z]\)\s)/gi;
- let prior=-1,next=group.context.length,bm;
- while((bm=boundary.exec(group.context))){if(bm.index<group.startIndex)prior=bm.index+bm[0].length;else if(bm.index>group.startIndex){next=bm.index;break;}}
- const scoped=group.context.slice(prior>=0?prior:Math.max(0,group.startIndex-140),next).trim()||group.context;
- const allContext=evidence+" "+scoped;
+ const stepMarker=/(?:\b\d+\.\s+|\b[a-z]\)\s+)/gi;
+ let source=group.context,last=null,m;
+ stepMarker.lastIndex=0;
+ while((m=stepMarker.exec(group.context))&&m.index<group.startIndex)last={index:m.index,end:stepMarker.lastIndex};
+ if(!last){
+   source=evidence;
+   stepMarker.lastIndex=0;
+   while((m=stepMarker.exec(evidence)))last={index:m.index,end:stepMarker.lastIndex};
+ }
+ const scoped=last?source.slice(last.end).trim():group.context;
+ const scope=scoped||group.context;
  let association=null;
- if(/\bwheel brake cylinder|brake wheel cylinder\b/i.test(allContext)&&/\bbolt\b/i.test(allContext))
-   association={component:"Wheel Brake Cylinder",fastener:"Bolt",evidence:scoped,associationSource:"Procedure step explicitly identifies wheel brake cylinder bolt"};
- else if(/\bconnect the brake line|brake line fitting|brake pipe\b/i.test(allContext))
-   association={component:"Brake Line",fastener:"Brake line fitting",evidence:scoped,associationSource:"Procedure step explicitly identifies brake-line connection"};
- else if(/\binstall (?:the )?(?:rear|front) wheel\b|\bwheel nuts?\b|\blug nuts?\b/i.test(allContext))
-   association={component:"Wheel",fastener:"Wheel nuts",evidence:scoped,associationSource:"Procedure step identifies wheel installation"};
+ if(/\bconnect the brake line|brake line fitting|brake pipe\b/i.test(scope))
+   association={component:"Brake Line",fastener:"Brake line fitting",evidence:scope,associationSource:"Procedure step explicitly identifies brake-line connection"};
+ else if(/\bwheel brake cylinder|brake wheel cylinder\b/i.test(scope)&&/\bbolt\b/i.test(scope))
+   association={component:"Wheel Brake Cylinder",fastener:"Bolt",evidence:scope,associationSource:"Procedure step explicitly identifies wheel brake cylinder bolt"};
+ else if(/\binstall (?:the )?(?:rear|front) wheel\b|\bwheel nuts?\b|\blug nuts?\b/i.test(scope))
+   association={component:"Wheel",fastener:"Wheel nuts",evidence:scope,associationSource:"Procedure step identifies wheel installation"};
  else {
-   const fastenerMatch=/\b(bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?)\b/i.exec(scoped);
-   const component=matchParts(allContext).find(p=>p.category!=="Consumable");
-   if(component&&fastenerMatch)association={component:component.name,fastener:fastenerMatch[1].replace(/s$/i,""),evidence:scoped,associationSource:"Nearby procedure text"};
+   const fastenerMatch=/\b(bolts?|nuts?|screws?|studs?|plugs?|clips?|pins?|clamps?|retainers?)\b/i.exec(scope);
+   const component=matchParts(scope).find(p=>p.category!=="Consumable");
+   if(component&&fastenerMatch)association={component:component.name,fastener:fastenerMatch[1].replace(/s$/i,""),evidence:scope,associationSource:"Nearby procedure text"};
  }
  const converted=group.values.map(v=>v.value*(TORQUE_TO_NM[v.unit]||1));
  const min=Math.min(...converted),max=Math.max(...converted);

@@ -1,0 +1,25 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
+const workerPath = fileURLToPath(new URL("../preview/worker.mjs", import.meta.url));
+const worker = readFileSync(workerPath, "utf8");
+
+test("preview Worker parses as valid JavaScript", () => {
+  const result = spawnSync(process.execPath, ["--check", workerPath], { encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test("preview overrides only the feature-branch viewer and repair module", () => {
+  assert.match(worker, /"\/manuals\.html"/);
+  assert.match(worker, /"\/repair-workspace\.js"/);
+  assert.match(worker, /feat\/compact-repair-engine-integration\/public/);
+});
+
+test("manual requests proxy to the existing Worker without a new storage binding", () => {
+  assert.match(worker, /claude-manual\.phillipstg\.workers\.dev/);
+  assert.match(worker, /url\.pathname\.startsWith\("\/m\/"\)/);
+  assert.doesNotMatch(worker, /R2|bucket\.put|\.put\(/i);
+});

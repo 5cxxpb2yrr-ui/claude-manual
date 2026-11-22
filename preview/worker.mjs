@@ -19,7 +19,7 @@ export default {
       let source;
       try {
         source = await fetch(`${SOURCE}/${override.file}`, {
-          cf: { cacheTtl: 0, cacheEverything: false }
+          cf: { cacheTtl: 60, cacheEverything: true }
         });
       } catch {
         source = null;
@@ -36,7 +36,7 @@ export default {
           apiUrl.searchParams.set("ref", "feat/compact-repair-engine-integration");
           const apiResponse = await fetch(apiUrl, {
             headers: { accept: "application/vnd.github+json", "user-agent": "claude-manual-preview" },
-            cf: { cacheTtl: 0, cacheEverything: false }
+            cf: { cacheTtl: 60, cacheEverything: true }
           });
           if (apiResponse.ok) {
             const file = await apiResponse.json();
@@ -59,7 +59,7 @@ export default {
       }
       const headers = new Headers(source?.ok ? source.headers : undefined);
       headers.set("content-type", override.type);
-      headers.set("cache-control", "no-store");
+      headers.set("cache-control", "public, max-age=15, stale-while-revalidate=60");
       headers.set("x-robots-tag", "noindex, nofollow");
       headers.set("x-lifeos-preview", "claude-manual-feature-branch");
       return new Response(request.method === "HEAD" ? null : body, {

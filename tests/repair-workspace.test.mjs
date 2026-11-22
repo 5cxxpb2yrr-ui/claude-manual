@@ -193,3 +193,15 @@ test("manual torque assignment choices are restricted to components and fastener
   const pulley = Engine.extractProcedure(`<h1>Water Pump Pulley: Installation</h1><p>ST2: PULLEY WRENCH PIN SET (18334AA020)</p><p>Tightening torque: 14 N.m (1.4 kgf-m, 10.3 ft-lb)</p><p>Install the V-belts.</p>`);
   assert.deepEqual(Engine.torqueAssignmentOptions(pulley).fasteners, ["Pulley mounting fastener"]);
 });
+
+
+test("unassigned torque can be manually assigned when page dropdowns have no matching choices", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /data-torque-component-custom/);
+  assert.match(source, /data-torque-fastener-custom/);
+  assert.match(source, /Or enter component manually/);
+  assert.match(source, /Or enter fastener manually/);
+  assert.match(source, /dataset\.torqueComponentCustom/);
+  assert.match(source, /dataset\.torqueFastenerCustom/);
+  assert.match(source, /data-torque-component-custom.*value.*trim/);
+});

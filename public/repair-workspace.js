@@ -105,11 +105,13 @@ function normalizeTorqueUnit(raw){
 const TORQUE_TO_NM={"N·m":1,"kgf·cm":0.0980665,"kgf·m":9.80665,"ft·lbf":1.355817948,"in·lbf":0.112984829};
 function stepContext(text,index){
  const before=text.slice(0,index);
- const markers=[...before.matchAll(/(?:^|\s)(?:\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,}|[a-z]\)\s+)/g)];
+ // Retain the numbered parent step and all its lettered substeps.
+ const marker=/^[ \t]*\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,}/gm;
+ const markers=[...before.matchAll(marker)];
  const start=markers.length?markers[markers.length-1].index:Math.max(0,index-280);
  const after=text.slice(index);
- const next=/(?:\s+\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,}|\s+[a-z]\)\s+)/.exec(after);
- const end=next?index+next.index:Math.min(text.length,index+360);
+ const next=marker.exec(after);
+ const end=next?index+next.index:Math.min(text.length,index+500);
  return text.slice(start,end).replace(/\s+/g," ").trim();
 }
 function extractTorque(text){
@@ -134,7 +136,11 @@ function groupTorque(torque){
  return groups.map(group=>{
   const evidence=group.stepContext||group.nearbyContext||group.context;
   let association=null;
-  if(/wheel brake cylinder|brake wheel cylinder/i.test(evidence)&&/\bbolt\b/i.test(evidence))
+  if(/install (?:the )?water pump assembly/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
+   association={component:"Water Pump Assembly",fastener:/\bnuts?\b/i.test(evidence)?"Bolts and nuts":"Bolts",evidence,associationSource:"Numbered installation step explicitly identifies the water pump assembly fasteners"};
+  else if(/install (?:the )?(?:water )?pump pulley/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
+   association={component:"Water Pump Pulley",fastener:"Bolts",evidence,associationSource:"Numbered installation step explicitly identifies the water pump pulley fasteners"};
+  else if(/wheel brake cylinder|brake wheel cylinder/i.test(evidence)&&/\bbolt\b/i.test(evidence))
    association={component:"Wheel Brake Cylinder",fastener:"Bolt",evidence,associationSource:"Procedure step explicitly identifies wheel brake cylinder bolt"};
   else if(/connect the brake line|brake line fitting|brake pipe/i.test(evidence))
    association={component:"Brake Line",fastener:"Brake line fitting",evidence,associationSource:"Procedure step explicitly identifies brake-line connection"};

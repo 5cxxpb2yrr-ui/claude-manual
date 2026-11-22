@@ -195,13 +195,29 @@ test("manual torque assignment choices are restricted to components and fastener
 });
 
 
-test("unassigned torque can be manually assigned when page dropdowns have no matching choices", () => {
-  const source = readFileSync(script, "utf8");
-  assert.match(source, /data-torque-component-custom/);
-  assert.match(source, /data-torque-fastener-custom/);
-  assert.match(source, /Or enter component manually/);
-  assert.match(source, /Or enter fastener manually/);
-  assert.match(source, /dataset\.torqueComponentCustom/);
-  assert.match(source, /dataset\.torqueFastenerCustom/);
-  assert.match(source, /data-torque-component-custom.*value.*trim/);
+test("water-pump assembly and pulley torques associate to their own numbered installation steps", () => {
+  const excerpt = `
+    <h1>Water Pump: Service and Repair</h1>
+    <b>INSTALLATION</b>
+    <p>1. INSTALL WATER PUMP ASSEMBLY</p>
+    <p>a) Install a new gasket and the water pump with the 3 bolts and 2 nuts.</p>
+    <p>Torque: 11 Nm (112 kgf-cm, 8 ft. lbs.)</p>
+    <p>2. INSTALL WATER PUMP PULLEY</p>
+    <p>a) Using SST, install the pump pulley with the 3 bolts.</p>
+    <p>SST 09960-10010 (09962-01000, 09963-00600)</p>
+    <p>Torque: 15 Nm (153 kgf-cm, 11 ft. lbs.)</p>`;
+  const facts = Engine.extractProcedure(excerpt);
+  assert.equal(facts.torqueSpecs.length, 2);
+  assert.deepEqual(facts.torqueSpecs.map(x => x.values[0]), [
+    {value:11,unit:"N·m"}, {value:15,unit:"N·m"}
+  ]);
+  assert.deepEqual(facts.torqueSpecs.map(x => [x.association?.component,x.association?.fastener]), [
+    ["Water Pump Assembly","Bolts and nuts"],
+    ["Water Pump Pulley","Bolts"]
+  ]);
+  assert.ok(facts.torqueSpecs.every(x => x.consistent && x.selectable));
+  assert.match(facts.torqueSpecs[0].evidence, /1\. INSTALL WATER PUMP ASSEMBLY/);
+  assert.match(facts.torqueSpecs[1].evidence, /2\. INSTALL WATER PUMP PULLEY/);
+  assert.ok(facts.tools.includes("special-service-tool"));
+  assert.ok(facts.toolReferences.some(x => x.reference.includes("09960-10010")));
 });

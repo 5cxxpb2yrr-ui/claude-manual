@@ -49,3 +49,9 @@ test("preview page overrides fall back to the GitHub Contents API when raw sourc
   assert.match(worker, /file\.encoding === "base64"/);
   assert.match(worker, /Preview source unavailable/);
 });
+
+test("Garage Manual Explorer project and repair-cart links navigate in the current tab", async () => {
+  const garage = readFileSync(new URL("../public/garage.html", import.meta.url), "utf8");
+  assert.match(garage, /:href="manualProjectLink\(selectedProject\)"(?![^>]*\btarget="_blank")/);
+  assert.match(garage, /:href="repairCartManualLink\(cart\)"(?![^>]*\btarget="_blank")/);
+});

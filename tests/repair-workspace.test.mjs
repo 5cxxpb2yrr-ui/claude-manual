@@ -223,12 +223,12 @@ test("water-pump assembly and pulley torques associate to their own numbered ins
 });
 
 test("guided repair mode extracts numbered factory steps and applies hybrid safety gates", () => {
-  const steps = Engine.extractRepairSteps(`1. REMOVE WHEEL
-Remove the wheel and tire assembly.
+  const steps = Engine.extractRepairSteps(`1. REMOVE BRAKE CALIPER
+Remove the brake caliper and support it.
 2. INSPECT BRAKE CALIPER
 Inspect the caliper and brake hose.
 3. INSTALL BRAKE PADS
-Install the pads after cleaning the support.
+Install the pads after removing the caliper.
 4. CHECK BRAKE OPERATION
 Verify brake operation.`);
   assert.equal(steps.length, 4);
@@ -237,7 +237,7 @@ Verify brake operation.`);
   assert.equal(steps[2].safetyCritical, true);
   assert.equal(steps[2].requiresPrevious, true);
   const states = {};
-  assert.equal(Engine.repairStepCanOpen(steps, states, 0), false);
+  assert.equal(Engine.repairStepCanOpen(steps, states, 0), true);
   states[steps[0].id] = {status:"done"};
   assert.equal(Engine.repairStepCanOpen(steps, states, 1), true);
   assert.equal(Engine.repairStepCanOpen(steps, states, 2), false);

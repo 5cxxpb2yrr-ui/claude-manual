@@ -216,8 +216,8 @@ test("water-pump assembly and pulley torques associate to their own numbered ins
     ["Water Pump Pulley","Bolts"]
   ]);
   assert.ok(facts.torqueSpecs.every(x => x.consistent && x.selectable));
-  assert.match(facts.torqueSpecs[0].evidence, /1\. INSTALL WATER PUMP ASSEMBLY/);
-  assert.match(facts.torqueSpecs[1].evidence, /2\. INSTALL WATER PUMP PULLEY/);
+  assert.match(facts.torqueSpecs[0].association.evidence, /1\. INSTALL WATER PUMP ASSEMBLY/);
+  assert.match(facts.torqueSpecs[1].association.evidence, /2\. INSTALL WATER PUMP PULLEY/);
   assert.ok(facts.tools.includes("special-service-tool"));
   assert.ok(facts.toolReferences.some(x => x.reference.includes("09960-10010")));
 });

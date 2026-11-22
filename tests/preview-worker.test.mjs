@@ -31,3 +31,10 @@ test("manual HTML rewrites root-relative Phoenix assets into the R2 manual path"
   assert.ok(worker.includes("assets\\//.test(value)"));
   assert.match(worker, /manualRoot \+ "\/" \+ value\.replace/);
 });
+
+
+test("preview Worker retries missing vehicle-local assets from the manual-level assets directory", () => {
+  assert.match(worker, /response\.status === 404/);
+  assert.match(worker, /url\.pathname\.match\(\/\^\\\\\/m\\\\\/\(\[\^/\]\+\)\\\\\/\[\^/\]\+\\\\\/assets\\\\\/\(\.\+\)\$\//);
+  assert.match(worker, /\/m\/\$\{assetPath\[1\]\}\/assets\/\$\{assetPath\[2\]\}/);
+});

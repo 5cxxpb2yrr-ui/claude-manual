@@ -7,14 +7,31 @@ on:
     branches: [main, "feat/compact-repair-engine-integration"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref_name || github.event.pull_request.head.ref }}
+          persist-credentials: true
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Compile Garage Tailwind CSS
+        run: npx --yes @tailwindcss/cli@4.1.17 --input ./src/garage.css --output ./public/garage.css --minify
+      - name: Commit generated stylesheet on feature branch
+        if: github.event_name == 'push' && github.ref_name == 'feat/compact-repair-engine-integration'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/garage.css
+          if git diff --cached --quiet; then
+            echo "Garage CSS is already up to date."
+          else
+            git commit -m "Build precompiled Garage stylesheet"
+            git push
+          fi
       - run: npm test

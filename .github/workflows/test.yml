@@ -20,8 +20,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Install pinned Tailwind build tools
+        run: npm install --no-save --no-package-lock tailwindcss@4.1.17 @tailwindcss/cli@4.1.17
       - name: Compile Garage Tailwind CSS
-        run: npx --yes @tailwindcss/cli@4.1.17 --input ./src/garage.css --output ./public/garage.css --minify
+        run: npx @tailwindcss/cli --input ./src/garage.css --output ./public/garage.css --minify
       - name: Commit generated stylesheet on feature branch
         if: github.event_name == 'push' && github.ref_name == 'feat/compact-repair-engine-integration'
         run: |

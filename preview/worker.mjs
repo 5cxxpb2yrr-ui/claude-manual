@@ -16,17 +16,54 @@ export default {
     const override = OVERRIDES[url.pathname];
 
     if (override && (request.method === "GET" || request.method === "HEAD")) {
-      const source = await fetch(`${SOURCE}/${override.file}`, {
-        cf: { cacheTtl: 0, cacheEverything: false }
-      });
-      if (!source.ok) return new Response("Preview source unavailable", { status: 502 });
-      const headers = new Headers(source.headers);
+      let source;
+      try {
+        source = await fetch(`${SOURCE}/${override.file}`, {
+          cf: { cacheTtl: 0, cacheEverything: false }
+        });
+      } catch {
+        source = null;
+      }
+
+      // GitHub's raw host can intermittently fail from edge runtimes. Fall
+      // back to the authenticated-free Contents API for the same branch file.
+      let body = source?.ok ? source.body : null;
+      if (!body) {
+        try {
+          const apiUrl = new URL(
+            `https://api.github.com/repos/5cxxpb2yrr-ui/claude-manual/contents/public/${override.file}`
+          );
+          apiUrl.searchParams.set("ref", "feat/compact-repair-engine-integration");
+          const apiResponse = await fetch(apiUrl, {
+            headers: { accept: "application/vnd.github+json", "user-agent": "claude-manual-preview" },
+            cf: { cacheTtl: 0, cacheEverything: false }
+          });
+          if (apiResponse.ok) {
+            const file = await apiResponse.json();
+            if (file.encoding === "base64" && typeof file.content === "string") {
+              const binary = atob(file.content.replace(/\\s/g, ""));
+              const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+              body = new Response(bytes).body;
+            }
+          }
+        } catch {
+          body = null;
+        }
+      }
+
+      if (!body) {
+        return new Response("Preview source unavailable", {
+          status: 502,
+          headers: { "cache-control": "no-store", "x-lifeos-preview-source": "unavailable" }
+        });
+      }
+      const headers = new Headers(source?.ok ? source.headers : undefined);
       headers.set("content-type", override.type);
       headers.set("cache-control", "no-store");
       headers.set("x-robots-tag", "noindex, nofollow");
       headers.set("x-lifeos-preview", "claude-manual-feature-branch");
-      return new Response(request.method === "HEAD" ? null : source.body, {
-        status: source.status,
+      return new Response(request.method === "HEAD" ? null : body, {
+        status: 200,
         headers
       });
     }

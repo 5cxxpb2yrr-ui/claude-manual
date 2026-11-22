@@ -14,7 +14,7 @@ test("preview Worker parses as valid JavaScript", () => {
 
 test("preview overrides only the feature-branch viewer and repair module", () => {
   assert.match(worker, /"\/garage"/);
-  assert.match(worker, /file: "garage\.html"/);
+  assert.match(worker, /file: "garage\\.html"/);
   assert.match(worker, /"\/manuals\.html"/);
   assert.match(worker, /"\/repair-workspace\.js"/);
   assert.match(worker, /feat\/compact-repair-engine-integration\/public/);
@@ -41,7 +41,7 @@ test("preview Worker retries missing vehicle-local assets from the manual-level 
 
 
 test("preview page overrides fall back to the GitHub Contents API when raw source fetch fails", () => {
-  assert.match(worker, /api\.github\.com\\/repos\\/5cxxpb2yrr-ui\\/claude-manual\\/contents\\/public/);
+  assert.ok(worker.includes("api.github.com/repos/5cxxpb2yrr-ui/claude-manual/contents/public/"));
   assert.match(worker, /apiResponse\.ok/);
   assert.match(worker, /file\.encoding === "base64"/);
   assert.match(worker, /Preview source unavailable/);

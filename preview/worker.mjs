@@ -33,7 +33,23 @@ export default {
 
     const target = new URL(url.pathname + url.search, UPSTREAM);
     const upstreamRequest = new Request(target, request);
-    const response = await fetch(upstreamRequest);
+    let response = await fetch(upstreamRequest);
+
+    // Some manual bundles publish shared Phoenix assets at the manual root,
+    // rather than repeating them inside each vehicle folder. Try that
+    // canonical location only when the vehicle-local asset is missing.
+    if (response.status === 404) {
+      const assetPath = url.pathname.match(/^\\/m\\/([^/]+)\\/[^/]+\\/assets\\/(.+)$/);
+      if (assetPath) {
+        const fallback = new URL(
+          `/m/${assetPath[1]}/assets/${assetPath[2]}${url.search}`,
+          UPSTREAM
+        );
+        const fallbackResponse = await fetch(new Request(fallback, request));
+        if (fallbackResponse.status !== 404) response = fallbackResponse;
+      }
+    }
+
     const headers = new Headers(response.headers);
     headers.set("x-lifeos-preview", "claude-manual-feature-branch");
     headers.set("x-robots-tag", "noindex, nofollow");

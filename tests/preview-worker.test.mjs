@@ -38,3 +38,11 @@ test("preview Worker retries missing vehicle-local assets from the manual-level 
   assert.match(worker, /assetPath = url\.pathname\.match/);
   assert.match(worker, /\/m\/\$\{assetPath\[1\]\}\/assets\/\$\{assetPath\[2\]\}/);
 });
+
+
+test("preview page overrides fall back to the GitHub Contents API when raw source fetch fails", () => {
+  assert.match(worker, /api\.github\.com\\/repos\\/5cxxpb2yrr-ui\\/claude-manual\\/contents\\/public/);
+  assert.match(worker, /apiResponse\.ok/);
+  assert.match(worker, /file\.encoding === "base64"/);
+  assert.match(worker, /Preview source unavailable/);
+});

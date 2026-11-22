@@ -25,3 +25,9 @@ test("manual requests proxy to the existing Worker without a new storage binding
   assert.match(worker, /url\.pathname\.startsWith\("\/m\/"\)/);
   assert.doesNotMatch(worker, /R2|bucket\.put|\.put\(/i);
 });
+
+test("manual HTML rewrites root-relative Phoenix assets into the R2 manual path", () => {
+  assert.match(worker, /const manualRoot = url\.pathname\.split\("\/"\)\.slice\(0, 4\)\.join\("\/"\)/);
+  assert.match(worker, /value\?\.startsWith\("\/assets\/"\)/);
+  assert.match(worker, /manualRoot \+ value/);
+});

@@ -3973,6 +3973,7 @@
 							this.applyGarageSetupAdjustments();
 							if(requestedVehicle&&this.vehicles.some(v=>String(v.id)===String(requestedVehicle)))this.activeVehicleId=requestedVehicle;
 							if (!this.activeVehicleId || !this.activeVehicle) this.activeVehicleId = this.vehicles[0]?.id;
+							try { localStorage.setItem("lifeos.garage.activeVehicle.v1", JSON.stringify({ vehicleId: this.activeVehicleId, vehicleName: this.activeVehicle?.name || "", updatedAt: new Date().toISOString() })); } catch (error) { console.warn("Active vehicle could not be shared with Manual Explorer", error); }
 							await this.saveToStorage();
 							this.refreshRepairCartLinks();
 							await this.runDatabaseHealthCheck();
@@ -4121,6 +4122,7 @@
 					switchVehicle(id) {
 						this.activeVehicleId = id;
 						this.tempMileage = this.activeVehicle.odometer;
+						try { localStorage.setItem('lifeos.garage.activeVehicle.v1', JSON.stringify({ vehicleId: id, vehicleName: this.activeVehicle?.name || '', updatedAt: new Date().toISOString() })); } catch (error) { console.warn('Active vehicle could not be shared with Manual Explorer', error); }
 					},
 
 					getStatusBadgeClass(status) {

@@ -10,7 +10,8 @@
 			MotorNote Pro Ultimate - Commercial Fleet & Personal Garage
 		</title>	
 		<!-- Tailwind CSS v4 CDN -->
-		<script defer src="https://unpkg.com/@tailwindcss/browser@4"></script>
+		<!-- Load the Tailwind compiler asynchronously so it cannot delay Garage startup. -->
+		<script async src="https://unpkg.com/@tailwindcss/browser@4"></script>
 		<!-- Alpine.js CDN -->
 		<script
 			defer

@@ -254,15 +254,15 @@ serviceTargets:ids("target"),consumables:ids("consumable"),tools:[...new Set(fac
 
 function extractRepairSteps(text){
  const source=String(text||"");
- const heading=/\\b(\\d{1,2})\\.\\s+((?:INSTALL|REMOVE|CHECK|INSPECT|DISCONNECT|CONNECT|ADJUST|TIGHTEN|LOOSEN|DRAIN|FILL|REPLACE|CLEAN|APPLY|SET|REPAIR|MEASURE|VERIFY|BLEED|REFILL|TORQUE|LUBRICATE|POSITION|SECURE|SUPPORT|LOWER|RAISE|ALIGN|SEPARATE|ATTACH|DETACH|PREPARE|RESET|INITIALIZE)\\b[A-Z0-9 /(),.&'-]{2,90}?)(?=\\s+[a-z]\\)\\s+|\\s+\\d{1,2}\\.\\s+|\\n|$)/g;
+ const heading=/\b(\d{1,2})\.\s+((?:INSTALL|REMOVE|CHECK|INSPECT|DISCONNECT|CONNECT|ADJUST|TIGHTEN|LOOSEN|DRAIN|FILL|REPLACE|CLEAN|APPLY|SET|REPAIR|MEASURE|VERIFY|BLEED|REFILL|TORQUE|LUBRICATE|POSITION|SECURE|SUPPORT|LOWER|RAISE|ALIGN|SEPARATE|ATTACH|DETACH|PREPARE|RESET|INITIALIZE)\b[A-Z0-9 /(),.&'-]{2,90}?)(?=\s+[a-z]\)\s+|\s+\d{1,2}\.\s+|\n|$)/g;
  const matches=[...source.matchAll(heading)],seen=new Set(),steps=[];
  matches.forEach((m,i)=>{
-  const number=Number(m[1]),title=m[2].trim().replace(/\\s+/g," "),id="step-"+number+"-"+slugify(title);
+  const number=Number(m[1]),title=m[2].trim().replace(/\s+/g," "),id="step-"+number+"-"+slugify(title);
   if(seen.has(id))return;seen.add(id);
   const start=m.index+m[0].length,end=i+1<matches.length?matches[i+1].index:Math.min(source.length,start+1800);
-  const detail=source.slice(start,end).replace(/^\\s+/,"").replace(/\\s+/g," ").trim().slice(0,1400);
-  const safetyCritical=/\\b(brake|airbag|srs|fuel|fuel line|high pressure|spring|strut|suspension|steering|jack|support vehicle|lift vehicle|high voltage|hybrid battery|ev battery|coolant under pressure|hot coolant|flammable|fire|battery terminal|disconnect battery|torque.*wheel|wheel.*torque)\\b/i.test(title+" "+detail);
-  const requiresPrevious=/\\bafter (?:remov(?:e|al|ing)|install(?:ation)?|disconnect(?:ing)?|connect(?:ing)?|adjust(?:ment)?|bleed(?:ing)?|drain(?:ing)?|refill(?:ing)?)\\b|\\bonce (?:the|this|that)\\b|\\bbefore (?:install|connect|lower|start|operate|drive)\\b|\\bfollowing (?:the|this)\\b/i.test(detail);
+  const detail=source.slice(start,end).replace(/^\s+/,"").replace(/\s+/g," ").trim().slice(0,1400);
+  const safetyCritical=/\b(brake|airbag|srs|fuel|fuel line|high pressure|spring|strut|suspension|steering|jack|support vehicle|lift vehicle|high voltage|hybrid battery|ev battery|coolant under pressure|hot coolant|flammable|fire|battery terminal|disconnect battery|torque.*wheel|wheel.*torque)\b/i.test(title+" "+detail);
+  const requiresPrevious=/\bafter (?:remov(?:e|al|ing)|install(?:ation)?|disconnect(?:ing)?|connect(?:ing)?|adjust(?:ment)?|bleed(?:ing)?|drain(?:ing)?|refill(?:ing)?)\b|\bonce (?:the|this|that)\b|\bbefore (?:install|connect|lower|start|operate|drive)\b|\bfollowing (?:the|this)\b/i.test(detail);
   steps.push({id,number,title,instruction:(title+(detail?" — "+detail:"")).trim(),detail,safetyCritical,requiresPrevious});
  });
  return steps;
@@ -276,7 +276,6 @@ function repairProgress(steps,states){
  const done=steps.filter(x=>states[x.id]?.status==="done").length,skipped=steps.filter(x=>states[x.id]?.status==="skipped").length,safetySkipped=steps.filter(x=>x.safetyCritical&&states[x.id]?.status==="skipped").length;
  return {total:steps.length,done,skipped,remaining:steps.length-done-skipped,percent:steps.length?Math.round(done/steps.length*100):0,safetySkipped,canFinish:steps.length>0&&done+skipped===steps.length&&safetySkipped===0};
 }
-
 const Engine={CATALOG,TOOLS,htmlToText,extractTorque,extractProcedure,extractRepairSteps,repairStepCanOpen,repairProgress,torqueAssignmentOptions,toRelationships,slugify};
 root.LifeOSRepairEngine=Engine;if(typeof module!=="undefined"&&module.exports)module.exports=Engine;
 

@@ -180,6 +180,7 @@ test("rear wheel brake cylinder torque values inherit their own procedure-step a
     ["Wheel","Wheel nuts"]
   ]);
   assert.ok(facts.torqueSpecs.every(x => x.consistent && x.selectable));
+  assert.ok(facts.torqueSpecs.every(x => x.association.associationSource.includes("Numbered installation step")));
   assert.equal(facts.torqueSpecs[3].values.find(x => x.unit==="kgf·cm").value,1050);
 });
 

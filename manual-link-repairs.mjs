@@ -57,7 +57,7 @@ export function resolveManualRootPath(manualRoot, value) {
   if (!value.startsWith("/") || value.startsWith("//")) return value;
   const suffix = value === "/" ? "index.html" : value.slice(1);
   const firstSegment = suffix.split("/")[0];
-  const manualRootFiles = new Set(["index.html", "about.html", "404.html", "style.css", "script.js", "images", "icons", "pages"]);
+  const manualRootFiles = new Set(["index.html", "about.html", "404.html", "style.css", "script.js", "images", "icons", "assets", "pages"]);
   if (!manualRootFiles.has(firstSegment)) return value;
   return `/m/${manualRoot.slice("manuals/".length)}/${suffix}`;
 }

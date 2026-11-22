@@ -221,3 +221,13 @@ test("water-pump assembly and pulley torques associate to their own numbered ins
   assert.ok(facts.tools.includes("special-service-tool"));
   assert.ok(facts.toolReferences.some(x => x.reference.includes("09960-10010")));
 });
+
+test("Repair Workspace can create a new Garage project for the active vehicle and refresh the project selector", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /id="rw-create-project"/);
+  assert.match(source, /Create new Garage project/);
+  assert.match(source, /\/garage\?vehicleId=/);
+  assert.match(source, /newProject=1/);
+  assert.match(source, /id="rw-refresh-projects"/);
+  assert.match(source, /refreshProjects\(\)/);
+});

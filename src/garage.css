@@ -1,0 +1,4 @@
+@import "tailwindcss";
+
+/* Scan the Garage document, including utility classes embedded in Alpine expressions. */
+@source "../public/garage.html";

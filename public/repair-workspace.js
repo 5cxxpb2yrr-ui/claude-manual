@@ -106,15 +106,15 @@ const TORQUE_TO_NM={"N·m":1,"kgf·cm":0.0980665,"kgf·m":9.80665,"ft·lbf":1.35
 function stepContext(text,index){
  const before=text.slice(0,index);
  // Zero-width matching finds every numbered step even when several share one HTML paragraph.
- const numbered=/(?=(?:^|\\s)\\d{1,2}\\.\\s+[A-Z][A-Z0-9 /-]{3,})/g;
+ const numbered=/(?=(?:^|\s)\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,})/g;
  const parentMatches=[...before.matchAll(numbered)];
  const parent=parentMatches[parentMatches.length-1];
- const parentStart=parent?parent.index+(before[parent.index]&&/\\s/.test(before[parent.index])?1:0):Math.max(0,index-280);
+ const parentStart=parent?parent.index+(before[parent.index]&&/\s/.test(before[parent.index])?1:0):Math.max(0,index-280);
  const after=text.slice(index);
  const nextNumbered=numbered.exec(after);
  const hardEnd=nextNumbered?index+nextNumbered.index:Math.min(text.length,index+500);
  const section=text.slice(parentStart,hardEnd);
- const substep=/(?:^|\\s)([a-z]\\)\\s+)/gi;
+ const substep=/(?:^|\s)([a-z]\)\s+)/gi;
  const sectionSubsteps=[...section.matchAll(substep)];
  const firstSubstep=sectionSubsteps[0];
  const titleEnd=firstSubstep?firstSubstep.index+firstSubstep[0].lastIndexOf(firstSubstep[1]):0;
@@ -124,10 +124,10 @@ function stepContext(text,index){
  const activeSubstep=priorSubsteps[priorSubsteps.length-1];
  const segmentStart=activeSubstep?parentStart+activeSubstep.index+activeSubstep[0].lastIndexOf(activeSubstep[1]):parentStart;
  const remaining=text.slice(index,hardEnd);
- const nextSubstep=/(?:^|\\s)[a-z]\\)\\s+/i.exec(remaining);
+ const nextSubstep=/(?:^|\s)[a-z]\)\s+/i.exec(remaining);
  const end=nextSubstep?index+nextSubstep.index:hardEnd;
  const segment=text.slice(segmentStart,end);
- return (parentTitle&&segmentStart!==parentStart?parentTitle+" ":"")+segment.replace(/\\s+/g," ").trim();
+ return (parentTitle&&segmentStart!==parentStart?parentTitle+" ":"")+segment.replace(/\s+/g," ").trim();
 }
 function extractTorque(text){
  const source=String(text),out=[];TORQUE_RE.lastIndex=0;let m;
@@ -199,8 +199,8 @@ const PRIORITY={required:5,recommended:4,target:3,consumable:2,mention:1};
 function requiredCueForPart(line,part){
 return part.aliases.some(alias=>{
 const partPattern="(^|[^a-z0-9])"+escapeRegex(alias)+"(?=$|[^a-z0-9])";
-const before=new RegExp("\\b(always replace|must be replaced|replace(?:d|ment)?|renew|install a new|discard and replace|do not reuse)\\b[^.;,]{0,14}"+partPattern,"i");
-const after=new RegExp(partPattern+"[^.;,]{0,14}\\b(must be replaced|should be replaced|is replaced|was replaced)\\b","i");
+const before=new RegExp("\b(always replace|must be replaced|replace(?:d|ment)?|renew|install a new|discard and replace|do not reuse)\b[^.;,]{0,14}"+partPattern,"i");
+const after=new RegExp(partPattern+"[^.;,]{0,14}\b(must be replaced|should be replaced|is replaced|was replaced)\b","i");
 return before.test(line)||after.test(line);
 });
 }

@@ -46,7 +46,7 @@ test("Garage imports the full Repair Cart draft into the new vehicle project", (
   assert.match(html, /requestedRepairDraft=deepLink\.get\('repairDraft'\)/);
   assert.match(html, /title:cart\?\x60\$\{procedure\} — \$\{vehicleName\}\x60:'Repair Project'/);
   assert.match(html, /cartSnapshot:cart/);
-  assert.match(html, /procedures:procedureRecord\?\[procedureRecord\]:\[\]/);
+  assert.match(html, /procedures:\s*procedureRecord\?\s*\[\s*procedureRecord\s*\]\s*:\s*\[\s*\]/);
   assert.match(html, /partRequirements: importedParts/);
   assert.match(html, /tasks: importedTasks/);
   assert.match(html, /projectId:p\.id/);

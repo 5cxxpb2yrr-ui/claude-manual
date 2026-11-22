@@ -98,7 +98,11 @@ test("root-relative manual assets resolve within the vehicle folder", () => {
   );
   assert.equal(
     resolveManualRootPath(root, "/assets/phoenix.css"),
-    "/assets/phoenix.css",
+    "/m/scion-service-manual/2006 Scion xB L4-1.5L (1NZ-FE)/assets/phoenix.css",
+  );
+  assert.equal(
+    resolveManualRootPath(root, "/assets/phoenix.js"),
+    "/m/scion-service-manual/2006 Scion xB L4-1.5L (1NZ-FE)/assets/phoenix.js",
   );
   assert.equal(
     resolveManualRootPath(root, "https://example.com/file.css"),

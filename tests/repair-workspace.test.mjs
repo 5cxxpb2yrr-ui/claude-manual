@@ -222,6 +222,38 @@ test("water-pump assembly and pulley torques associate to their own numbered ins
   assert.ok(facts.toolReferences.some(x => x.reference.includes("09960-10010")));
 });
 
+test("guided repair mode extracts numbered factory steps and applies hybrid safety gates", () => {
+  const steps = Engine.extractRepairSteps(`1. REMOVE WHEEL
+Remove the wheel and tire assembly.
+2. INSPECT BRAKE CALIPER
+Inspect the caliper and brake hose.
+3. INSTALL BRAKE PADS
+Install the pads after cleaning the support.
+4. CHECK BRAKE OPERATION
+Verify brake operation.`);
+  assert.equal(steps.length, 4);
+  assert.equal(steps[0].number, 1);
+  assert.equal(steps[0].safetyCritical, true);
+  assert.equal(steps[2].safetyCritical, true);
+  assert.equal(steps[2].requiresPrevious, true);
+  const states = {};
+  assert.equal(Engine.repairStepCanOpen(steps, states, 0), false);
+  states[steps[0].id] = {status:"done"};
+  assert.equal(Engine.repairStepCanOpen(steps, states, 1), true);
+  assert.equal(Engine.repairStepCanOpen(steps, states, 2), false);
+  states[steps[1].id] = {status:"done"};
+  assert.equal(Engine.repairStepCanOpen(steps, states, 2), true);
+  states[steps[2].id] = {status:"skipped",skipReason:"Unavailable"};
+  assert.equal(Engine.repairProgress(steps, states).canFinish, false);
+  states[steps[2].id] = {status:"done"};
+  states[steps[3].id] = {status:"done"};
+  assert.equal(Engine.repairProgress(steps, states).canFinish, true);
+});
+
+test("guided repair mode refuses to invent steps when numbered instructions are absent", () => {
+  assert.deepEqual(Engine.extractRepairSteps("Water Pump: Specifications\\nTorque: 11 Nm"), []);
+});
+
 test("Repair Workspace can create a new Garage project for the active vehicle and refresh the project selector", () => {
   const source = readFileSync(script, "utf8");
   assert.match(source, /id="rw-create-project"/);

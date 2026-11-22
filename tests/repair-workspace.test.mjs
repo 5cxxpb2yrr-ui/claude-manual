@@ -250,6 +250,14 @@ Verify brake operation.`);
   assert.equal(Engine.repairProgress(steps, states).canFinish, true);
 });
 
+test("guided repair execution persists to the existing Garage-linked cart and cannot navigate backward through a locked step", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /execution=\{status:"in-progress"/);
+  assert.match(source, /execution=\{status:"completed"/);
+  assert.match(source, /all\[key\]=\{\.\.\.snapshot\(\),execution\}/);
+  assert.match(source, /if\(repairStepCanOpen\(steps,states,i\)\)\{current=i;persist\(\);render\(\);return;\}/);
+});
+
 test("guided repair mode refuses to invent steps when numbered instructions are absent", () => {
   assert.deepEqual(Engine.extractRepairSteps("Water Pump: Specifications\\nTorque: 11 Nm"), []);
 });

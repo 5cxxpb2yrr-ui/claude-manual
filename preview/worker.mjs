@@ -39,7 +39,7 @@ export default {
     // rather than repeating them inside each vehicle folder. Try that
     // canonical location only when the vehicle-local asset is missing.
     if (response.status === 404) {
-      const assetPath = url.pathname.match(/^\\/m\\/([^/]+)\\/[^/]+\\/assets\\/(.+)$/);
+      const assetPath = url.pathname.match(/^\/m\/([^/]+)\/[^/]+\/assets\/(.+)$/);
       if (assetPath) {
         const fallback = new URL(
           `/m/${assetPath[1]}/assets/${assetPath[2]}${url.search}`,

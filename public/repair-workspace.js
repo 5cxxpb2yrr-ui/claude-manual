@@ -105,25 +105,29 @@ function normalizeTorqueUnit(raw){
 const TORQUE_TO_NM={"N·m":1,"kgf·cm":0.0980665,"kgf·m":9.80665,"ft·lbf":1.355817948,"in·lbf":0.112984829};
 function stepContext(text,index){
  const before=text.slice(0,index);
- const numbered=/(?:^|\s)(\d{1,2}\.\s+[A-Z][A-Z0-9 /-]{3,})/g;
+ // Zero-width matching finds every numbered step even when several share one HTML paragraph.
+ const numbered=/(?=(?:^|\\s)\\d{1,2}\\.\\s+[A-Z][A-Z0-9 /-]{3,})/g;
  const parentMatches=[...before.matchAll(numbered)];
  const parent=parentMatches[parentMatches.length-1];
- const parentStart=parent?parent.index+parent[0].lastIndexOf(parent[1]):Math.max(0,index-280);
- const parentTitle=parent?parent[1]:"";
+ const parentStart=parent?parent.index+(before[parent.index]&&/\\s/.test(before[parent.index])?1:0):Math.max(0,index-280);
  const after=text.slice(index);
  const nextNumbered=numbered.exec(after);
  const hardEnd=nextNumbered?index+nextNumbered.index:Math.min(text.length,index+500);
- const parentSection=text.slice(parentStart,hardEnd);
- const beforeTorque=parentSection.slice(0,index-parentStart);
- const substep=/(?:^|\s)([a-z]\)\s+)/gi;
+ const section=text.slice(parentStart,hardEnd);
+ const substep=/(?:^|\\s)([a-z]\\)\\s+)/gi;
+ const sectionSubsteps=[...section.matchAll(substep)];
+ const firstSubstep=sectionSubsteps[0];
+ const titleEnd=firstSubstep?firstSubstep.index+firstSubstep[0].lastIndexOf(firstSubstep[1]):0;
+ const parentTitle=titleEnd?text.slice(parentStart,parentStart+titleEnd).trim():"";
+ const beforeTorque=section.slice(0,index-parentStart);
  const priorSubsteps=[...beforeTorque.matchAll(substep)];
  const activeSubstep=priorSubsteps[priorSubsteps.length-1];
  const segmentStart=activeSubstep?parentStart+activeSubstep.index+activeSubstep[0].lastIndexOf(activeSubstep[1]):parentStart;
  const remaining=text.slice(index,hardEnd);
- const nextSubstep=/(?:^|\s)[a-z]\)\s+/i.exec(remaining);
+ const nextSubstep=/(?:^|\\s)[a-z]\\)\\s+/i.exec(remaining);
  const end=nextSubstep?index+nextSubstep.index:hardEnd;
  const segment=text.slice(segmentStart,end);
- return (parentTitle&&segmentStart!==parentStart?parentTitle+" ":"")+segment.replace(/\s+/g," ").trim();
+ return (parentTitle&&segmentStart!==parentStart?parentTitle+" ":"")+segment.replace(/\\s+/g," ").trim();
 }
 function extractTorque(text){
  const source=String(text),out=[];TORQUE_RE.lastIndex=0;let m;

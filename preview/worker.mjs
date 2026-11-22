@@ -55,8 +55,8 @@ export default {
           element(element) {
             for (const attribute of ["src", "href"]) {
               const value = element.getAttribute(attribute);
-              if (value?.startsWith("/assets/")) {
-                element.setAttribute(attribute, manualRoot + value);
+              if (value && /^(?:\/|\.\/)?assets\//.test(value)) {
+                element.setAttribute(attribute, manualRoot + "/" + value.replace(/^(?:\/|\.\/)?/, ""));
               }
             }
           }

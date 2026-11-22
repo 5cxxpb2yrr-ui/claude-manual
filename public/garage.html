@@ -22,8 +22,17 @@
 			rel="stylesheet"
 		/>
 		<style>
+			/* Critical theme fallback: keep Garage dark even if the Tailwind CDN is delayed or unavailable. */
+			html,
 			body {
+				background-color: #09090b;
+				color: #f4f4f5;
+				min-height: 100%;
+			}
+			body {
+				margin: 0;
 				font-family: 'Inter', sans-serif;
+			}
 			}
 			.font-mono {
 				font-family: 'JetBrains Mono', monospace;

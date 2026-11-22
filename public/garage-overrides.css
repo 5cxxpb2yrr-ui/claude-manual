@@ -1,0 +1,90 @@
+
+			/* Critical theme fallback: keep Garage dark even if the Tailwind CDN is delayed or unavailable. */
+			html,
+			body {
+				background-color: #09090b;
+				color: #f4f4f5;
+				min-height: 100%;
+			}
+			body {
+				margin: 0;
+				font-family: 'Inter', sans-serif;
+			}
+			}
+			.font-mono {
+				font-family: 'JetBrains Mono', monospace;
+			}
+			.no-scrollbar::-webkit-scrollbar {
+				display: none;
+			}
+			.no-scrollbar {
+				-ms-overflow-style: none;
+				scrollbar-width: none;
+			}
+			/* Form fields must render at >=16px or iOS Safari auto-zooms the
+			   page on focus. Overrides any smaller text-size utility classes
+			   applied directly to inputs/selects/textareas. */
+			input,
+			select,
+			textarea {
+				font-size: 16px !important;
+			}
+			/* Glassmorphic Aesthetic Styling */
+			.glass-panel {
+				background: rgba(18, 18, 24, 0.78);
+				border: 1px solid rgba(245, 158, 11, 0.2);
+				border-radius: 16px;
+				backdrop-filter: blur(16px);
+				-webkit-backdrop-filter: blur(16px);
+				box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.06);
+				color: #f4f4f5;
+				transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+			}
+			.glass-panel:hover {
+				border-color: rgba(245, 158, 11, 0.4);
+			}
+			.glass-card-subtle {
+				background: rgba(24, 24, 32, 0.6);
+				border: 1px solid rgba(255, 255, 255, 0.08);
+				backdrop-filter: blur(12px);
+			}
+			.btn-primary {
+				background: linear-gradient(135deg, #f59e0b, #ea580c);
+				color: #09090b;
+				font-weight: 800;
+				border-radius: 12px;
+				transition: all 0.2s ease;
+				box-shadow: 0 4px 14px 0 rgba(245, 158, 11, 0.35);
+			}
+			.btn-primary:hover {
+				opacity: 0.95;
+				transform: translateY(-1px);
+				box-shadow: 0 6px 20px 0 rgba(245, 158, 11, 0.5);
+			}
+			.kb-badge {
+				display: inline-block;
+				background: linear-gradient(135deg, #f59e0b, #d97706);
+				color: #09090b;
+				font-weight: 800;
+				font-size: 0.7rem;
+				letter-spacing: 0.05em;
+				padding: 0.2rem 0.6rem;
+				border-radius: 6px;
+			}
+			/* Printing Rules for Service Expense Reports */
+			@media print {
+				body {
+					background: #ffffff !important;
+					color: #000000 !important;
+				}
+				header, nav, button, .no-print {
+					display: none !important;
+				}
+				.glass-panel {
+					border: 1px solid #cccccc !important;
+					background: #ffffff !important;
+					color: #000000 !important;
+					box-shadow: none !important;
+				}
+			}
+		

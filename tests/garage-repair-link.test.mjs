@@ -40,3 +40,15 @@ test("Kanban cards and project modals identify their associated vehicle", () => 
   assert.match(html, /activeVehicle\?\.name \|\| 'Select a vehicle first'/);
   assert.match(html, /vehicleNameForProject\(project\)/);
 });
+
+test("Garage imports the full Repair Cart draft into the new vehicle project", () => {
+  assert.match(html, /lifeos\.repair\.project-draft\.v1/);
+  assert.match(html, /requestedRepairDraft=deepLink\.get\('repairDraft'\)/);
+  assert.match(html, /title:cart\?\x60\$\{procedure\} — \$\{vehicleName\}\x60:'Repair Project'/);
+  assert.match(html, /cartSnapshot:cart/);
+  assert.match(html, /procedures:procedureRecord\?\[procedureRecord\]:\[\]/);
+  assert.match(html, /partRequirements: importedParts/);
+  assert.match(html, /tasks: importedTasks/);
+  assert.match(html, /projectId:p\.id/);
+  assert.match(html, /localStorage\.removeItem\('lifeos\.repair\.project-draft\.v1'\)/);
+});

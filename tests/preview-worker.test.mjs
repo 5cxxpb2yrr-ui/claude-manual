@@ -14,6 +14,8 @@ test("preview Worker parses as valid JavaScript", () => {
 
 test("preview overrides only the feature-branch viewer and repair module", () => {
   assert.ok(worker.includes('"/garage"'));
+  assert.ok(worker.includes('"/garage-overrides.css"'));
+  assert.ok(worker.includes('"/manuals.css"'));
   assert.ok(worker.includes('file: "garage.html"'));
   assert.ok(worker.includes('"/manuals"'));
   assert.ok(worker.includes('"/manuals.html"'));

@@ -44,11 +44,24 @@ export default {
       const html = (await response.text()).replaceAll(UPSTREAM, url.origin);
       headers.delete("content-length");
       headers.set("cache-control", "no-store");
-      return new Response(html, {
+      const manualRoot = url.pathname.split("/").slice(0, 4).join("/");
+      const htmlResponse = new Response(html, {
         status: response.status,
         statusText: response.statusText,
         headers
       });
+      return new HTMLRewriter()
+        .on("script[src], link[href], img[src], source[src]", {
+          element(element) {
+            for (const attribute of ["src", "href"]) {
+              const value = element.getAttribute(attribute);
+              if (value?.startsWith("/assets/")) {
+                element.setAttribute(attribute, manualRoot + value);
+              }
+            }
+          }
+        })
+        .transform(htmlResponse);
     }
 
     return new Response(response.body, {

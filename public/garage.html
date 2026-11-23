@@ -2798,11 +2798,25 @@
 						<template x-for="(milestone,index) in (selectedProject.milestones||[])" :key="milestone.id || index"><div class="flex justify-between text-zinc-300 border-b border-zinc-800 py-1"><span x-text="milestone.title"></span><button @click="removeProjectMilestone(selectedProject,index)" class="text-rose-400">Remove</button></div></template>
 					</div>
 					<div class="border-t border-zinc-800 pt-3 space-y-2">
-						<h4 class="text-sm font-bold text-white">Factory manual procedures</h4>
-						<p class="text-zinc-500">Attach only procedures already curated in this vehicle's Maintenance Knowledge Base. The source reference is preserved; no generic repair steps are invented.</p>
-						<template x-if="!knowledgeBaseForProject(selectedProject).length"><p class="text-amber-300">No curated procedures are available for this vehicle yet. Add a verified manual procedure to the Knowledge Base first.</p></template>
-						<template x-for="procedure in knowledgeBaseForProject(selectedProject)" :key="procedure.id"><div class="flex items-center gap-2 bg-zinc-950 rounded-lg p-2"><div class="min-w-0 flex-1"><p class="text-white font-semibold" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p></div><button x-show="!projectHasProcedure(selectedProject,procedure.id)" @click="attachProjectProcedure(selectedProject,procedure.id)" class="px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300">Attach</button><span x-show="projectHasProcedure(selectedProject,procedure.id)" class="text-emerald-400">Attached</span></div></template>
-						<template x-for="procedure in (selectedProject.procedures||[])" :key="procedure.id"><div class="flex items-center justify-between gap-2 border border-emerald-500/20 rounded-lg p-2"><div class="min-w-0 flex-1"><p class="text-emerald-300" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p><div x-show="procedureHasQuickSpecs(procedure)" class="mt-2 rounded-lg bg-zinc-950/80 border border-zinc-800 p-2"><p class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Quick specs</p><ul class="space-y-1 text-[11px] text-zinc-200"><template x-for="(spec,index) in procedureQuickSpecs(procedure)" :key="procedure.id+'-project-spec-'+index"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li></template></ul></div><a :href="projectProcedureUrl(procedure)" target="_blank" rel="noopener" class="inline-block mt-2 text-amber-400 underline">Open manual source ↗</a></div><button @click="detachProjectProcedure(selectedProject,procedure.id)" class="text-rose-400">Detach</button></div></template>
+						<template x-if="(selectedProject.procedures||[]).length">
+							<div class="space-y-2">
+								<h4 class="text-sm font-bold text-white">Attached repair procedures</h4>
+								<template x-for="procedure in (selectedProject.procedures||[])" :key="procedure.id"><div class="flex items-center justify-between gap-2 border border-emerald-500/20 rounded-lg p-3 bg-emerald-500/[0.04]"><div class="min-w-0 flex-1"><p class="text-emerald-300 font-semibold" x-text="procedure.title"></p><p class="text-zinc-500 text-xs" x-text="procedure.sourceLabel"></p><div x-show="procedureHasQuickSpecs(procedure)" class="mt-2 rounded-lg bg-zinc-950/80 border border-zinc-800 p-2"><p class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Quick specs</p><ul class="space-y-1 text-[11px] text-zinc-200"><template x-for="(spec,index) in procedureQuickSpecs(procedure)" :key="procedure.id+'-project-spec-'+index"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li></template></ul></div><a :href="projectProcedureUrl(procedure)" target="_blank" rel="noopener" class="inline-block mt-2 text-amber-400 underline">Open manual source ↗</a></div><button @click="detachProjectProcedure(selectedProject,procedure.id)" class="shrink-0 text-rose-400 px-2 py-2">Detach</button></div></template>
+							</div>
+						</template>
+						<div class="border-t border-zinc-800 pt-3 space-y-2">
+							<details class="rounded-xl border border-zinc-800 bg-zinc-950/70 overflow-hidden">
+								<summary class="flex items-center justify-between gap-3 p-3 cursor-pointer list-none">
+									<span class="min-w-0"><strong class="block text-sm text-white">Factory manual procedures</strong><span class="block text-xs text-zinc-500 mt-1">Choose from this vehicle's curated Maintenance Knowledge Base</span></span>
+									<span class="shrink-0 text-xs text-amber-300" x-text="knowledgeBaseForProject(selectedProject).length + ' available'"></span>
+								</summary>
+								<div class="px-3 pb-3 space-y-2 border-t border-zinc-800">
+									<p class="text-xs text-zinc-500 pt-2">Attach only verified procedures already curated for this vehicle. Source references are preserved; no generic repair steps are invented.</p>
+									<template x-if="!knowledgeBaseForProject(selectedProject).length"><p class="text-amber-300 text-sm">No curated procedures are available for this vehicle yet.</p></template>
+									<template x-for="procedure in knowledgeBaseForProject(selectedProject)" :key="procedure.id"><label class="flex items-start gap-3 rounded-lg bg-black/40 border border-zinc-800 p-3 cursor-pointer"><input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-amber-400" :checked="projectHasProcedure(selectedProject,procedure.id)" @change="$event.target.checked ? attachProjectProcedure(selectedProject,procedure.id) : detachProjectProcedure(selectedProject,procedure.id)"><span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-zinc-100" x-text="procedure.title"></span><span class="block text-xs text-zinc-500 mt-1" x-text="procedure.sourceLabel"></span></span><span class="text-[10px] text-zinc-500" x-text="projectHasProcedure(selectedProject,procedure.id) ? 'Attached' : 'Add'"></span></label></template>
+								</div>
+							</details>
+						</div>
 					</div>
 					<div class="border-t border-zinc-800 pt-3 space-y-3">
 						<h4 class="text-sm font-bold text-white">Parts & procurement</h4>

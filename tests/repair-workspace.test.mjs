@@ -31,6 +31,12 @@ test("project Objective/Notes opens in a full-screen editable modal", () => {
   assert.match(html, /Save Objective \/ Notes/);
 });
 
+test("Repair Mode interpolates the Quick Specs content instead of rendering a literal placeholder", () => {
+  const source = readFileSync(script, "utf8");
+  assert.ok(source.includes("QUICK SPECS</h2>'+modeQuickSpecs+'</section>"));
+  assert.doesNotMatch(source, /\$\{modeQuickSpecs\}/);
+});
+
 test("full-screen Repair Mode places Quick Specs above the guided procedure steps", () => {
   const source = readFileSync(script, "utf8");
   const quick = source.indexOf('class="rm-quick-specs"');

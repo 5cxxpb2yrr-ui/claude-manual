@@ -22,6 +22,20 @@ test("manual viewer exposes the repair workspace from procedure pages", () => {
   assert.match(html, /src="\/repair-workspace\.js" defer/);
 });
 
+test("repair-project deep link is one-shot and does not reopen the create modal after refresh", () => {
+  const source = readFileSync(new URL("../public/garage.html", import.meta.url), "utf8");
+  assert.match(source, /searchParams\.delete\('newProject'\)/);
+  assert.match(source, /searchParams\.delete\('repairDraft'\)/);
+  assert.match(source, /history\.replaceState\(history\.state/);
+});
+
+test("manual procedure context is stored in the procedure record, not duplicated into Objective/Notes", () => {
+  const source = readFileSync(new URL("../public/garage.html", import.meta.url), "utf8");
+  assert.match(source, /description:''\};const cleanUrl/);
+  assert.doesNotMatch(source, /description:cart\?notes/);
+  assert.match(source, /const procedureRecord=cart\?/);
+});
+
 test("project Objective/Notes opens in a full-screen editable modal", () => {
   const html = readFileSync(new URL("../public/garage.html", import.meta.url), "utf8");
   assert.match(html, /projectNotes: false/);

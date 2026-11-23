@@ -207,12 +207,12 @@ return before.test(line)||after.test(line);
 const RELATED_PROCEDURE_LABELS=new Set(["testing and inspection","removal and installation","disassembly and reassembly","specifications"]);
 function findRelatedProcedureLinks(html,baseUrl){
  const links=[],seen=new Set();
- const anchors=[...String(html||"").matchAll(/<a\\b[^>]*>[\\s\\S]*?<\\/a>/gi)];
+ const anchors=[...String(html||"").matchAll(/<a\b[^>]*>[\s\S]*?<\/a>/gi)];
  anchors.forEach(match=>{
-  const tag=match[0],hrefMatch=/\\bhref\\s*=\\s*["']([^"']+)["']/i.exec(tag);
+  const tag=match[0],hrefMatch=/\bhref\s*=\s*["']([^"']+)["']/i.exec(tag);
   const label=strip(tag.replace(/<[^>]+>/g," ")).toLowerCase();
   if(!hrefMatch||!RELATED_PROCEDURE_LABELS.has(label))return;
-  try{const url=new URL(hrefMatch[1],baseUrl);if(url.origin!==new URL(baseUrl).origin||!url.pathname.includes("/pages/")||seen.has(url.href))return;seen.add(url.href);links.push({label:strip(tag.replace(/<[^>]+>/g," ")),url:url.href,page:(/\\/pages\\/(\\d+)(?:\\.html)?$/i.exec(url.pathname)||[])[1]||""});}catch(_){}
+  try{const url=new URL(hrefMatch[1],baseUrl);if(url.origin!==new URL(baseUrl).origin||!url.pathname.includes("/pages/")||seen.has(url.href))return;seen.add(url.href);links.push({label:strip(tag.replace(/<[^>]+>/g," ")),url:url.href,page:(/\/pages\/(\d+)(?:\.html)?$/i.exec(url.pathname)||[])[1]||""});}catch(_){}
  });
  return links;
 }

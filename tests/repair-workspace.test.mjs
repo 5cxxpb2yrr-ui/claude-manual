@@ -22,6 +22,20 @@ test("manual viewer exposes the repair workspace from procedure pages", () => {
   assert.match(html, /src="\/repair-workspace\.js" defer/);
 });
 
+test("Quick Specs render immediately below the procedure title and before repair details", () => {
+  const source = readFileSync(script, "utf8");
+  const quick = source.indexOf("aria-label=\"Quick Specs\"");
+  const parts = source.indexOf("Parts and service targets", quick);
+  const tools = source.indexOf("Tools</h3>", parts);
+  const torque = source.indexOf("Torque specifications · cart assignment", tools);
+  assert.ok(quick > source.indexOf('shell.querySelector("#rw-sub").textContent'));
+  assert.ok(parts > quick);
+  assert.ok(tools > parts);
+  assert.ok(torque > tools);
+  assert.match(source, /const quickTorque=/);
+  assert.match(source, /const quickTools=/);
+});
+
 test("repair workspace reads the manual through the same-origin route instead of iframe DOM access", () => {
   const source = readFileSync(script, "utf8");
   assert.match(source, /fetch\(pageUrl\.href,\{credentials:"same-origin",cache:"no-store"\}\)/);

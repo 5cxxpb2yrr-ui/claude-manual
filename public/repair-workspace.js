@@ -307,13 +307,13 @@ document.body.append(shell);shell.addEventListener("click",e=>{if(e.target===she
 async function openWorkspace(){
 const frame=document.getElementById("fr");
 if(!frame){alert("Open a manual procedure page first.");return;}
-let doc;
+let doc,pageUrl,pageHtml;
 try{
-const pageUrl=new URL(frame.getAttribute("src")||frame.src,location.href);
+pageUrl=new URL(frame.getAttribute("src")||frame.src,location.href);
 if(pageUrl.origin!==location.origin)throw new Error("The manual page is outside the preview origin.");
 const response=await fetch(pageUrl.href,{credentials:"same-origin",cache:"no-store"});
 if(!response.ok)throw new Error("Manual page request failed ("+response.status+").");
-const pageHtml=await response.text();
+pageHtml=await response.text();
 doc=new DOMParser().parseFromString(pageHtml,"text/html");
 if(!doc.body)throw new Error("The manual page returned no readable content.");
 }catch(error){alert("Could not open Repair Workspace: "+error.message);return;}

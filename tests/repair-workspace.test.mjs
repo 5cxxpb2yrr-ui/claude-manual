@@ -32,11 +32,12 @@ test("repair-project deep link is one-shot and does not reopen the create modal 
 test("attached repair procedures render above a collapsed curated procedure selector", () => {
   const source = readFileSync(new URL("../public/garage.html", import.meta.url), "utf8");
   const attached = source.indexOf("Attached repair procedures");
-  const curated = source.indexOf("Factory manual procedures", attached);
-  const selector = source.indexOf("<details", curated);
-  assert.ok(attached >= 0 && curated > attached && selector > curated);
-  assert.match(source.slice(selector, source.indexOf("</details>", selector)), /type="checkbox"/);
-  assert.match(source.slice(selector, source.indexOf("</details>", selector)), /projectHasProcedure\(selectedProject,procedure\.id\)/);
+  const selector = source.indexOf("<details", attached);
+  const curated = source.indexOf("Factory manual procedures", selector);
+  const close = source.indexOf("</details>", selector);
+  assert.ok(attached >= 0 && selector > attached && curated > selector && close > curated);
+  assert.match(source.slice(selector, close), /type="checkbox"/);
+  assert.match(source.slice(selector, close), /projectHasProcedure\(selectedProject,procedure\.id\)/);
 });
 
 test("manual procedure context is stored in the procedure record, not duplicated into Objective/Notes", () => {

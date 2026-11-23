@@ -9,6 +9,26 @@ const Engine = require("../public/repair-workspace.js");
 const script = new URL("../public/repair-workspace.js", import.meta.url);
 const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "utf8");
 
+test("Alternator contents page resolves its related factory procedure pages as one bundle", () => {
+  const html = '<a href="../pages/5661.html">Testing and Inspection</a><a href="../pages/5662.html">Removal and Installation</a><a href="../pages/5663.html">Disassembly and Reassembly</a><a href="../pages/5690.html">Specifications</a><a href="../pages/5664.html">Key to Diagrams</a>';
+  const links = Engine.findRelatedProcedureLinks(html, "https://preview.example/m/scion/pages/2601");
+  assert.deepEqual(links.map(x => [x.label, x.page]), [
+    ["Testing and Inspection", "5661"],
+    ["Removal and Installation", "5662"],
+    ["Disassembly and Reassembly", "5663"],
+    ["Specifications", "5690"]
+  ]);
+});
+
+test("Repair Workspace fetches and displays linked factory pages and preserves their source references", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /const relatedLinks=findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
+  assert.match(source, /Promise\.all\(relatedLinks\.map/);
+  assert.match(source, /const combinedHtml=pageHtml/);
+  assert.match(source, /Related factory manual pages/);
+  assert.match(source, /relatedSources:relatedPages\.map/);
+});
+
 test("repair workspace module parses as valid JavaScript", () => {
   const result = spawnSync(process.execPath, ["--check", script.pathname], { encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.stdout);

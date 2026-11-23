@@ -310,6 +310,16 @@ test("guided repair mode refuses to invent steps when numbered instructions are 
   assert.deepEqual(Engine.extractRepairSteps("Water Pump: Specifications\\nTorque: 11 Nm"), []);
 });
 
+test("creating a Garage project navigates in the same tab", () => {
+  const source = readFileSync(script, "utf8");
+  const start = source.indexOf('content.querySelector("#rw-create-project").onclick');
+  const end = source.indexOf('content.querySelector("#rw-refresh-projects").onclick', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = source.slice(start, end);
+  assert.match(handler, /window\.location\.assign\(target\)/);
+  assert.doesNotMatch(handler, /window\.open\(/);
+});
+
 test("Repair Workspace can create a new Garage project for the active vehicle and refresh the project selector", () => {
   const source = readFileSync(script, "utf8");
   assert.match(source, /id="rw-create-project"/);

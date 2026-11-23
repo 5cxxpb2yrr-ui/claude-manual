@@ -374,3 +374,15 @@ test("Repair Workspace can create a new Garage project for the active vehicle an
   assert.match(source, /id="rw-refresh-projects"/);
   assert.match(source, /refreshProjects\(\)/);
 });
+
+
+test("Repair Workspace keeps the active manual URL in scope while loading related factory pages", () => {
+  const source = readFileSync(script, "utf8");
+  const start = source.indexOf("async function openWorkspace()");
+  const end = source.indexOf('document.addEventListener("click"', start);
+  assert.ok(start >= 0 && end > start);
+  const handler = source.slice(start, end);
+  assert.match(handler, /let doc,pageUrl,pageHtml;\\s*try\\{\\s*pageUrl=new URL/);
+  assert.match(handler, /pageHtml=await response\\.text\\(\\)/);
+  assert.match(handler, /findRelatedProcedureLinks\\(pageHtml,pageUrl\\.href\\)/);
+});

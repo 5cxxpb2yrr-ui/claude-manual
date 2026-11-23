@@ -22,6 +22,17 @@ test("manual viewer exposes the repair workspace from procedure pages", () => {
   assert.match(html, /src="\/repair-workspace\.js" defer/);
 });
 
+test("full-screen Repair Mode places Quick Specs above the guided procedure steps", () => {
+  const source = readFileSync(script, "utf8");
+  const quick = source.indexOf('class="rm-quick-specs"');
+  const layout = source.indexOf('<main class="rm-layout">', quick);
+  assert.ok(quick >= 0);
+  assert.ok(layout > quick);
+  assert.match(source, /const modeTorque=/);
+  assert.match(source, /const modeTools=/);
+  assert.match(source, /aria-label="Quick Specs"/);
+});
+
 test("Quick Specs render immediately below the procedure title and before repair details", () => {
   const source = readFileSync(script, "utf8");
   const quick = source.indexOf("aria-label=\"Quick Specs\"");

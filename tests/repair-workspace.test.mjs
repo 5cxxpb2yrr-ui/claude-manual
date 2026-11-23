@@ -22,6 +22,15 @@ test("manual viewer exposes the repair workspace from procedure pages", () => {
   assert.match(html, /src="\/repair-workspace\.js" defer/);
 });
 
+test("project Objective/Notes opens in a full-screen editable modal", () => {
+  const html = readFileSync(new URL("../public/garage.html", import.meta.url), "utf8");
+  assert.match(html, /projectNotes: false/);
+  assert.match(html, /modals\.projectNotes = true/);
+  assert.match(html, /FULL-SCREEN PROJECT OBJECTIVE \/ NOTES EDITOR/);
+  assert.match(html, /x-model="selectedProject\.description"/);
+  assert.match(html, /Save Objective \/ Notes/);
+});
+
 test("full-screen Repair Mode places Quick Specs above the guided procedure steps", () => {
   const source = readFileSync(script, "utf8");
   const quick = source.indexOf('class="rm-quick-specs"');
@@ -45,6 +54,14 @@ test("Quick Specs render immediately below the procedure title and before repair
   assert.ok(torque > tools);
   assert.match(source, /const quickTorque=/);
   assert.match(source, /const quickTools=/);
+});
+
+test("Repair Workspace and Repair Mode put the procedure title before Quick Specs", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /content\.innerHTML='<h1 class="rw-procedure-title">/);
+  const title = source.indexOf('class="rm-procedure-heading"');
+  const quick = source.indexOf('class="rm-quick-specs"', title);
+  assert.ok(title >= 0 && quick > title);
 });
 
 test("repair workspace reads the manual through the same-origin route instead of iframe DOM access", () => {

@@ -20,3 +20,15 @@ test("Scion search results resolve into the published Standard manual folder", (
     "/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/6661.html",
   );
 });
+
+
+test("Scion Engine > Water Pump keeps the original manual href target", () => {
+  const repair = JSON.parse(
+    readFileSync(new URL("../public/data/scion-repair.json", import.meta.url), "utf8"),
+  );
+  const engine = repair.c.find((item) => item.n === "Engine, Cooling and Exhaust")
+    ?.c?.find((item) => item.n === "Engine");
+  const waterPump = engine?.c?.find((item) => item.n === "Water Pump");
+  assert.ok(waterPump, "Engine > Water Pump navigation entry must exist");
+  assert.equal(waterPump.p, 2777);
+});

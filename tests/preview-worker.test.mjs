@@ -19,6 +19,8 @@ test("preview overrides only the feature-branch viewer and repair module", () =>
   assert.ok(worker.includes('file: "garage.html"'));
   assert.ok(worker.includes('"/manuals"'));
   assert.ok(worker.includes('"/manuals.html"'));
+  assert.ok(worker.includes('"/data/manifest.json"'));
+  assert.ok(worker.includes('file: "data/manifest.json"'));
   assert.ok(worker.includes('"/repair-workspace.js"'));
   assert.ok(worker.includes("feat/compact-repair-engine-integration/public"));
 });

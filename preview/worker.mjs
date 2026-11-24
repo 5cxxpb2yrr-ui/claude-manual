@@ -8,6 +8,7 @@ const OVERRIDES = {
   "/manuals.css": { file: "manuals.css", type: "text/css; charset=utf-8" },
   "/manuals": { file: "manuals.html", type: "text/html; charset=utf-8" },
   "/manuals.html": { file: "manuals.html", type: "text/html; charset=utf-8" },
+  "/data/manifest.json": { file: "data/manifest.json", type: "application/json; charset=utf-8" },
   "/repair-workspace.js": { file: "repair-workspace.js", type: "text/javascript; charset=utf-8" }
 };
 

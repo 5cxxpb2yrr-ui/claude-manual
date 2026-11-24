@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import {
   SCION_PAGE_REPLACEMENTS,
   SCION_UNAVAILABLE_PAGE_IDS,
@@ -108,4 +109,13 @@ test("root-relative manual assets resolve within the vehicle folder", () => {
     resolveManualRootPath(root, "https://example.com/file.css"),
     "https://example.com/file.css",
   );
+});
+
+
+test("Scion manifest targets the published Standard corpus folder", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../public/data/manifest.json", import.meta.url), "utf8"));
+  const scion = manifest.vehicles.find((vehicle) => vehicle.make === "Scion" && vehicle.year === "2006");
+  assert.ok(scion, "2006 Scion xB must be present in the manual manifest");
+  assert.equal(scion.folder, "2006 Scion xB Standard");
+  assert.equal(resolveScionPageKey(`manuals/${scion.manual}/${scion.folder}/pages/13871.html`), null);
 });

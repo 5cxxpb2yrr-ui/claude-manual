@@ -32,3 +32,15 @@ test("Scion Engine > Water Pump keeps the original manual href target", () => {
   assert.ok(waterPump, "Engine > Water Pump navigation entry must exist");
   assert.equal(waterPump.p, 2777);
 });
+
+
+test("Scion Cooling System > Water Pump resolves to the source manual procedure", () => {
+  const repair = JSON.parse(
+    readFileSync(new URL("../public/data/scion-repair.json", import.meta.url), "utf8"),
+  );
+  const cooling = repair.c.find((item) => item.n === "Engine, Cooling and Exhaust")
+    ?.c?.find((item) => item.n === "Cooling System");
+  const waterPump = cooling?.c?.find((item) => item.n === "Water Pump");
+  assert.ok(waterPump, "Cooling System > Water Pump navigation entry must exist");
+  assert.equal(waterPump.p, 2777);
+});

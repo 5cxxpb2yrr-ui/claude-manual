@@ -24,7 +24,9 @@ jobs:
       - name: Install pinned Tailwind build tools
         run: npm install --no-save --no-package-lock tailwindcss@4.1.17 @tailwindcss/cli@4.1.17
       - name: Compile Garage Tailwind CSS
-        run: npx @tailwindcss/cli --input ./src/garage.css --output ./public/garage.css --minify
+        run: |
+          npx @tailwindcss/cli --input ./src/garage.css --output ./public/garage.css --minify
+          printf '\n' >> ./public/garage.css
       - name: Verify generated stylesheet is committed
         run: git diff --exit-code -- public/garage.css
       - run: npm test

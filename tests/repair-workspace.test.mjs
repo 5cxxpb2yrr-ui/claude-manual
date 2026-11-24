@@ -382,7 +382,7 @@ test("Repair Workspace keeps the active manual URL in scope while loading relate
   const end = source.indexOf('document.addEventListener("click"', start);
   assert.ok(start >= 0 && end > start);
   const handler = source.slice(start, end);
-  assert.match(handler, /let doc,pageUrl,pageHtml;\\s*try\\{\\s*pageUrl=new URL/);
-  assert.match(handler, /pageHtml=await response\\.text\\(\\)/);
-  assert.match(handler, /findRelatedProcedureLinks\\(pageHtml,pageUrl\\.href\\)/);
+  assert.match(handler, /let doc,pageUrl,pageHtml;\s*try\{\s*pageUrl=new URL/);
+  assert.match(handler, /pageHtml=await response\.text\(\)/);
+  assert.match(handler, /findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
 });

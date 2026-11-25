@@ -68,7 +68,7 @@ test("navigation API does not expose arbitrary R2 keys", async () => {
   };
 
   const response = await worker.fetch(
-    new Request("https://manual.example/api/navigation/../../secrets.json"),
+    new Request("https://manual.example/api/navigation/secrets.json"),
     env,
   );
 

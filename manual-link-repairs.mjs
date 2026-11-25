@@ -17,6 +17,7 @@ export const SCION_PAGE_REPLACEMENTS = Object.freeze({
   4248: 1623,    // Drive Belt -> Repair and Diagnosis > Maintenance
   4274: 1636,    // Power Steering Fluid -> Repair and Diagnosis > Maintenance > Fluids
   4276: 1630,    // Brake Fluid -> Repair and Diagnosis > Maintenance > Fluids
+  4280: 6546,    // Exhaust Manifold reference -> indexed Exhaust Manifold: Specifications page
   5972: 1613,    // Idle Speed -> Repair and Diagnosis > Maintenance
   6379: 1614,    // Fuel Pressure Release -> Fuel Filter maintenance procedure
   6735: 1631,    // Clutch Fluid -> Repair and Diagnosis > Maintenance > Fluids
@@ -56,7 +57,7 @@ export function resolveManualRootPath(manualRoot, value) {
   if (!value.startsWith("/") || value.startsWith("//")) return value;
   const suffix = value === "/" ? "index.html" : value.slice(1);
   const firstSegment = suffix.split("/")[0];
-  const manualRootFiles = new Set(["index.html", "about.html", "404.html", "style.css", "script.js", "images", "icons", "pages"]);
+  const manualRootFiles = new Set(["index.html", "about.html", "404.html", "style.css", "script.js", "images", "icons", "assets", "pages"]);
   if (!manualRootFiles.has(firstSegment)) return value;
   return `/m/${manualRoot.slice("manuals/".length)}/${suffix}`;
 }

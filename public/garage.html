@@ -1178,6 +1178,7 @@
 										class="text-xs font-bold text-white"
 										x-text="proj.title"
 									></h4>
+									<div class="flex items-center gap-1.5 text-[10px] text-amber-300" x-text="vehicleNameForProject(proj)"></div>
 									<div class="text-[11px] font-mono flex justify-between text-zinc-400">
 										<span
 											>Budget: $<span
@@ -1249,6 +1250,7 @@
 												class="text-xs font-bold text-white"
 												x-text="proj.title"
 											></h4>
+											<div class="flex items-center gap-1.5 text-[10px] text-amber-300" x-text="vehicleNameForProject(proj)"></div>
 											<div
 												class="text-[11px] font-mono flex justify-between text-zinc-400"
 											>
@@ -2580,6 +2582,7 @@
 					<h3 class="text-base font-bold text-white">
 						Create Relational Project Notebook
 					</h3>
+					<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"><span class="text-zinc-400">Vehicle</span><div class="font-bold text-amber-300" x-text="activeVehicle?.name || 'Select a vehicle first'"></div></div>
 					<div class="space-y-3 text-xs">
 						<div>
 							<label class="block text-zinc-400 mb-1"
@@ -2831,6 +2834,7 @@
 						</button>
 					</div>
 					<div class="space-y-1 text-zinc-300">
+						<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 mb-2"><div class="text-[10px] uppercase tracking-wider text-zinc-400">Vehicle</div><div class="text-sm font-bold text-amber-300" x-text="vehicleNameForProject(selectedProject)"></div></div>
 						<div>
 							<strong>Status:</strong>
 							<span x-text="selectedProject.status"></span>
@@ -2842,6 +2846,7 @@
 						</div>
 						<div x-show="selectedProject.maintenancePlanId" class="text-amber-400"><strong>Maintenance:</strong> Linked</div>
 						<button x-show="!selectedProject.maintenancePlanId" @click="linkProjectToMaintenance(selectedProject)" class="w-full py-2 bg-amber-500/10 text-amber-400 font-bold rounded-xl border border-amber-500/30">🔧 Link to Maintenance Workflow</button>
+						<div class="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2"><div class="flex items-center justify-between gap-2"><strong class="text-zinc-300">Manual & repair cart</strong><a :href="manualProjectLink(selectedProject)" class="text-amber-400 font-bold">Open in Manual Explorer ↗</a></div><template x-for="cart in repairCartsForProject(selectedProject)" :key="cart.cartKey"><a :href="repairCartManualLink(cart)" class="block rounded-lg border border-zinc-800 p-2 hover:border-amber-500/50"><span class="block text-white font-semibold" x-text="cart.procedure || 'Saved procedure'"></span><span class="block text-[10px] text-zinc-400" x-text="(cart.items || []).length + ' parts · ' + (cart.tools || []).length + ' tools · ' + (cart.torqueSpecs || []).length + ' torque groups'"></span></a></template><div x-show="!repairCartsForProject(selectedProject).length" class="text-[11px] text-zinc-500">No manual procedure carts linked yet. Open a procedure in Manual Explorer, choose this project, and save the cart.</div></div>
 						<div x-show="selectedProject.partRequirements && selectedProject.partRequirements.length" class="pt-2">
 							<strong class="text-zinc-400">Parts:</strong>
 							<template x-for="part in (selectedProject.partRequirements || [])" :key="part.id">
@@ -2865,7 +2870,7 @@
 							<label class="text-zinc-400">Target date<input type="date" x-model="selectedProject.dueDate" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></label>
 							<label class="text-zinc-400">Priority<select x-model="selectedProject.priority" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></label>
 						</div>
-						<label class="block text-zinc-400">Objective / notes<textarea x-model="selectedProject.description" rows="2" placeholder="What needs to be accomplished?" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></textarea></label>
+						<div class="space-y-2"><div class="flex items-center justify-between gap-2"><strong class="text-zinc-400">Objective / notes</strong><button type="button" @click="modals.projectNotes = true" class="px-3 py-2 rounded-lg border border-amber-500/40 bg-amber-500/10 text-amber-200 text-xs font-bold">Expand full screen ↗</button></div><button type="button" @click="modals.projectNotes = true" class="w-full min-h-16 text-left rounded-xl border border-zinc-800 bg-zinc-950 p-3 text-sm leading-relaxed text-zinc-200 whitespace-pre-wrap"><span x-text="selectedProject.description || 'Add the objective, repair context, symptoms, or notes…'"></span></button></div>
 						<div class="flex justify-between items-center"><strong class="text-white">Work breakdown</strong><span class="text-purple-300" x-text="projectCompletion(selectedProject)+'% complete'"></span></div>
 						<template x-for="(task,index) in (selectedProject.tasks||[])" :key="task.id || index"><div class="bg-zinc-950 rounded-xl p-3 space-y-2"><div class="flex items-center gap-2"><input type="checkbox" class="w-5 h-5 accent-purple-500" :checked="!!task.done" :disabled="!task.done&&!projectTaskDependenciesMet(selectedProject,task)" @change="setProjectTaskDone(selectedProject,index,$event.target.checked)"><span class="flex-1 text-zinc-200" :class="task.done?'line-through text-zinc-500':''" x-text="task.name"></span><span x-show="!projectTaskDependenciesMet(selectedProject,task)" class="text-amber-300 text-[10px]">Blocked</span><button @click="removeProjectTask(selectedProject,index)" class="text-rose-400 p-2">✕</button></div><div class="grid grid-cols-2 gap-2"><label class="text-[10px] text-zinc-500">Planned hours<input type="number" min="0" step="0.25" x-model.number="task.plannedHours" @change="saveProjectTaskEstimate(selectedProject)" class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white"></label><label class="text-[10px] text-zinc-500">Hourly rate<input type="number" min="0" step="0.01" x-model.number="task.hourlyRate" @change="saveProjectTaskEstimate(selectedProject)" class="mt-1 w-full bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-white"></label></div><div class="flex items-center gap-2"><select :value="projectDependencyDrafts[task.id] || ''" @change="setProjectDependencyDraft(task.id,$event.target.value)" class="min-w-0 flex-1 bg-zinc-900 border border-zinc-800 rounded-lg p-2 text-xs text-zinc-200"><option value="">Choose prerequisite task…</option><template x-for="candidate in (selectedProject.tasks||[])" :key="candidate.id"><option :value="candidate.id" x-text="candidate.name" :disabled="candidate.id===task.id || (task.dependencies||[]).includes(candidate.id)"></option></template></select><button @click="addProjectTaskDependency(selectedProject,task.id,projectDependencyDrafts[task.id])" class="px-3 py-2 rounded-lg border border-purple-500/40 text-purple-200 text-xs">Add dependency</button></div><div class="flex flex-wrap gap-1" x-show="(task.dependencies||[]).length"><template x-for="dependencyId in (task.dependencies||[])" :key="dependencyId"><span class="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-1 text-[10px] text-amber-200"><span x-text="projectTaskName(selectedProject,dependencyId)"></span><button @click="removeProjectTaskDependency(selectedProject,task.id,dependencyId)" class="text-amber-300">×</button></span></template></div></div></template>
 						<div class="flex gap-2"><input x-model="projectTaskDraft" @keydown.enter.prevent="addProjectTask(selectedProject)" placeholder="Add a task…" class="min-w-0 flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><button @click="addProjectTask(selectedProject)" class="px-3 rounded-lg bg-purple-600 text-white font-bold">Add</button></div><div class="flex justify-between text-xs text-zinc-400"><span>Estimated labor</span><strong class="text-amber-300" x-text="String.fromCharCode(36)+projectLaborEstimate(selectedProject).toFixed(2)"></strong></div>
@@ -2873,11 +2878,25 @@
 						<template x-for="(milestone,index) in (selectedProject.milestones||[])" :key="milestone.id || index"><div class="flex justify-between text-zinc-300 border-b border-zinc-800 py-1"><span x-text="milestone.title"></span><button @click="removeProjectMilestone(selectedProject,index)" class="text-rose-400">Remove</button></div></template>
 					</div>
 					<div class="border-t border-zinc-800 pt-3 space-y-2">
-						<h4 class="text-sm font-bold text-white">Factory manual procedures</h4>
-						<p class="text-zinc-500">Attach only procedures already curated in this vehicle's Maintenance Knowledge Base. The source reference is preserved; no generic repair steps are invented.</p>
-						<template x-if="!knowledgeBaseForProject(selectedProject).length"><p class="text-amber-300">No curated procedures are available for this vehicle yet. Add a verified manual procedure to the Knowledge Base first.</p></template>
-						<template x-for="procedure in knowledgeBaseForProject(selectedProject)" :key="procedure.id"><div class="flex items-center gap-2 bg-zinc-950 rounded-lg p-2"><div class="min-w-0 flex-1"><p class="text-white font-semibold" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p></div><button x-show="!projectHasProcedure(selectedProject,procedure.id)" @click="attachProjectProcedure(selectedProject,procedure.id)" class="px-3 py-2 rounded-lg border border-amber-500/40 text-amber-300">Attach</button><span x-show="projectHasProcedure(selectedProject,procedure.id)" class="text-emerald-400">Attached</span></div></template>
-						<template x-for="procedure in (selectedProject.procedures||[])" :key="procedure.id"><div class="flex items-center justify-between gap-2 border border-emerald-500/20 rounded-lg p-2"><div class="min-w-0 flex-1"><p class="text-emerald-300" x-text="procedure.title"></p><p class="text-zinc-500" x-text="procedure.sourceLabel"></p><div x-show="procedureHasQuickSpecs(procedure)" class="mt-2 rounded-lg bg-zinc-950/80 border border-zinc-800 p-2"><p class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Quick specs</p><ul class="space-y-1 text-[11px] text-zinc-200"><template x-for="(spec,index) in procedureQuickSpecs(procedure)" :key="procedure.id+'-project-spec-'+index"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li></template></ul></div><a :href="projectProcedureUrl(procedure)" target="_blank" rel="noopener" class="inline-block mt-2 text-amber-400 underline">Open manual source ↗</a></div><button @click="detachProjectProcedure(selectedProject,procedure.id)" class="text-rose-400">Detach</button></div></template>
+						<template x-if="(selectedProject.procedures||[]).length">
+							<div class="space-y-2">
+								<h4 class="text-sm font-bold text-white">Attached repair procedures</h4>
+								<template x-for="procedure in (selectedProject.procedures||[])" :key="procedure.id"><div class="flex items-center justify-between gap-2 border border-emerald-500/20 rounded-lg p-3 bg-emerald-500/[0.04]"><div class="min-w-0 flex-1"><p class="text-emerald-300 font-semibold" x-text="procedure.title"></p><p class="text-zinc-500 text-xs" x-text="procedure.sourceLabel"></p><div x-show="procedureHasQuickSpecs(procedure)" class="mt-2 rounded-lg bg-zinc-950/80 border border-zinc-800 p-2"><p class="text-[10px] uppercase tracking-widest font-bold text-amber-400 mb-1">Quick specs</p><ul class="space-y-1 text-[11px] text-zinc-200"><template x-for="(spec,index) in procedureQuickSpecs(procedure)" :key="procedure.id+'-project-spec-'+index"><li class="flex gap-2"><span class="text-amber-400">•</span><span x-text="spec"></span></li></template></ul></div><a :href="projectProcedureUrl(procedure)" target="_blank" rel="noopener" class="inline-block mt-2 text-amber-400 underline">Open manual source ↗</a></div><button @click="detachProjectProcedure(selectedProject,procedure.id)" class="shrink-0 text-rose-400 px-2 py-2">Detach</button></div></template>
+							</div>
+						</template>
+						<div class="border-t border-zinc-800 pt-3 space-y-2">
+							<details class="rounded-xl border border-zinc-800 bg-zinc-950/70 overflow-hidden">
+								<summary class="flex items-center justify-between gap-3 p-3 cursor-pointer list-none">
+									<span class="min-w-0"><strong class="block text-sm text-white">Factory manual procedures</strong><span class="block text-xs text-zinc-500 mt-1">Choose from this vehicle's curated Maintenance Knowledge Base</span></span>
+									<span class="shrink-0 text-xs text-amber-300" x-text="knowledgeBaseForProject(selectedProject).length + ' available'"></span>
+								</summary>
+								<div class="px-3 pb-3 space-y-2 border-t border-zinc-800">
+									<p class="text-xs text-zinc-500 pt-2">Attach only verified procedures already curated for this vehicle. Source references are preserved; no generic repair steps are invented.</p>
+									<template x-if="!knowledgeBaseForProject(selectedProject).length"><p class="text-amber-300 text-sm">No curated procedures are available for this vehicle yet.</p></template>
+									<template x-for="procedure in knowledgeBaseForProject(selectedProject)" :key="procedure.id"><label class="flex items-start gap-3 rounded-lg bg-black/40 border border-zinc-800 p-3 cursor-pointer"><input type="checkbox" class="mt-1 h-4 w-4 shrink-0 accent-amber-400" :checked="projectHasProcedure(selectedProject,procedure.id)" @change="$event.target.checked ? attachProjectProcedure(selectedProject,procedure.id) : detachProjectProcedure(selectedProject,procedure.id)"><span class="min-w-0 flex-1"><span class="block text-sm font-semibold text-zinc-100" x-text="procedure.title"></span><span class="block text-xs text-zinc-500 mt-1" x-text="procedure.sourceLabel"></span></span><span class="text-[10px] text-zinc-500" x-text="projectHasProcedure(selectedProject,procedure.id) ? 'Attached' : 'Add'"></span></label></template>
+								</div>
+							</details>
+						</div>
 					</div>
 					<div class="border-t border-zinc-800 pt-3 space-y-3">
 						<h4 class="text-sm font-bold text-white">Parts & procurement</h4>
@@ -2942,6 +2961,23 @@
 					>
 						Delete Project
 					</button>
+				</div>
+			</div>
+
+			<!-- FULL-SCREEN PROJECT OBJECTIVE / NOTES EDITOR -->
+			<div x-show="modals.projectNotes" x-cloak @click.stop="modals.projectNotes = false" class="fixed inset-0 z-[100] bg-zinc-950/95 backdrop-blur-xl" x-transition.opacity>
+				<div @click.stop class="h-[100dvh] w-full flex flex-col bg-zinc-950">
+					<header class="flex items-center justify-between gap-3 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-4 border-b border-zinc-800">
+						<div class="min-w-0"><p class="text-[10px] uppercase tracking-[0.2em] font-bold text-amber-400">Project workspace</p><h2 class="text-lg font-black text-white">Objective / Notes</h2><p class="text-xs text-zinc-400 truncate" x-text="selectedProject?.title || 'Project'"></p></div>
+						<button type="button" @click="modals.projectNotes = false" aria-label="Close notes editor" class="shrink-0 rounded-xl border border-zinc-700 px-4 py-3 text-sm font-bold text-zinc-200">Close</button>
+					</header>
+					<main class="flex-1 min-h-0 p-4 sm:p-6 flex flex-col gap-3">
+						<p class="text-sm leading-relaxed text-zinc-400">Capture the goal, symptoms, diagnostic findings, repair scope, and anything important to remember while working on this project.</p>
+						<textarea x-model="selectedProject.description" autofocus placeholder="What needs to be accomplished?" class="flex-1 min-h-0 w-full resize-none rounded-2xl border border-zinc-700 bg-zinc-900 p-5 text-base sm:text-lg leading-8 text-white placeholder:text-zinc-600 focus:outline-none focus:border-amber-500"></textarea>
+					</main>
+					<footer class="px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-zinc-800">
+						<button type="button" @click="saveProjectWorkspace(selectedProject); modals.projectNotes = false" class="w-full rounded-xl bg-amber-500 py-4 text-base font-black text-zinc-950">Save Objective / Notes</button>
+					</footer>
 				</div>
 			</div>
 
@@ -3052,6 +3088,8 @@
 					analyticsPeriod: '12m',
 					analyticsVehicleId: 'all',
 					activeVehicleId: 'scion-xb',
+					repairCartLinks: [],
+					pendingRepairProjectDraft: null,
 					sortOrder: 'desc',
 					smartQuery: '',
 					timelineSearch: '',
@@ -3115,6 +3153,7 @@
 						repairDetail: false,
 						newProject: false,
 						projectDetail: false,
+						projectNotes: false,
 						projectPartsPicker: false,
 				projectCompletion: false,
 						newPart: false,
@@ -3570,6 +3609,12 @@
 					manualLink(hash) {
 						return this.manualLibrary.base + '/manuals.html' + this.manualBackParam() + '#' + hash;
 					},
+					vehicleNameForProject(project) { return this.vehicles.find(item=>String(item.id)===String(project?.vehicleId))?.name || "Vehicle not linked"; },
+					manualProjectLink(project) { const v=this.vehicles.find(item=>String(item.id)===String(project?.vehicleId)); const info=v&&this.manualLibrary.vehicles[v.id]; return info?this.manualLink('/veh/'+info.idx+'/rep'):this.manualLink('/'); },
+					repairCartManualLink(cart) { return this.manualLibrary.base+'/manuals.html'+this.manualBackParam()+(String(cart?.route||'').startsWith('#')?cart.route:'#'+String(cart?.route||'/')); },
+					repairCartsForProject(project) { return this.repairCartLinks.filter(cart=>String(cart.projectId)===String(project?.id)); },
+					refreshRepairCartLinks() { try { const saved=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'); this.repairCartLinks=Object.entries(saved).map(([cartKey,cart])=>({...cart,cartKey})).filter(cart=>cart&&cart.projectId); } catch { this.repairCartLinks=[]; } },
+					publishRepairProjectIndex() { try { localStorage.setItem('lifeos.repair.projects.v1',JSON.stringify((this.projects||[]).map(project=>({id:project.id,vehicleId:project.vehicleId,title:project.title,status:project.status,category:project.category,createdAt:project.createdAt,updatedAt:project.updatedAt})))); } catch(error) { console.warn('Repair project index could not be published',error); } },
 
 					openManualSearch(q) {
 						const t = String(q || '').trim();
@@ -3934,6 +3979,8 @@
 
 
 					async initApp() {
+				const deepLink=new URLSearchParams(location.search),requestedVehicle=deepLink.get('vehicleId'),requestedProject=deepLink.get('projectId'),requestedRepairDraft=deepLink.get('repairDraft'),createProject=deepLink.get('newProject')==='1';
+				window.addEventListener('storage',event=>{if(event.key==='lifeos.repair.carts.v1')this.refreshRepairCartLinks();});
 				window.addEventListener('resize',()=>this.isMobileView=window.innerWidth<768);
 				// Deep link: yourapp.html#specs opens the Specs tab (used by the Manual Explorer's "Back" link)
 				const goHash=()=>{const h=location.hash.replace('#','').toLowerCase();if(h==='specs'||h==='profile')this.currentTab='profile';};
@@ -3956,9 +4003,15 @@
 								this.hydrateAttachments();
 							}
 							this.applyGarageSetupAdjustments();
+							if(requestedVehicle&&this.vehicles.some(v=>String(v.id)===String(requestedVehicle)))this.activeVehicleId=requestedVehicle;
 							if (!this.activeVehicleId || !this.activeVehicle) this.activeVehicleId = this.vehicles[0]?.id;
+							try { localStorage.setItem("lifeos.garage.activeVehicle.v1", JSON.stringify({ vehicleId: this.activeVehicleId, vehicleName: this.activeVehicle?.name || "", updatedAt: new Date().toISOString() })); } catch (error) { console.warn("Active vehicle could not be shared with Manual Explorer", error); }
 							await this.saveToStorage();
-							await this.runDatabaseHealthCheck();
+							this.refreshRepairCartLinks();
+							if(requestedProject){const project=this.projects.find(p=>String(p.id)===String(requestedProject));if(project){this.currentTab='projects';this.openProjectDetail(project);}}
+							else if(createProject){this.currentTab='projects';let draft=null;try{const candidate=JSON.parse(localStorage.getItem('lifeos.repair.project-draft.v1')||'null');if(candidate&&candidate.cart&&(!requestedRepairDraft||candidate.id===requestedRepairDraft))draft=candidate;}catch(error){console.warn('Repair project draft could not be read',error);}this.pendingRepairProjectDraft=draft;const cart=draft?.cart,vehicleName=this.activeVehicle?.name||cart?.vehicle||'this vehicle',procedure=String(cart?.procedure||'Repair Project').trim(),items=Array.isArray(cart?.items)?cart.items:[],tools=Array.isArray(cart?.tools)?cart.tools:[],torqueSpecs=Array.isArray(cart?.torqueSpecs)?cart.torqueSpecs:[];this.newProjectForm={...this.newProjectForm,title:cart?`${procedure} — ${vehicleName}`:'Repair Project',category:cart?.category||'Repair',description:''};const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('newProject');cleanUrl.searchParams.delete('repairDraft');history.replaceState(history.state,'',cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);this.modals.newProject=true;}
+							// Integrity checks are read-only and must not delay the requested Garage view.
+							this.runDatabaseHealthCheck().catch(error => console.warn('Background database health check failed', error));
 							if (source === 'legacy-localstorage' && this.garageDB) localStorage.setItem('motornote_pro_migration_complete', new Date().toISOString());
 						} catch (error) {
 							console.error('Garage initialization failed', error?.name || 'Error', error?.message || error, error?.stack || '');
@@ -4031,6 +4084,7 @@
 						} else {
 							await new Promise((resolve, reject) => { const tx = this.garageDB.transaction('state', 'readwrite'); tx.objectStore('state').put({ key: 'current', value: state }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed')); });
 						}
+						this.publishRepairProjectIndex();
 						this.lastSavedAt = state.savedAt;
 						this.saveState = 'saved';
 						return true;
@@ -4101,6 +4155,7 @@
 					switchVehicle(id) {
 						this.activeVehicleId = id;
 						this.tempMileage = this.activeVehicle.odometer;
+						try { localStorage.setItem('lifeos.garage.activeVehicle.v1', JSON.stringify({ vehicleId: id, vehicleName: this.activeVehicle?.name || '', updatedAt: new Date().toISOString() })); } catch (error) { console.warn('Active vehicle could not be shared with Manual Explorer', error); }
 					},
 
 					getStatusBadgeClass(status) {
@@ -4333,9 +4388,14 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					async completeProjectAndRecordService(project) { if(!project || !this.projectReadyToComplete(project))return; const f=this.projectCompletionForm,vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)),mileage=Number(f.mileage); if(!vehicle || !f.verified || !f.date || !Number.isFinite(mileage) || mileage<0){alert('Confirm the work, date, and a valid odometer reading.');return;} const existing=this.logs.find(log=>String(log.projectId||'')===String(project.id)); if(existing){project.maintenanceLogId=existing.id;project.status='Completed';project.completion=100;project.completedAt=project.completedAt||new Date().toISOString();await this.saveToStorage();this.modals.projectCompletion=false;this.modals.projectDetail=false;return;} const now=new Date().toISOString(),cost=this.projectActualCost(project),plan=this.maintenancePlans.find(item=>String(item.id)===String(project.maintenancePlanId)); const log={id:'project-service-'+project.id,projectId:project.id,maintenancePlanId:plan?.id||null,vehicleId:vehicle.id,vehicle:vehicle.name,mileage,date:f.date,serviceType:project.title||'Completed vehicle project',category:'Maintenance',cost,notes:String(f.notes||'').trim(),attachments:[],history:[],projectCategory:project.category||'General',procedureReferences:(project.procedures||[]).map(item=>({id:item.id,title:item.title,sourceLabel:item.sourceLabel,sourcePath:item.sourcePath})),projectAttachmentIds:(project.attachments||[]).map(item=>item.id),projectCostEntryIds:(project.costEntries||[]).map(item=>item.id)}; this.logs.unshift(log); project.status='Completed';project.completion=100;project.completedAt=now;project.maintenanceLogId=log.id;project.actualCost=cost;project.updatedAt=now; if(mileage>Number(vehicle.odometer||0))vehicle.odometer=mileage; if(plan && plan.status!=='Cancelled'){plan.status='Completed';plan.completedAt=now;plan.completion=100;plan.actualCost=cost;plan.tasks=(plan.tasks||[]).map(task=>({...task,done:true}));} const saved=await this.saveToStorage(); if(saved){this.modals.projectCompletion=false;this.modals.projectDetail=false;this.selectedProject=project;this.selectedMaintenancePlan=plan||null;}else{alert('The service record could not be saved. The project is still open; try confirming again.');} },
 					async saveProjectWorkspace(project) { if(!project)return; const canonical=this.projects.find(item=>String(item.id)===String(project.id)); const target=canonical||project; if(target!==project){ Object.assign(target,project); } if(!Array.isArray(target.partRequirements))target.partRequirements=[]; if(!Array.isArray(target.purchaseOrders))target.purchaseOrders=[]; if(!Array.isArray(target.costEntries))target.costEntries=[]; target.completion=this.projectCompletion(target); target.updatedAt=new Date().toISOString(); target.budget=Math.max(0,Number(target.budget)||0); target.actualCost=this.projectActualCost(target); this.syncProjectMaintenancePlan(target); const saved=await this.saveToStorage(); if(saved){this.selectedProject=target;this.modals.projectDetail=false;} else {alert('Project could not be saved. Your project remains open; try saving again.');} },
 
-						saveNewProject() {
+						async saveNewProject() {
+							const draft=this.pendingRepairProjectDraft,cart=draft?.cart||null,now=new Date().toISOString(),projectId='project-'+Date.now();
+							const cartItems=Array.isArray(cart?.items)?cart.items:[],cartTools=Array.isArray(cart?.tools)?cart.tools:[],cartTorque=Array.isArray(cart?.torqueSpecs)?cart.torqueSpecs:[];
+							const procedureRecord=cart?{id:'repair-cart-'+(draft.id||Date.now()),title:cart.procedure||'Manual repair procedure',category:this.newProjectForm.category||'Repair',sourceLabel:cart.procedure||'Manual Explorer',sourcePath:cart.source||'',specs:[...cartTorque.map(group=>'Torque: '+(group.values||[]).map(value=>value.value+' '+value.unit).join(' / ')+(group.association?' · '+group.association.component+' · '+group.association.fastener:'')),...cartTools.map(tool=>'Tool: '+tool),...(Array.isArray(cart.warnings)?cart.warnings.map(warning=>'Warning: '+(warning.text||warning)):[])],route:cart.route||'',vehicle:cart.vehicle||this.activeVehicle?.name||'',vehicleId:this.activeVehicleId,cartKey:cart.cartKey||null,cartSnapshot:cart,items:cartItems,tools:cartTools,torqueSpecs:cartTorque,torque:Array.isArray(cart.torque)?cart.torque:[],warnings:Array.isArray(cart.warnings)?cart.warnings:[],attachedAt:now}:null;
+							const importedTasks=cart?[{id:'repair-procedure-'+projectId,name:'Review factory procedure: '+(cart.procedure||'Manual repair procedure'),done:false,sourcePath:cart.source||'',route:cart.route||''},...cartItems.map((item,index)=>({id:`repair-item-${projectId}-${index}`,name:`${item.relationship==='required'?'Replace':'Inspect / service'} ${item.name}`,done:false,relationship:item.relationship||'mention',confidence:item.confidence||0,source:'Manual Explorer'})),...cartTools.map((tool,index)=>({id:`repair-tool-${projectId}-${index}`,name:'Prepare tool: '+tool,done:false,source:'Manual Explorer'})),...cartTorque.map((group,index)=>({id:`repair-torque-${projectId}-${index}`,name:'Apply torque: '+(group.values||[]).map(value=>value.value+' '+value.unit).join(' / ')+(group.association?' — '+group.association.component+' · '+group.association.fastener:''),done:false,source:'Manual Explorer',specification:group}))]:[];
+							const importedParts=cartItems.map((item,index)=>({id:`repair-part-${projectId}-${index}`,partNumber:item.oem||'',description:item.name,quantity:1,unitCost:0,status:item.relationship==='required'?'Required':'Service target',relationship:item.relationship||'mention',confidence:item.confidence||0,source:'Manual Explorer'}));
 							const p = {
-								id: 'project-' + Date.now(),
+								id: projectId,
 								vehicleId: this.activeVehicleId,
 								title: (this.newProjectForm.title || '').trim() || 'General Maintenance Project',
 								category: this.newProjectForm.category || 'General',
@@ -4346,16 +4406,20 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 								priority: this.newProjectForm.priority || 'Medium',
 								dueDate: this.newProjectForm.dueDate || '',
 								completion: 0,
-								tasks: [],
+								tasks: importedTasks,
 								milestones: [],
-								procedures: [],
-								createdAt: new Date().toISOString(),
-								updatedAt: new Date().toISOString()
+								procedures: procedureRecord?[procedureRecord]:[],
+								partRequirements: importedParts,
+								purchaseOrders: [],costEntries: [],attachments: [],
+								createdAt: now,
+								updatedAt: now
 							};
 							this.projects.push(p);
-							this.saveToStorage();
+							const saved = await this.saveToStorage();
+							if(saved&&cart){try{const stored=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'),cartKey=cart.cartKey||`${cart.source||'manual'}::${cart.route||cart.procedure||projectId}`;stored[cartKey]={...cart,cartKey,projectId:p.id,projectTitle:p.title,vehicleId:p.vehicleId,vehicle:this.activeVehicle?.name||cart.vehicle||'',updatedAt:now};localStorage.setItem('lifeos.repair.carts.v1',JSON.stringify(stored));localStorage.removeItem('lifeos.repair.project-draft.v1');this.pendingRepairProjectDraft=null;this.refreshRepairCartLinks();}catch(error){console.warn('Project saved, but the Repair Cart link could not be written',error);alert('Project saved, but its Repair Cart link could not be stored. Reopen the cart and link it to this project.');}}
 							this.newProjectForm = { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' };
 							this.modals.newProject = false;
+							if(saved)this.openProjectDetail(p);else alert('Project could not be saved. It remains in this session; try saving again.');
 						},
 
 					deleteProjectRecord(id) {

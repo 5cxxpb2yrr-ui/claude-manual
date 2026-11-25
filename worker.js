@@ -13,6 +13,31 @@ const TYPES = {
   gif: "image/gif",
   txt: "text/plain; charset=utf-8",
 };
+const NAVIGATION_FILES = new Set([
+  "scion-repair.json",
+  "scion-parts.json",
+  "subaru-repair.json",
+  "subaru-labor.json",
+]);
+
+async function serveNavigationIndex(request, env, filename) {
+  if (!NAVIGATION_FILES.has(filename)) {
+    return new Response("Not found", { status: 404 });
+  }
+
+  const object = await env.MANUALS.get(`index/navigation/${filename}`);
+  if (object) {
+    const headers = new Headers();
+    object.writeHttpMetadata(headers);
+    headers.set("content-type", "application/json; charset=utf-8");
+    headers.set("cache-control", "public, max-age=300");
+    return new Response(request.method === "HEAD" ? null : object.body, { headers });
+  }
+
+  // Keep the current app usable until the breadcrumb-generated indexes have
+  // completed their first full-site publish to R2.
+  return env.ASSETS.fetch(new Request(new URL(`/data/${filename}`, request.url), request));
+}
 
 function rewriteManualHtml(response, request, manualRoot, currentKey) {
   const requestUrl = new URL(request.url);
@@ -88,6 +113,11 @@ function rewriteManualHtml(response, request, manualRoot, currentKey) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/api/navigation/")) {
+      const filename = url.pathname.slice("/api/navigation/".length);
+      return serveNavigationIndex(request, env, filename);
+    }
 
     if (!url.pathname.startsWith("/m/")) {
       return env.ASSETS.fetch(request);

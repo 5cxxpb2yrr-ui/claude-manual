@@ -7,7 +7,7 @@
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/m/*"]
+    "run_worker_first": ["/m/*", "/api/navigation/*"]
   },
   "r2_buckets": [
     { "binding": "MANUALS", "bucket_name": "motornote-manual-site" }

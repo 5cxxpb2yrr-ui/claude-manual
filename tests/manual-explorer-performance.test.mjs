@@ -6,18 +6,19 @@ import { fileURLToPath } from "node:url";
 
 const path = fileURLToPath(new URL("../public/manuals.html", import.meta.url));
 const html = readFileSync(path, "utf8");
-const inline = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(x => x[1]).filter(x => x.trim());
+const inline = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].map(x => x[1]).filter(x => x.trim());
 
-test("Manual Explorer loads only the index needed for the requested route", () => {
-  assert.match(html, /async function ensureGuide\(vi,gi\)/);
-  assert.match(html, /async function ensureRouteIndexes\(a,b,c\)/);
-  assert.match(html, /await ensureRouteIndexes\(a,b,c\)/);
-  assert.doesNotMatch(html, /M\.vehicles\.flatMap\(\(v,vi\)=>v\.guides\.map\(async/);
+test("Manual Explorer loads guide indexes on demand for the selected route", () => {
+  assert.match(html, /async function loadGuide/);
+  assert.match(html, /async function loadAllGuides/);
+  assert.match(html, /await loadAllGuides\\(\\)/);
+  assert.match(html, /await loadGuide\\(\\+b,\\+c\\)/);
+  assert.doesNotMatch(html, /M\\.vehicles\\.flatMap\\(\\(v,vi\\)=>v\\.guides\\.map\\(async/);
 });
 
-test("Manual search still loads all guide indexes on demand", () => {
-  assert.match(html, /if\(a==="search"\)\{await ensureAllGuides\(\);return\}/);
-  assert.match(html, /if\(a==="v"\|\|a==="t"\)\{await ensureGuide\(\+b,\+c\);return\}/);
+test("Manual search loads all guide indexes only when the search route is opened", () => {
+  assert.match(html, /if\\(a==="search"\\)[\\s\\S]*?await loadAllGuides\\(\\)/);
+  assert.match(html, /if\\(a==="t"\\|\\|a==="v"\\)[\\s\\S]*?await loadGuide\\(\\+b,\\+c\\)/);
 });
 
 test("Manual Explorer inline JavaScript remains syntactically valid", () => {

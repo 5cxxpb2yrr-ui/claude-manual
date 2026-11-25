@@ -3618,7 +3618,10 @@
 
 					openManualSearch(q) {
 						const t = String(q || '').trim();
-						window.open(this.manualLibrary.base + '/manuals.html' + this.manualBackParam() + '#/search' + (t ? '/' + encodeURIComponent(t) : ''), '_blank', 'noopener');
+						const back = this.manualBackParam();
+						const vehicle = this.manualInfo?.idx;
+						const vehicleParam = Number.isInteger(vehicle) ? (back ? '&' : '?') + 'vehicle=' + encodeURIComponent(vehicle) : '';
+						window.open(this.manualLibrary.base + '/manuals.html' + back + vehicleParam + '#/search' + (t ? '/' + encodeURIComponent(t) : ''), '_blank', 'noopener');
 					},
 
 					get vehicleLogs() {

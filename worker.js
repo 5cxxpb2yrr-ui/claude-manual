@@ -15,7 +15,7 @@ const TYPES = {
 };
 const NAVIGATION_FILES = new Set([
   "scion-repair.json",
-  "scion-labor.json",
+  "scion-parts.json",
   "subaru-repair.json",
   "subaru-labor.json",
 ]);

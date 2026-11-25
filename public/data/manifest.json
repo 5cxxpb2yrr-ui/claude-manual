@@ -42,7 +42,7 @@
         {
           "title": "Parts and Labor",
           "sub": "Parts and labor times",
-          "tree": "/api/navigation/scion-labor.json"
+          "tree": "/api/navigation/scion-parts.json"
         }
       ]
     }

@@ -14,12 +14,12 @@
         {
           "title": "Repair and Diagnosis",
           "sub": "Engine, Chassis, Body, Electrical",
-          "tree": "data/subaru-repair.json"
+          "tree": "/api/navigation/subaru-repair.json"
         },
         {
           "title": "Labor Times",
           "sub": "Crosstrek Base variant",
-          "tree": "data/subaru-labor.json"
+          "tree": "/api/navigation/subaru-labor.json"
         }
       ]
     },
@@ -37,12 +37,12 @@
         {
           "title": "Repair and Diagnosis",
           "sub": "Engine, Chassis, Body, Electrical",
-          "tree": "data/scion-repair.json"
+          "tree": "/api/navigation/scion-repair.json"
         },
         {
           "title": "Parts and Labor",
           "sub": "Parts and labor times",
-          "tree": "data/scion-parts.json"
+          "tree": "/api/navigation/scion-labor.json"
         }
       ]
     }

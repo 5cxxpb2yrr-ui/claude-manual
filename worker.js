@@ -168,7 +168,8 @@ export default {
       headers.set("content-type", TYPES[extension]);
     }
     headers.set("etag", object.httpEtag);
-    headers.set("cache-control", "public, max-age=86400");
+    // Manual HTML can link to pages replaced during a corpus publish; do not retain stale page documents.
+    headers.set("cache-control", extension === "html" ? "no-store" : "public, max-age=86400");
 
     const response = new Response(request.method === "HEAD" ? null : object.body, { headers });
     if (extension === "html" && request.method !== "HEAD") {

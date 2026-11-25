@@ -6,25 +6,27 @@ import { fileURLToPath } from "node:url";
 
 const path = fileURLToPath(new URL("../public/manuals.html", import.meta.url));
 const html = readFileSync(path, "utf8");
-const inline = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/gi)].map(x => x[1]).filter(x => x.trim());
+const scriptStart = html.indexOf("<script>") + "<script>".length;
+const scriptEnd = html.indexOf("</script>", scriptStart);
+const inline = html.slice(scriptStart, scriptEnd);
 
 test("Manual Explorer loads guide indexes on demand for the selected route", () => {
-  assert.match(html, /async function loadGuide/);
-  assert.match(html, /async function loadAllGuides/);
-  assert.match(html, /await loadAllGuides\\(\\)/);
-  assert.match(html, /await loadGuide\\(\\+b,\\+c\\)/);
-  assert.doesNotMatch(html, /M\\.vehicles\\.flatMap\\(\\(v,vi\\)=>v\\.guides\\.map\\(async/);
+  assert.ok(html.includes("async function loadGuide("));
+  assert.ok(html.includes("async function loadAllGuides("));
+  assert.ok(html.includes("await loadAllGuides()"));
+  assert.ok(html.includes("await loadGuide(+b,+c)"));
+  assert.ok(!html.includes("M.vehicles.flatMap((v,vi)=>v.guides.map(async"));
 });
 
 test("Manual search loads all guide indexes only when the search route is opened", () => {
-  assert.match(html, /if\\(a==="search"\\)[\\s\\S]*?await loadAllGuides\\(\\)/);
-  assert.match(html, /if\\(a==="t"\\|\\|a==="v"\\)[\\s\\S]*?await loadGuide\\(\\+b,\\+c\\)/);
+  assert.ok(html.includes('if(a==="search")'));
+  assert.ok(html.includes("await loadAllGuides()"));
+  assert.ok(html.includes('else if(a==="t"||a==="v")'));
+  assert.ok(html.includes("await loadGuide(+b,+c)"));
 });
 
 test("Manual Explorer inline JavaScript remains syntactically valid", () => {
-  assert.ok(inline.length);
-  for (const source of inline) {
-    const result = spawnSync(process.execPath, ["--check", "-"], { input: source, encoding: "utf8" });
-    assert.equal(result.status, 0, result.stderr || result.stdout);
-  }
+  assert.ok(inline.trim());
+  const result = spawnSync(process.execPath, ["--check", "-"], { input: inline, encoding: "utf8" });
+  assert.equal(result.status, 0, result.stderr || result.stdout);
 });

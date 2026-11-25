@@ -5,7 +5,7 @@ import { Script } from "node:vm";
 
 test("manual explorer inline application script parses before boot", () => {
   const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "utf8");
-  const match = html.match(/<script>([\\s\\S]*?)<\\/script>/);
+  const match = html.match(/<script>([\s\S]*?)<\/script>/);
 
   assert.ok(match, "manual explorer inline script should exist");
   assert.doesNotThrow(

@@ -216,6 +216,74 @@ function findRelatedProcedureLinks(html,baseUrl){
  });
  return links;
 }
+
+function findScionSiblingSpecificationPages(tree,pageId){
+ const wanted=String(pageId);let targetPath=null;
+ function locate(node,path){
+  for(const child of node.c||[]){
+   const next=[...path,child];
+   if(child.p!==undefined&&String(child.p)===wanted){targetPath=next;return true;}
+   if(child.c&&locate(child,next))return true;
+  }
+  return false;
+ }
+ locate(tree,[]);
+ if(!targetPath)return [];
+ let component="";
+ for(let i=targetPath.length-1;i>=0;i--){
+  const name=String(targetPath[i].n||"");
+  const match=/^(.+?):\\s*(?:testing and inspection|service and repair|removal and installation|disassembly and reassembly|specifications)$/i.exec(name);
+  if(match){component=match[1].trim();break;}
+ }
+ if(!component){
+  for(let i=targetPath.length-1;i>=0;i--){
+   const name=String(targetPath[i].n||"").trim();
+   if(name&&!/^(additional pages|part \\d+)/i.test(name)&&!/(testing and inspection|service and repair|removal and installation|disassembly and reassembly)$/i.test(name)){
+    component=name;break;
+   }
+  }
+ }
+ if(!component)return [];
+ const norm=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const componentKey=norm(component),containers=targetPath.slice(0,-1).reverse();
+ for(const container of containers){
+  const matches=[];
+  function collect(node,path){
+   for(const child of node.c||[]){
+    const next=[...path,String(child.n||"")];
+    if(child.p!==undefined&&String(child.p)!==wanted&&/specifications?/i.test(child.n||"")&&norm(next.join(" ")).includes(componentKey)){
+     matches.push({page:String(child.p),label:String(child.n),component,path:next});
+    }
+    if(child.c)collect(child,next);
+   }
+  }
+  collect(container,[String(container.n||"")]);
+  if(matches.length){
+   matches.sort((a,b)=>{
+    const exactA=norm(a.label)===norm(component+": Specifications")?0:1;
+    const exactB=norm(b.label)===norm(component+": Specifications")?0:1;
+    return exactA-exactB||a.page.localeCompare(b.page,undefined,{numeric:true});
+   });
+   return matches;
+  }
+ }
+ return [];
+}
+async function findScionSiblingSpecificationLinks(pageUrl){
+ if(!/scion-service-manual/i.test(pageUrl.pathname))return [];
+ const match=/\\/pages\\/(\\d+)\\.html$/i.exec(pageUrl.pathname);
+ if(!match)return [];
+ try{
+  const response=await fetch("/api/navigation/scion-repair.json",{credentials:"same-origin",cache:"no-store"});
+  if(!response.ok)return [];
+  const tree=await response.json();
+  return findScionSiblingSpecificationPages(tree,match[1]).map(page=>{
+   const url=new URL(pageUrl.href);url.pathname=url.pathname.replace(/\\/pages\\/\\d+\\.html$/i,"/pages/"+page.page+".html");
+   return {...page,url:url.href};
+  });
+ }catch(_){return [];}
+}
+
 function extractProcedure(html,context){
 context=context||{};const h1=/<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html),tt=/<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html);
 const title=context.title||strip(h1?h1[1]:tt?tt[1]:"")||"Manual procedure";
@@ -288,7 +356,7 @@ function repairProgress(steps,states){
  const done=steps.filter(x=>states[x.id]?.status==="done").length,skipped=steps.filter(x=>states[x.id]?.status==="skipped").length,safetySkipped=steps.filter(x=>x.safetyCritical&&states[x.id]?.status==="skipped").length;
  return {total:steps.length,done,skipped,remaining:steps.length-done-skipped,percent:steps.length?Math.round(done/steps.length*100):0,safetySkipped,canFinish:steps.length>0&&done+skipped===steps.length&&safetySkipped===0};
 }
-const Engine={CATALOG,TOOLS,htmlToText,findRelatedProcedureLinks,extractTorque,extractProcedure,extractRepairSteps,repairStepCanOpen,repairProgress,torqueAssignmentOptions,toRelationships,slugify};
+const Engine={CATALOG,TOOLS,htmlToText,findRelatedProcedureLinks,findScionSiblingSpecificationPages,extractTorque,extractProcedure,extractRepairSteps,repairStepCanOpen,repairProgress,torqueAssignmentOptions,toRelationships,slugify};
 root.LifeOSRepairEngine=Engine;if(typeof module!=="undefined"&&module.exports)module.exports=Engine;
 
 if(typeof document!=="undefined"){
@@ -317,7 +385,7 @@ pageHtml=await response.text();
 doc=new DOMParser().parseFromString(pageHtml,"text/html");
 if(!doc.body)throw new Error("The manual page returned no readable content.");
 }catch(error){alert("Could not open Repair Workspace: "+error.message);return;}
-const relatedLinks=findRelatedProcedureLinks(pageHtml,pageUrl.href);
+const linkedPages=findRelatedProcedureLinks(pageHtml,pageUrl.href),scionSpecPages=await findScionSiblingSpecificationLinks(pageUrl),relatedLinks=[...new Map([...linkedPages,...scionSpecPages].map(link=>[link.url,link])).values()];
 const relatedResults=await Promise.all(relatedLinks.map(async link=>{try{const response=await fetch(link.url,{credentials:"same-origin",cache:"no-store"});if(!response.ok)return {...link,available:false};const html=await response.text();const parsed=new DOMParser().parseFromString(html,"text/html");return {...link,available:true,title:parsed.querySelector("h1")?.innerText||link.label,html};}catch(_){return {...link,available:false};}}));
 const relatedPages=relatedResults.filter(x=>x.available);
 const combinedHtml=pageHtml+"\\n"+relatedPages.map(x=>x.html).join("\\n");

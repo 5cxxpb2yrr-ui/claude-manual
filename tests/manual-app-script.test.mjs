@@ -6,9 +6,10 @@ import { Script } from "node:vm";
 test("alternator search includes generator procedures and ranks service work above maps and DTCs", () => {
   const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "utf8");
   assert.match(html, /termGroups=terms\.map\(t=>\/\^\(alternator\|alternators\)\$\/\.test\(t\)\?\["alternator","alternators","generator","generators"\]/);
-  assert.match(html, /serviceProcedureBonus=.*?removal\|installation\|inspection\|testing\|service and repair/s);
-  assert.match(html, /mapPenalty=.*?map - electrical systems.*?650/s);
-  assert.match(html, /dtcPenalty=.*?DTC.*?450/s);
+  assert.match(html, /tumble generator valve/i);
+  assert.match(html, /serviceProcedureBonus=.*?repair and diagnosis.*?removal\|installation\|inspection\|testing\|service and repair/s);
+  assert.match(html, /mapPenalty=.*?map - electrical systems.*?700/s);
+  assert.match(html, /dtcPenalty=.*?dtc .*?700/s);
   assert.match(html, /guides\[gi\]\.title\+" › "/);
 });
 

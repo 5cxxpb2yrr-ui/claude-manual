@@ -6,7 +6,7 @@ const stop=new Set("i need to my the a an on in for of and with replace replacem
 const action=/\b(removal|installation|inspection|replacement|testing|service and repair|components|disassembly|reassembly|assembly|specifications)\b/i;
 const configs={"subaru-crosstrek":{vi:0,name:"2019 Subaru Crosstrek",tree:"subaru-repair.json",manual:"subaru-service-manual",folder:"2019 Subaru Crosstrek Limited"},"scion-xb":{vi:1,name:"2006 Scion xB",tree:"scion-repair.json",manual:"scion-service-manual",folder:"2006 Scion xB Standard"}};
 function resolveSections(tree,scope){
- let query=norm(scope).replace(/\b(o2|oxygen sensors)\b/g,"oxygen sensor").replace(/\b(alternators?)\b/g,"generator").replace(/\b(a f|air fuel ratio)\b/g,"front oxygen");
+ let query=norm(scope).replace(/\b(upstream|downstream)\b/g,m=>m==="upstream"?"front":"rear").replace(/\b(o2|oxygen sensors)\b/g,"oxygen sensor").replace(/\b(alternators?)\b/g,"generator").replace(/\b(a f|air fuel ratio)\b/g,"front oxygen");
  const words=query.split(" ").filter(w=>w&&!stop.has(w)).map(w=>w.replace(/s$/,""));
  if(!words.length)return [];
  const sections=new Map();
@@ -17,7 +17,7 @@ function resolveSections(tree,scope){
  if(!matches.length||matches.length<Math.min(2,words.length))continue;
  if(/\b(front|upstream)\b/.test(query)&&/\brear\b/.test(cn)||/\b(rear|downstream)\b/.test(query)&&/\bfront\b/.test(cn))continue;
  if(/tumble generator/i.test(component))continue;
- const key=norm(path.join(" / ")),score=matches.length*10+(words.every(w=>corpus.includes(w))?20:0)+(leaf.includes("removal")||leaf.includes("installation")?2:0);
+ const key=JSON.stringify(path.map(norm)),score=matches.length*10+(words.every(w=>corpus.includes(w))?20:0)+(leaf.includes("removal")||leaf.includes("installation")?2:0);
  let g=sections.get(key);if(!g){g={component,path,score,pages:[]};sections.set(key,g);}
  g.score=Math.max(g.score,score);if(!g.pages.some(p=>norm(p.title)===leaf))g.pages.push({page:c.p,title:c.n});
  }}
@@ -61,12 +61,24 @@ async function generate({vehicleId,scope,fetcher=root.fetch,engine=root.LifeOSRe
  const replacement=/\b(replac\w*|chang\w*|new)\b/i.test(text);
  if(replacement)for(const section of sections)parts.push({name:section.component,relationship:"candidate",source:"User scope; confirm diagnosis and VIN fitment",quantity:1});
  for(const p of docs){
-  for(const item of p.facts.parts||[]){if(!["required","consumable"].includes(item.relationship))continue;if(!parts.some(x=>norm(x.name)===norm(item.name)))parts.push({name:item.name,relationship:item.relationship,source:p.sourceLabel,quantity:1});}
+  for(const item of p.facts.parts||[]){if(!["required","consumable"].includes(item.relationship)||p.role==="support")continue;if(!parts.some(x=>norm(x.name)===norm(item.name)))parts.push({name:item.name,relationship:item.relationship,source:p.sourceLabel,quantity:1});}
+  const source=p.facts.pageText||"";
+  const addPart=(name)=>{if(!parts.some(x=>norm(x.name)===norm(name)))parts.push({name,relationship:"consumable",source:p.sourceLabel,quantity:1});};
+  const addTool=(name)=>{if(!tools.has(name))tools.set(name,{name,source:"Suggested from "+p.sourceLabel});};
+  if(/spray-type lubricant/i.test(source))addPart("Spray-type lubricant"+(/004301003/.test(source)?" (004301003 or equivalent)":""));
+  if(/anti-seize compound/i.test(source))addPart("Anti-seize compound"+(/NEVER-SEEZ NSN/i.test(source)?" (NEVER-SEEZ NSN, JET LUBE SS-30 or equivalent)":""));
+  if(/oxygen.*sensor.*removal/i.test(p.title))addTool("Oxygen sensor socket (verify fit)");
+  if(/lift up the vehicle/i.test(source))addTool("Vehicle lift or rated jack stands");
+  if(/disconnect.*(?:ground terminal|negative battery terminal)/i.test(source))addTool("Battery terminal wrench");
+  if(/remove the bolts and clips/i.test(source))addTool("Trim clip removal tool and ratchet");
+  if(/measure the resistance/i.test(source))addTool("Digital multimeter");
+  if(p.facts.torqueSpecs?.length)addTool("Torque wrench (appropriate range)");
   for(const t of p.facts.toolDetails||[])if(!tools.has(t.id))tools.set(t.id,{name:t.name,source:p.sourceLabel});
   for(const t of p.facts.toolReferences||[])if(!tools.has(t.reference))tools.set(t.reference,{name:t.reference,source:p.sourceLabel});
   for(const w of p.facts.warnings||[])warnings.push({text:w.text,source:p.sourceLabel});
   for(const t of p.facts.torqueSpecs||[])specs.push({text:t.values.map(v=>v.value+" "+v.unit).join(" / ")+(t.association?" · "+t.association.component+" · "+t.association.fastener:" · Verify fastener in source"),source:p.sourceLabel,page:p.page,context:t.context});
  }
+ if(sections.some(s=>/oxygen.*sensor/i.test(s.component)))tools.set("OBD-II",{name:"OBD-II diagnostic scanner",source:"Suggested diagnostic verification"});
  const tasks=[{name:"Confirm diagnosis, repair scope and part fitment",source:"Preparation"},{name:"Review factory precautions and prepare tools",source:"Preparation"},...docs.filter(p=>/inspection|removal|installation|replacement|service and repair/i.test(p.title)).map(p=>({name:"Review / perform: "+p.title,source:p.sourceLabel,route:p.route})),{name:"Verify completed work and record results",source:"Verification"}];
  return {vehicleId,scope:text,title:sections.map(s=>s.component).join(" + ")+(replacement?" Replacement":" Repair"),sections:sections.map(s=>s.component),documents:docs.map(p=>({id:p.id,title:p.title,sourceLabel:p.sourceLabel,sourcePath:p.sourcePath,route:p.route,role:p.role,specs:specs.filter(s=>s.page===p.page).map(s=>s.text)})),parts,tools:[...tools.values()],warnings,specs,tasks,unavailable,limitations:["Candidate parts are not confirmed failures or verified part numbers.","Review factory diagrams, fastener assignments and procedure dependencies before work.","No prices or tool ownership verified."]};
 }

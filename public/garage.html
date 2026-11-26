@@ -2206,6 +2206,18 @@
 						</div>
 					</div>
 
+					<section x-show="!isEditingRepair" class="rounded-xl border border-amber-500/30 bg-zinc-950 p-3 space-y-2">
+						<div class="flex items-center justify-between gap-2"><h4 class="text-amber-300 font-bold">Guided Repair</h4><a :href="repairRecordSearchLink(selectedRepair)" class="text-amber-400 text-xs font-bold">Find procedure ↗</a></div>
+						<template x-for="entry in guidedRepairRecordEntries(selectedRepair)" :key="entry.route">
+							<div class="rounded-lg border border-zinc-800 p-3 space-y-2">
+								<p class="font-semibold text-white" x-text="entry.title"></p>
+								<p x-show="entry.execution" class="text-xs text-zinc-400" x-text="guidedRepairProgress(entry)"></p>
+								<a :href="guidedRepairRecordLink(entry,selectedRepair)" class="block rounded-xl bg-amber-500 text-zinc-950 text-center py-3 font-black" x-text="entry.execution?.status==='completed'?'Review guided repair →':entry.execution?.status==='in-progress'?'Resume guided repair →':'Start guided repair →'"></a>
+							</div>
+						</template>
+						<p x-show="!guidedRepairRecordEntries(selectedRepair).length" class="text-xs text-zinc-400">No supported factory procedure is linked to this record. Find a procedure in the manual or open its linked project to prepare guided repair.</p>
+						<button type="button" x-show="repairRecordProject(selectedRepair)" @click="const project=repairRecordProject(selectedRepair); if(project){closeRepairWorkspace();openProjectDetail(project)}" class="text-xs text-amber-300 underline">Open linked repair project →</button>
+					</section>
 					<!-- 3-Column Responsive Grid -->
 					<div class="grid grid-cols-1 lg:grid-cols-3 gap-4 text-xs">
 						<!-- LEFT PANEL: Record Data -->
@@ -3635,6 +3647,31 @@
 						return [...entries.values()];
 					},
 					guidedRepairLink(entry,project) { const route=this.guidedRepairRoute(entry);if(!route||!project?.id)return this.manualProjectLink(project);const params=new URLSearchParams({guided:'1',projectId:String(project.id)});if(/^https?:$/.test(location.protocol))params.set('back',location.origin+location.pathname);return this.manualLibrary.base+'/manuals.html?'+params.toString()+route; },
+					repairRecordProject(record) { return record?.projectId?this.projects.find(p=>String(p.id)===String(record.projectId)):null; },
+					repairRecordVehicle(record) { return this.vehicles.find(v=>this.isLogForVehicle(record,v)); },
+					guidedRepairRecordEntries(record) {
+						const vehicle=this.repairRecordVehicle(record),info=this.manualLibrary.vehicles[vehicle?.id];if(!info)return [];
+						const entries=new Map(),project=this.repairRecordProject(record);
+						const add=entry=>{const route=this.guidedRepairRoute(entry);if(!route||Number(route.split('/')[2])!==info.idx||entries.has(route))return;entries.set(route,{...entry,route,title:entry.procedure||entry.title||'Factory repair procedure'});};
+						if(project)this.guidedRepairEntries(project).forEach(add);
+						(record?.procedureReferences||[]).forEach(add);
+						return [...entries.values()];
+					},
+					guidedRepairRecordLink(entry,record) {
+						const route=this.guidedRepairRoute(entry),vehicle=this.repairRecordVehicle(record),project=this.repairRecordProject(record);
+						if(!route||!record?.id||!vehicle)return this.repairRecordSearchLink(record);
+						const params=new URLSearchParams({guided:'1',repairId:String(record.id)});
+						if(project)params.set('projectId',String(project.id));
+						if(/^https?:$/.test(location.protocol))params.set('back',location.origin+location.pathname);
+						return this.manualLibrary.base+'/manuals.html?'+params.toString()+route;
+					},
+					repairRecordSearchLink(record) {
+						const vehicle=this.repairRecordVehicle(record),info=this.manualLibrary.vehicles[vehicle?.id],params=new URLSearchParams();
+						if(Number.isInteger(info?.idx))params.set('vehicle',String(info.idx));
+						if(/^https?:$/.test(location.protocol))params.set('back',location.origin+location.pathname);
+						const q=String(record?.serviceType||'').trim();
+						return this.manualLibrary.base+'/manuals.html?'+params.toString()+'#/search'+(q?'/'+encodeURIComponent(q):'');
+					},
 					guidedRepairProgress(entry) { const steps=entry.execution?.steps||[];return steps.filter(s=>s.status==='done').length+' of '+steps.length+' steps complete'; },
 					refreshRepairCartLinks() { try { const saved=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'); this.repairCartLinks=Object.entries(saved).map(([cartKey,cart])=>({...cart,cartKey})).filter(cart=>cart&&cart.projectId); } catch { this.repairCartLinks=[]; } },
 					publishRepairProjectIndex() { try { localStorage.setItem('lifeos.repair.projects.v1',JSON.stringify((this.projects||[]).map(project=>({id:project.id,vehicleId:project.vehicleId,title:project.title,status:project.status,category:project.category,createdAt:project.createdAt,updatedAt:project.updatedAt})))); } catch(error) { console.warn('Repair project index could not be published',error); } },
@@ -4005,7 +4042,7 @@
 
 
 					async initApp() {
-				const deepLink=new URLSearchParams(location.search),requestedVehicle=deepLink.get('vehicleId'),requestedProject=deepLink.get('projectId'),requestedRepairDraft=deepLink.get('repairDraft'),createProject=deepLink.get('newProject')==='1';
+				const deepLink=new URLSearchParams(location.search),requestedVehicle=deepLink.get('vehicleId'),requestedProject=deepLink.get('projectId'),requestedRepair=deepLink.get('repairId'),requestedRepairDraft=deepLink.get('repairDraft'),createProject=deepLink.get('newProject')==='1';
 				window.addEventListener('storage',event=>{if(event.key==='lifeos.repair.carts.v1')this.refreshRepairCartLinks();});
 				window.addEventListener('resize',()=>this.isMobileView=window.innerWidth<768);
 				// Deep link: yourapp.html#specs opens the Specs tab (used by the Manual Explorer's "Back" link)
@@ -4034,7 +4071,8 @@
 							try { localStorage.setItem("lifeos.garage.activeVehicle.v1", JSON.stringify({ vehicleId: this.activeVehicleId, vehicleName: this.activeVehicle?.name || "", updatedAt: new Date().toISOString() })); } catch (error) { console.warn("Active vehicle could not be shared with Manual Explorer", error); }
 							await this.saveToStorage();
 							this.refreshRepairCartLinks();
-							if(requestedProject){const project=this.projects.find(p=>String(p.id)===String(requestedProject));if(project){this.currentTab='projects';this.openProjectDetail(project);}}
+							if(requestedRepair){const record=this.logs.find(l=>String(l.id)===String(requestedRepair));if(record)this.openRepairDetail(record);}
+							else if(requestedProject){const project=this.projects.find(p=>String(p.id)===String(requestedProject));if(project){this.currentTab='projects';this.openProjectDetail(project);}}
 							else if(createProject){this.currentTab='projects';let draft=null;try{const candidate=JSON.parse(localStorage.getItem('lifeos.repair.project-draft.v1')||'null');if(candidate&&candidate.cart&&(!requestedRepairDraft||candidate.id===requestedRepairDraft))draft=candidate;}catch(error){console.warn('Repair project draft could not be read',error);}this.pendingRepairProjectDraft=draft;const cart=draft?.cart,vehicleName=this.activeVehicle?.name||cart?.vehicle||'this vehicle',procedure=String(cart?.procedure||'Repair Project').trim(),items=Array.isArray(cart?.items)?cart.items:[],tools=Array.isArray(cart?.tools)?cart.tools:[],torqueSpecs=Array.isArray(cart?.torqueSpecs)?cart.torqueSpecs:[];this.newProjectForm={...this.newProjectForm,title:cart?`${procedure} — ${vehicleName}`:'Repair Project',category:cart?.category||'Repair',description:''};const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete('newProject');cleanUrl.searchParams.delete('repairDraft');history.replaceState(history.state,'',cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);this.modals.newProject=true;}
 							// Integrity checks are read-only and must not delay the requested Garage view.
 							this.runDatabaseHealthCheck().catch(error => console.warn('Background database health check failed', error));

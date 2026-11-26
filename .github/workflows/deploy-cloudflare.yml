@@ -31,6 +31,13 @@ jobs:
         with:
           node-version: 22
 
+      - name: Prepare local PDF receipt reader
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts pdfjs-dist@4.10.38
+          mkdir -p public/vendor/pdfjs
+          cp node_modules/pdfjs-dist/legacy/build/pdf.mjs node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs public/vendor/pdfjs/
+          cp node_modules/pdfjs-dist/LICENSE public/vendor/pdfjs/LICENSE
+
       - name: Run tests
         run: npm test
 
@@ -51,6 +58,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Prepare local PDF receipt reader
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts pdfjs-dist@4.10.38
+          mkdir -p public/vendor/pdfjs
+          cp node_modules/pdfjs-dist/legacy/build/pdf.mjs node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs public/vendor/pdfjs/
+          cp node_modules/pdfjs-dist/LICENSE public/vendor/pdfjs/LICENSE
 
       - name: Deploy Worker, static assets, and R2 binding
         env:
@@ -74,6 +88,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Prepare local PDF receipt reader
+        run: |
+          npm install --no-save --package-lock=false --ignore-scripts pdfjs-dist@4.10.38
+          mkdir -p public/vendor/pdfjs
+          cp node_modules/pdfjs-dist/legacy/build/pdf.mjs node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs public/vendor/pdfjs/
+          cp node_modules/pdfjs-dist/LICENSE public/vendor/pdfjs/LICENSE
 
       - name: Deploy isolated preview Worker for preview-branch push, dispatch, or pull request
         env:

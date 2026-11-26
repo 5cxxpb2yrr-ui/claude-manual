@@ -1116,7 +1116,8 @@
 							</button>
 						</template>
 					</div>
-					<template x-if="inventoryCommandNext"><button type="button" @click="inventoryView=inventoryCommandNext.view" class="glass-panel w-full text-left px-3 py-2 flex justify-between items-center gap-2"><div class="min-w-0"><p class="text-[9px] font-bold uppercase text-amber-400">Next best action</p><p class="text-xs font-semibold text-white" x-text="inventoryCommandNext.title"></p><p class="text-[10px] text-zinc-400" x-text="inventoryCommandNext.detail"></p></div><span class="text-amber-300">→</span></button></template>
+					<button type="button" @click="inventoryView='prices'" class="glass-panel w-full text-left px-3 py-2 flex justify-between text-xs font-bold text-amber-300"><span>Price & supplier intelligence</span><span>→</span></button>
+<template x-if="inventoryCommandNext"><button type="button" @click="inventoryView=inventoryCommandNext.view" class="glass-panel w-full text-left px-3 py-2 flex justify-between items-center gap-2"><div class="min-w-0"><p class="text-[9px] font-bold uppercase text-amber-400">Next best action</p><p class="text-xs font-semibold text-white" x-text="inventoryCommandNext.title"></p><p class="text-[10px] text-zinc-400" x-text="inventoryCommandNext.detail"></p></div><span class="text-amber-300">→</span></button></template>
 					<div class="glass-panel p-3 space-y-3">
 						<div class="flex items-center justify-between gap-2"><h3 class="text-sm text-white font-bold" x-text="inventoryViewTitle"></h3><button type="button" x-show="inventoryView!=='stock'" @click="inventoryView='stock'" class="text-xs text-amber-300">Stock →</button><button type="button" x-show="inventoryView==='stock'" @click="inventoryView='history'" class="text-xs text-amber-300">History →</button></div>
 						<div x-show="inventoryView==='stock'||inventoryView==='value'" class="space-y-2">
@@ -1210,7 +1211,19 @@
 							<template x-if="inventoryShoppingList.reviews.length"><details class="rounded-lg border border-zinc-800 p-2"><summary class="text-xs font-bold text-amber-300 cursor-pointer">Confirm before buying · <span x-text="inventoryShoppingList.reviews.length"></span></summary><template x-for="item in inventoryShoppingList.reviews" :key="item.key"><div class="border-t border-zinc-800 py-2 mt-1"><p class="text-xs font-semibold text-white" x-text="item.name"></p><p class="text-[10px] text-zinc-400" x-text="item.source+' · '+item.reason"></p></div></template></details></template>
 							<details class="rounded-lg border border-zinc-800 p-2"><summary class="cursor-pointer text-xs font-bold text-amber-300">Copy shopping list</summary><textarea readonly :value="inventoryShoppingText" class="w-full bg-zinc-950 text-xs text-zinc-200 border border-zinc-800 rounded-lg mt-2 p-2" rows="6" @focus="$event.target.select()"></textarea><button type="button" @click="copyInventoryShopping()" class="w-full mt-1 rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2">Copy list</button><p class="text-[10px] text-zinc-400 mt-1" x-text="inventoryShoppingMessage"></p></details>
 						</div>
-						<div x-show="inventoryView==='orders'" class="space-y-3">
+						<template x-if="inventoryView==='prices'"><div class="space-y-3">
+<p class="text-[10px] text-zinc-400">Historical received purchase lines only. Prices are not current quotes or landed costs. Confirm fitment, shipping and tax before buying.</p>
+<div class="grid grid-cols-2 gap-2"><div class="rounded-lg border border-zinc-800 p-2"><p class="text-xl font-mono text-white" x-text="inventoryPriceReport.observations"></p><p class="text-xs text-zinc-400">Price observations</p></div><div class="rounded-lg border border-zinc-800 p-2"><p class="text-xl font-mono text-white" x-text="inventoryPriceReport.suppliers.length"></p><p class="text-xs text-zinc-400">Suppliers</p></div></div>
+<h4 class="text-xs font-bold text-amber-300">Current purchasing needs</h4>
+<template x-for="r in inventoryPriceReport.recommendations" :key="r.key"><div class="rounded-lg border border-zinc-800 p-2 space-y-1"><div class="flex justify-between gap-2 text-xs"><strong x-text="r.item.name"></strong><span class="text-amber-300" x-text="r.item.quantity+' '+r.item.unit"></span></div><p class="text-xs text-zinc-400" x-text="r.supplier?'Historical comparison: '+r.supplier.name+' · '+inventoryMoney(r.supplier.latest.price)+' / '+r.item.unit+' · '+r.supplier.latest.date:'No recent exact comparable price; request quote.'"></p><p class="text-xs text-emerald-300" x-show="r.estimatedSavings>0" x-text="'Historical difference: '+inventoryMoney(r.estimatedSavings)+' (not guaranteed savings)'"></p><button type="button" @click="openVendorDraft(r.item)" class="text-xs text-amber-300 font-bold">Review purchase →</button></div></template>
+<p x-show="!inventoryPriceReport.recommendations.length" class="text-xs text-zinc-400">No uncovered quantified demand.</p>
+<h4 class="text-xs font-bold text-amber-300">Price history</h4><input x-model="priceSearch" placeholder="Search part or supplier…" class="w-full bg-zinc-950 rounded-lg border border-zinc-800 p-2 text-sm text-white">
+<template x-for="p in inventoryPriceRows" :key="p.key"><details class="rounded-lg border border-zinc-800 p-2"><summary class="cursor-pointer text-xs flex justify-between gap-2"><span x-text="p.name+' · '+p.unit"></span><strong class="text-emerald-300" x-text="p.latest?inventoryMoney(p.latest.price):'Undated'"></strong></summary><p class="text-[10px] text-zinc-400 mt-2" x-text="p.fitment+' · '+(p.partNumber||'No part number')"></p><div class="grid grid-cols-3 gap-1 text-xs mt-2"><div>Low <strong x-text="inventoryMoney(p.low)"></strong></div><div>Avg <strong x-text="inventoryMoney(p.average)"></strong></div><div>High <strong x-text="inventoryMoney(p.high)"></strong></div></div><template x-for="(o,i) in p.observations" :key="i"><div class="flex justify-between text-xs border-t border-zinc-800 mt-1 pt-1"><span x-text="o.supplier+' · '+(o.date||'Undated')"></span><span x-text="inventoryMoney(o.price)+' × '+o.quantity"></span></div></template></details></template>
+<p x-show="!inventoryPriceRows.length" class="text-xs text-zinc-400">No matching received purchase history.</p>
+<h4 class="text-xs font-bold text-amber-300">Supplier performance</h4>
+<template x-for="s in inventoryPriceReport.suppliers" :key="s.key"><div class="border border-zinc-800 rounded-lg p-2 text-xs space-y-1"><div class="flex justify-between"><strong x-text="s.name"></strong><strong x-text="inventoryMoney(s.receivedValue)"></strong></div><p class="text-zinc-400" x-text="s.completed+' completed · '+s.open+' open · '+s.orders+' recorded orders'"></p><p class="text-zinc-400" x-text="s.timed?s.onTime+'/'+s.timed+' dated completed orders on time':'Not enough dated delivery evidence'"></p></div></template>
+</div></template>
+<div x-show="inventoryView==='orders'" class="space-y-3">
 							<button type="button" @click="openVendorDraft()" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2">+ Import receipt / record order</button>
 							<p class="text-[10px] text-zinc-400">Amazon or any vendor. Review item rows and record delivery separately. No retailer login required.</p>
 							<p x-show="vendorError" x-text="vendorError" class="text-xs text-rose-300" role="alert"></p>
@@ -3015,6 +3028,7 @@
 		<script src="/inventory-demand.js"></script>
 		<script src="/inventory-purchasing.js"></script>
 <script src="/inventory-capture.js"></script>
+<script src="/inventory-prices.js"></script>
 		<script>
 			function garageApp() {
 				return {
@@ -3043,7 +3057,7 @@
 					showLightbox: false,
 					lightboxImage: '',
 					isEditingRepair: false,
-					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",captureBusy:false,vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
+					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",captureBusy:false,vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",priceSearch:"",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
 					garageDB: null,
 					saveState: 'saved', lastSaveError:'',
 					lastSavedAt: null,
@@ -3819,7 +3833,9 @@ async saveVendorDraft(){
 						const neutral="border-zinc-700 bg-zinc-950 text-zinc-100",blue="border-sky-500/30 bg-sky-500/5 text-sky-300",amber="border-amber-500/40 bg-amber-500/10 text-amber-300",green="border-emerald-500/30 bg-emerald-500/5 text-emerald-300";
 						return [{id:"stock",view:"stock",label:"Stock items",value:stock.length,detail:"Part records",tone:blue},{id:"tools",view:"tools",label:"Owned tools",value:(this.toolInventory||[]).length,detail:"Equipment",tone:blue},{id:"value",view:"value",label:"Stock value",value:this.inventoryMoney(value),detail:"Recorded cost",tone:green},{id:"soon",view:"soon",label:"Needed soon",value:soon,detail:"20 days / projects",tone:soon?amber:neutral},{id:"review",view:"review",label:"Shortages",value:review,detail:"Uncovered demand",tone:review?amber:neutral},{id:"orders",view:"orders",label:"On order",value:orders,detail:"Purchase orders",tone:orders?"border-violet-500/30 bg-violet-500/5 text-violet-300":neutral}];
 					},
-					get inventoryViewTitle(){return ({stock:"Parts inventory",tools:"Owned tools",value:"Stock by value",soon:"Needed soon",review:"Uncovered demand",shopping:"Consolidated shopping list",orders:"Purchases & receiving",history:"Stock movement history"})[this.inventoryView]||"Parts inventory";},
+					get inventoryPriceReport(){return window.MotorNotePriceIntelligence.analyze({orders:this.vendorOrders||[],inventory:this.inventory||[],shopping:this.inventoryShoppingList.items});},
+get inventoryPriceRows(){const q=this.priceSearch.trim().toLowerCase();return this.inventoryPriceReport.products.filter(p=>!q||[p.name,p.partNumber,p.fitment,...p.suppliers.map(s=>s.name)].join(" ").toLowerCase().includes(q));},
+get inventoryViewTitle(){return ({stock:"Parts inventory",tools:"Owned tools",value:"Stock by value",soon:"Needed soon",review:"Uncovered demand",shopping:"Consolidated shopping list",orders:"Purchases & receiving",history:"Stock movement history",prices:"Price & supplier intelligence"})[this.inventoryView]||"Parts inventory";},
 					get inventoryCommandNext(){
 						const f=this.inventoryForecast(20);
 						if(f.shortages.length)return {view:"shopping",title:"Review shopping list",detail:window.MotorNoteDemandEngine.shoppingList(f,this.vehicles||[]).items.length+" uncovered purchase lines · confirm fitment"};

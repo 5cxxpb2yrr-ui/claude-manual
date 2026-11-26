@@ -244,6 +244,7 @@ function findScionSiblingSpecificationPages(tree,pageId){
  for(let i=targetPath.length-1;i>=0;i--){
   const name=String(targetPath[i].n||"").trim();
   const head=name.split(":")[0].trim();
+  if(/^(removal and installation|disassembly and reassembly|removal|installation|testing and inspection|specifications|service and repair|key to diagrams)$/i.test(head))continue;
   const candidate=head.replace(/\b(?:assembly|unit|subassembly|remove|replace|install|overhaul|testing|inspection|service|repair|specifications)\b/gi," ").replace(/\s+/g," ").trim();
   if(candidate&&!/^(additional pages|part \d+|other variant|electrical|charging system)$/i.test(candidate)){
    component=candidate;break;

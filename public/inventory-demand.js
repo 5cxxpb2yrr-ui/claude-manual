@@ -7,7 +7,7 @@ const norm=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
 const same=(a,b)=>a!=null&&b!=null&&String(a)===String(b);
 const day=(v,now)=>{if(!v)return null;const t=new Date(v).getTime();return Number.isFinite(t)?Math.max(0,Math.ceil((t-now)/86400000)):null;};
 const terminal=r=>r.used||/^(used|installed|cancelled|canceled)(?:\b|$)/i.test(r.status||"");
-function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],predictions=[],horizon=20,now=Date.now()}={}){
+function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],predictions=[],vendorOrders=[],horizon=20,now=Date.now()}={}){
  const stock=inventory.map(p=>({p,free:Math.max(0,positive(p.quantity)-positive(p.reservedQuantity)),reserved:Math.min(positive(p.quantity),positive(p.reservedQuantity)),legacy:0}));
  const liveProjects=projects.filter(active),livePlans=maintenancePlans.filter(active);
  const byVehicle=id=>vehicles.find(v=>same(v.id,id));
@@ -59,6 +59,7 @@ function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],pred
  const compatible=(p,v)=>!!v&&(p.vehicleCompatibility==="Universal"||p.vehicleCompatibility===v.name||same(p.vehicleId,v.id));
  function matches(s,d){
   const r=d.r,p=s.p,v=byVehicle(d.vehicleId);
+  if(r.unit&&norm(r.unit)!==norm(p.unit||"each"))return false;
   if(r.inventoryId!=null&&String(r.inventoryId)!=="")return same(p.id,r.inventoryId);
   if(!compatible(p,v))return false;
   const pn=norm(r.partNumber);if(pn)return pn===norm(p.partNumber);
@@ -68,7 +69,7 @@ function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],pred
  reqs.sort((a,b)=>Number(!!b.r.reserved)-Number(!!a.r.reserved)||a.days-b.days||Number(b.r.inventoryId!=null)-Number(a.r.inventoryId!=null)||a.key.localeCompare(b.key));
  const rows=[];
  for(const d of reqs){
-  const r=d.r,qty=d.quantity,candidates=stock.filter(s=>matches(s,d)),allocations=[];
+  const r=d.r,qty=d.quantity,linkedLines=vendorOrders.filter(o=>/^(Ordered|Partially received|Received)$/i.test(o.status||"")).flatMap(o=>(o.lines||[]).filter(l=>l.demandKey===d.key).map(l=>({line:l,order:o}))),candidates=stock.filter(s=>matches(s,d)||linkedLines.some(({line})=>line.receivedQuantity>0&&same(s.p.id,line.inventoryId)&&compatible(s.p,byVehicle(d.vehicleId))&&(!r.unit||norm(r.unit)===norm(s.p.unit||"each")))),allocations=[];
   let reserved=0,onHand=0,incoming=0,received=0,remaining=qty;
   if(r.reserved&&r.inventoryId!=null){
    const s=candidates[0],pool=d.kind==="maintenance"?"legacy":"reserved";
@@ -84,6 +85,7 @@ function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],pred
     }else{incoming+=n;remaining-=n;}
    }
   }
+  for(const {line,order} of linkedLines){if(order.status==="Received")continue;const n=Math.min(remaining,Math.max(0,positive(line.quantity)-positive(line.receivedQuantity)));incoming+=n;remaining-=n;}
   for(const s of candidates){
    const n=Math.min(remaining,s.free);if(n){s.free-=n;onHand+=n;remaining-=n;allocations.push({itemId:s.p.id,quantity:n,kind:"available"});}
    if(remaining<=0)break;

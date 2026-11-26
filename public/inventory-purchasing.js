@@ -28,7 +28,19 @@ function validateDraft(draft,orders=[],legacy=[]){
   if(!String(l.vehicleCompatibility||"").trim())throw Error("Line "+(i+1)+": choose fitment or Not verified.");
   return {id:"line-"+(i+1),description,partNumber:String(l.partNumber||"").trim(),quantity,unitCost,unit:String(l.unit).trim(),vehicleCompatibility:l.vehicleCompatibility,inventoryId:l.inventoryId||null,demandKey:l.demandKey||null,barcode:String(l.barcode||"").trim(),receivedQuantity:0};
  });
- return {vendor,orderNumber,orderedDate:draft.orderedDate||"",expectedDate:draft.expectedDate||"",status:"Ordered",lines,...(draft.receiptSource?{receiptSource:clone(draft.receiptSource)}:{})};
+ const evidence={};
+ if(draft.receiptSource){
+  evidence.receiptSource=clone(draft.receiptSource);
+  if(draft.receiptTotals){
+   evidence.receiptTotals=Object.fromEntries(["subtotal","shipping","discount","tax","total"].map(key=>{
+    const value=draft.receiptTotals[key];
+    if(value==null)return [key,null];
+    if(typeof value!=="number"||!Number.isFinite(value))throw Error("Invalid extracted receipt amount: "+key);
+    return [key,value];
+   }));
+  }
+ }
+ return {vendor,orderNumber,orderedDate:draft.orderedDate||"",expectedDate:draft.expectedDate||"",status:"Ordered",lines,...evidence};
 }
 function receive(order,inventory,amounts,now=new Date().toISOString()){
  if(!order||!["Ordered","Partially received"].includes(order.status))throw Error("Order is not open for receiving.");

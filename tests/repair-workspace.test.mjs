@@ -11,6 +11,22 @@ const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "u
 
 
 const scionRepair = JSON.parse(readFileSync(new URL("../public/data/scion-repair.json", import.meta.url), "utf8"));
+test("Scion Repair Workspace finds matching specifications across both Scion navigation guides", () => {
+  const crossGuide = { c: [
+    { n: "Parts and Labor", c: [{ n: "Other Variant", c: [{ n: "Electrical", c: [{ n: "Charging System", c: [
+      { n: "Alternator Assembly: Remove & Replace", p: 110 },
+      { n: "Alternator Assembly: Remove, Install, and Overhaul", p: 111 }
+    ] }] }] }] },
+    { n: "Repair and Diagnosis", c: [{ n: "Starting and Charging", c: [{ n: "Charging System", c: [
+      { n: "Alternator: Specifications", p: 5690 }
+    ] }] }] }
+  ] };
+  for (const pageId of [110, 111]) {
+    const matches = Engine.findScionSiblingSpecificationPages(crossGuide, pageId);
+    assert.ok(matches.some(page => page.page === "5690" && /Alternator: Specifications/i.test(page.label)));
+  }
+});
+
 test("Scion Repair Workspace discovers specification siblings from the navigation tree", () => {
   const waterPump = Engine.findScionSiblingSpecificationPages(scionRepair, 6552);
   assert.ok(waterPump.some(page => page.page === "6553" && /Water Pump: Specifications/i.test(page.label)));

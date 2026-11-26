@@ -1164,15 +1164,25 @@
 							</div></template>
 						</div>
 					</div></div>
-						<div x-show="inventoryView==='soon'" class="space-y-2">
-							<p class="text-xs text-zinc-400">Stock of two or fewer available units with maintenance due within 20 days or active project demand.</p>
-							<template x-for="item in inventoryDemandAlerts()" :key="item.id"><button type="button" @click="openEditPartModal(inventory.find(p=>String(p.id)===String(item.id)))" class="w-full text-left rounded-lg border border-amber-500/30 bg-amber-500/5 p-2"><div class="flex justify-between gap-2 text-xs"><span class="font-bold text-white" x-text="item.name"></span><span class="text-amber-300" x-text="item.available+' available'"></span></div><p class="text-[10px] text-zinc-400 mt-1" x-text="item.reasons.join(' · ')"></p></button></template>
-							<p x-show="!lowInventoryCount" class="text-xs text-zinc-400">No low-stock items with imminent demand.</p>
-						</div>
-						<div x-show="inventoryView==='review'" class="space-y-2">
-							<p class="text-xs text-zinc-400">Outstanding project requirements without enough verified matching stock. Fitment and allocations still need review.</p>
-							<template x-for="item in inventoryProjectReview" :key="item.key"><button type="button" @click="currentTab='projects';openProjectDetail(item.project)" class="w-full text-left border border-zinc-800 rounded-lg p-2"><div class="flex justify-between gap-2 text-xs"><span class="font-bold text-white" x-text="item.name"></span><span class="text-amber-300" x-text="'Qty '+item.quantity"></span></div><p class="text-[10px] text-zinc-400" x-text="item.project.title+' · '+item.reason"></p></button></template>
-							<p x-show="!inventoryProjectReview.length" class="text-xs text-zinc-400">No unmatched project requirements recorded.</p>
+						<div x-show="inventoryView==='soon'||inventoryView==='review'" class="space-y-3">
+							<div class="grid grid-cols-3 gap-1.5" role="group" aria-label="Maintenance forecast horizon">
+								<template x-for="days in [20,90,365]" :key="days"><button type="button" @click="inventoryForecastHorizon=days" :aria-pressed="inventoryForecastHorizon===days" class="rounded-lg border py-2 text-xs font-bold" :class="inventoryForecastHorizon===days?'border-amber-400 text-amber-300 bg-amber-500/10':'border-zinc-800 text-zinc-400'" x-text="days+' days'"></button></template>
+							</div>
+							<p class="text-[10px] text-zinc-400">Active projects plus next scheduled service within the selected window. Read-only allocations, not actual reservations. Dashboard tiles always use 20 days.</p>
+							<template x-for="item in (inventoryView==='review'?inventoryForecast(inventoryForecastHorizon).shortages:inventoryForecast(inventoryForecastHorizon).rows)" :key="item.key">
+								<div class="rounded-lg border p-2 space-y-2" :class="item.shortage?'border-amber-500/40 bg-amber-500/5':'border-zinc-800 bg-zinc-950'">
+									<div class="flex justify-between gap-2 text-xs"><span class="font-bold text-white" x-text="item.name"></span><span class="shrink-0 font-bold" :class="item.shortage?'text-amber-300':'text-emerald-300'" x-text="item.shortage?item.shortage+' uncovered':item.incoming?'On order':item.received?'Received':'Stock matched'"></span></div>
+									<p class="text-[10px] text-zinc-400" x-text="item.source+' · '+((vehicles||[]).find(v=>String(v.id)===String(item.vehicleId))?.name||'Vehicle not recorded')+(item.kind==='project'?' · Active project':' · '+item.days+'d')"></p>
+									<div class="grid grid-cols-4 gap-1 text-center">
+										<template x-for="cell in [{label:'Need',value:item.quantity},{label:'Stock',value:item.onHand+item.reserved},{label:'Ordered',value:item.incoming},{label:'Gap',value:item.shortage}]" :key="cell.label"><div class="rounded bg-zinc-900 p-1"><div class="font-bold text-white text-xs" x-text="cell.value"></div><div class="text-[9px] text-zinc-400" x-text="cell.label"></div></div></template>
+									</div>
+									<p x-show="item.received" class="text-[10px] text-zinc-400" x-text="item.received+' received, not yet added to stock'"></p>
+									<p class="text-[10px] text-zinc-400" x-text="item.estimated?'Estimated schedule requirement — verify quantity and fitment.':item.needsReview?'Confirm part identity and fitment.':'Confirm allocation before purchasing.'"></p>
+									<button type="button" x-show="item.projectId!=null" @click="const p=projects.find(p=>String(p.id)===String(item.projectId));if(p){currentTab='projects';openProjectDetail(p)}" class="text-xs font-bold text-amber-300">Open project →</button>
+								</div>
+							</template>
+							<p x-show="!(inventoryView==='review'?inventoryForecast(inventoryForecastHorizon).shortages:inventoryForecast(inventoryForecastHorizon).rows).length" class="text-xs text-zinc-400">No quantified requirements in this view.</p>
+							<template x-if="inventoryForecast(inventoryForecastHorizon).reviews.length"><details class="rounded-lg border border-zinc-800 p-2"><summary class="text-xs font-bold text-amber-300 cursor-pointer">Needs confirmation · <span x-text="inventoryForecast(inventoryForecastHorizon).reviews.length"></span></summary><template x-for="item in inventoryForecast(inventoryForecastHorizon).reviews" :key="item.key"><div class="border-t border-zinc-800 py-2 mt-1"><p class="text-xs font-semibold text-white" x-text="item.name"></p><p class="text-[10px] text-zinc-400" x-text="item.source+' · '+item.reason"></p></div></template></details></template>
 						</div>
 						<div x-show="inventoryView==='orders'" class="space-y-2">
 							<template x-for="entry in inventoryOpenOrders" :key="entry.key"><button type="button" @click="currentTab='projects';openProjectDetail(entry.project)" class="w-full text-left border border-zinc-800 rounded-lg p-2"><div class="flex justify-between text-xs gap-2"><span class="font-bold text-white" x-text="entry.order.vendor||'Supplier'"></span><span class="text-amber-300" x-text="entry.order.status"></span></div><p class="text-[10px] text-zinc-400" x-text="entry.project.title+' · '+(entry.order.lines||[]).length+' lines · '+inventoryMoney(projectPurchaseOrderTotal(entry.order))"></p><p class="text-[10px] text-zinc-400" x-text="entry.order.expectedDate?'Expected '+entry.order.expectedDate:'No expected date'"></p></button></template>
@@ -2957,6 +2967,7 @@
 		<script src="/repair-workspace.js"></script>
 		<script src="/repair-planner.js"></script>
 		<script src="/inventory-engine.js"></script>
+		<script src="/inventory-demand.js"></script>
 		<script>
 			function garageApp() {
 				return {
@@ -2985,7 +2996,7 @@
 					showLightbox: false,
 					lightboxImage: '',
 					isEditingRepair: false,
-					appSchemaVersion: 8, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",inventorySearch:"",
+					appSchemaVersion: 8, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",inventorySearch:"",inventoryForecastHorizon:20,
 					garageDB: null,
 					saveState: 'saved',
 					lastSavedAt: null,
@@ -3683,15 +3694,20 @@
 						}
 						return rows;
 					},
-					get inventoryCommandTiles(){
-						const stock=this.inventory||[],value=stock.reduce((sum,p)=>sum+Math.max(0,Number(p.quantity)||0)*Math.max(0,Number(p.unitCost)||0),0),soon=this.lowInventoryCount,review=this.inventoryProjectReview.length,orders=this.inventoryOpenOrders.length;
-						const neutral="border-zinc-700 bg-zinc-950 text-zinc-100",blue="border-sky-500/30 bg-sky-500/5 text-sky-300",amber="border-amber-500/40 bg-amber-500/10 text-amber-300",green="border-emerald-500/30 bg-emerald-500/5 text-emerald-300";
-						return [{id:"stock",view:"stock",label:"Stock items",value:stock.length,detail:"Part records",tone:blue},{id:"tools",view:"tools",label:"Owned tools",value:(this.toolInventory||[]).length,detail:"Equipment",tone:blue},{id:"value",view:"value",label:"Stock value",value:this.inventoryMoney(value),detail:"Recorded cost",tone:green},{id:"soon",view:"soon",label:"Needed soon",value:soon,detail:"20 days / projects",tone:soon?amber:neutral},{id:"review",view:"review",label:"Unmatched",value:review,detail:"Project requirements",tone:review?amber:neutral},{id:"orders",view:"orders",label:"On order",value:orders,detail:"Purchase orders",tone:orders?"border-violet-500/30 bg-violet-500/5 text-violet-300":neutral}];
+					inventoryForecast(days=20){
+						const predictions=(this.vehicles||[]).flatMap(v=>this.predictiveForVehicle(v).map(item=>({...item,vehicleId:v.id})));
+						return window.MotorNoteDemandEngine.forecast({inventory:this.inventory||[],vehicles:this.vehicles||[],projects:this.projects||[],maintenancePlans:this.maintenancePlans||[],predictions,horizon:Number(days)});
 					},
-					get inventoryViewTitle(){return ({stock:"Parts inventory",tools:"Owned tools",value:"Stock by value",soon:"Needed soon",review:"Unmatched project requirements",orders:"Open purchase orders",history:"Stock movement history"})[this.inventoryView]||"Parts inventory";},
+					get inventoryCommandTiles(){
+						const stock=this.inventory||[],value=stock.reduce((sum,p)=>sum+Math.max(0,Number(p.quantity)||0)*Math.max(0,Number(p.unitCost)||0),0),forecast=this.inventoryForecast(20),soon=forecast.rows.filter(r=>r.kind!=="project").length+forecast.reviews.length,review=forecast.shortages.length,orders=this.inventoryOpenOrders.length;
+						const neutral="border-zinc-700 bg-zinc-950 text-zinc-100",blue="border-sky-500/30 bg-sky-500/5 text-sky-300",amber="border-amber-500/40 bg-amber-500/10 text-amber-300",green="border-emerald-500/30 bg-emerald-500/5 text-emerald-300";
+						return [{id:"stock",view:"stock",label:"Stock items",value:stock.length,detail:"Part records",tone:blue},{id:"tools",view:"tools",label:"Owned tools",value:(this.toolInventory||[]).length,detail:"Equipment",tone:blue},{id:"value",view:"value",label:"Stock value",value:this.inventoryMoney(value),detail:"Recorded cost",tone:green},{id:"soon",view:"soon",label:"Needed soon",value:soon,detail:"20 days / projects",tone:soon?amber:neutral},{id:"review",view:"review",label:"Shortages",value:review,detail:"Uncovered demand",tone:review?amber:neutral},{id:"orders",view:"orders",label:"On order",value:orders,detail:"Purchase orders",tone:orders?"border-violet-500/30 bg-violet-500/5 text-violet-300":neutral}];
+					},
+					get inventoryViewTitle(){return ({stock:"Parts inventory",tools:"Owned tools",value:"Stock by value",soon:"Needed soon",review:"Uncovered demand",orders:"Open purchase orders",history:"Stock movement history"})[this.inventoryView]||"Parts inventory";},
 					get inventoryCommandNext(){
-						if(this.inventoryProjectReview.length)return {view:"review",title:"Review outstanding project supplies",detail:this.inventoryProjectReview.length+" unmatched requirements"};
-						if(this.lowInventoryCount)return {view:"soon",title:"Review upcoming stock needs",detail:this.lowInventoryCount+" low-stock items with demand"};
+						const f=this.inventoryForecast(20);
+						if(f.shortages.length)return {view:"review",title:"Review uncovered supply requirements",detail:f.shortages.length+" shortage lines · confirm fitment before buying"};
+						if(f.reviews.length)return {view:"soon",title:"Confirm upcoming maintenance requirements",detail:f.reviews.length+" quantities or specifications to review"};
 						if(this.inventoryOpenOrders.length)return {view:"orders",title:"Check incoming orders",detail:this.inventoryOpenOrders.length+" open orders"};
 						return null;
 					},

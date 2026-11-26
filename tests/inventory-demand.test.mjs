@@ -35,3 +35,17 @@ test("received unstocked orders and linked plans do not create duplicate demand"
  assert.equal(f.rows[0].received,2);
  assert.equal(f.shortages.length,0);
 });
+
+
+test("shopping list consolidates only same vehicle, part identity and unit, preserving sources",()=>{
+ const row=(key,extra={})=>({key,name:"Filter",partNumber:"A-1",unit:"each",vehicleId:"s",quantity:3,shortage:2,onHand:1,days:0,source:key,kind:"project",projectId:key,...extra});
+ const f={horizon:20,rows:[row("a"),row("b",{partNumber:"A1",shortage:1,quantity:3,incoming:1}),row("c",{vehicleId:"t"}),row("d",{unit:"set"}),row("e",{partNumber:""}),row("f",{partNumber:""}),row("g",{shortage:0})],reviews:[{name:"Oil",source:"Service",reason:"Confirm volume"}]};
+ const list=engine.shoppingList(f,[v,other]);
+ assert.equal(list.items.length,5);
+ const merged=list.items.find(x=>x.sources.length===2);
+ assert.equal(merged.quantity,3);
+ assert.equal(merged.incoming,1);
+ assert.deepEqual(merged.sources.map(s=>s.key),["a","b"]);
+ assert.equal(list.items.filter(x=>!x.partNumber).length,2);
+ assert.match(engine.shoppingText(list),/Confirm before buying/);
+});

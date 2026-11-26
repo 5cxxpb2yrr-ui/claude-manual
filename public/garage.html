@@ -1150,6 +1150,17 @@
 							<p x-show="toolInventoryError" x-text="toolInventoryError" class="text-xs text-rose-300"></p>
 						</div>
 					</details>
+					<details class="glass-panel px-3 py-2">
+						<summary class="cursor-pointer text-sm font-bold text-amber-300">Stock movement history · <span x-text="inventoryLedger.length"></span></summary>
+						<p class="text-xs text-zinc-400 mt-2">Opening balances and saved quantity/reservation changes. Tools are not consumable stock.</p>
+						<div class="mt-2 max-h-80 overflow-y-auto space-y-1">
+							<template x-for="entry in inventoryLedger.slice().reverse()" :key="entry.id"><div class="border-t border-zinc-800 py-2 text-xs">
+								<div class="flex justify-between gap-2"><span class="font-bold text-white" x-text="entry.name"></span><span class="text-amber-300" x-text="entry.type.replaceAll('-',' ')"></span></div>
+								<div class="text-zinc-400" x-text="entry.reason+' · '+new Date(entry.timestamp).toLocaleDateString()"></div>
+								<div class="grid grid-cols-2 gap-1 mt-1"><div class="rounded bg-zinc-950 p-1.5" x-text="'On hand: '+entry.before.onHand+' → '+entry.after.onHand"></div><div class="rounded bg-zinc-950 p-1.5" x-text="'Reserved: '+entry.before.reserved+' → '+entry.after.reserved"></div></div>
+							</div></template>
+						</div>
+					</details>
 					<!-- Mobile: one card per part -->
 					<div class="sm:hidden space-y-2">
 						<template x-for="item in inventory" :key="'inv-card-'+item.id">
@@ -3014,6 +3025,7 @@
 		<!-- ================= APPLICATION ENGINE SCRIPT ================= -->
 		<script src="/repair-workspace.js"></script>
 		<script src="/repair-planner.js"></script>
+		<script src="/inventory-engine.js"></script>
 		<script>
 			function garageApp() {
 				return {
@@ -3042,7 +3054,7 @@
 					showLightbox: false,
 					lightboxImage: '',
 					isEditingRepair: false,
-					appSchemaVersion: 7,
+					appSchemaVersion: 8, inventoryLedger:[], inventorySaveTail:null,
 					garageDB: null,
 					saveState: 'saved',
 					lastSavedAt: null,
@@ -4203,6 +4215,7 @@
 						if (Array.isArray(saved.logs)) this.logs = saved.logs;
 						if (Array.isArray(saved.projects)) this.projects = saved.projects;
 						if (Array.isArray(saved.inventory)) this.inventory = saved.inventory;
+						this.inventoryLedger=Array.isArray(saved.inventoryLedger)?saved.inventoryLedger:[];
 						this.toolInventory = Array.isArray(saved.toolInventory)?saved.toolInventory:[];
 						if (Array.isArray(saved.maintenancePlans)) this.maintenancePlans = saved.maintenancePlans;
 						if (Array.isArray(saved.archivedMaintenance)) this.archivedMaintenance = saved.archivedMaintenance;
@@ -4228,7 +4241,7 @@
 
 				getPersistableState() {
 					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? undefined : val));
-					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), toolInventory:strip(this.toolInventory||[]), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
+					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), inventoryLedger:strip(this.inventoryLedger||[]), toolInventory:strip(this.toolInventory||[]), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
 				},
 
 				loadGarageState() {
@@ -4236,24 +4249,20 @@
 					return new Promise(resolve => { const req = this.garageDB.transaction('state', 'readonly').objectStore('state').get('current'); req.onsuccess = () => resolve(req.result?.value || null); req.onerror = () => resolve(null); });
 				},
 
-				async saveToStorage() {
-					this.saveState = 'saving';
-					const state = this.getPersistableState();
-					try {
-						if (!this.garageDB) {
-							localStorage.setItem('motornote_pro_app_state', JSON.stringify(state));
-						} else {
-							await new Promise((resolve, reject) => { const tx = this.garageDB.transaction('state', 'readwrite'); tx.objectStore('state').put({ key: 'current', value: state }); tx.oncomplete = resolve; tx.onerror = () => reject(tx.error || new Error('IndexedDB write failed')); });
-						}
-						this.publishRepairProjectIndex();
-						this.lastSavedAt = state.savedAt;
-						this.saveState = 'saved';
-						return true;
-					} catch (e) {
-						console.error('Save failed', e);
-						this.saveState = 'error';
-						return false;
-					}
+				async saveToStorage(reason="Saved inventory change",reference=null) {
+					const state=this.getPersistableState();
+					const persist=async()=>{
+						this.saveState='saving';
+						try {
+							state.inventoryLedger=window.MotorNoteInventoryEngine.reconcile(this.inventoryLedger,state.inventory,{reason,reference,timestamp:state.savedAt});
+							if(!this.garageDB)localStorage.setItem('motornote_pro_app_state',JSON.stringify(state));
+							else await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('state','readwrite');tx.objectStore('state').put({key:'current',value:state});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('IndexedDB write failed'));tx.onabort=()=>reject(tx.error||new Error('IndexedDB write aborted'));});
+							this.inventoryLedger=state.inventoryLedger;
+							this.publishRepairProjectIndex();
+							this.lastSavedAt=state.savedAt;this.saveState='saved';return true;
+						}catch(e){console.error('Save failed',e);this.saveState='error';return false;}
+					};
+					const task=Promise.resolve(this.inventorySaveTail).then(persist,persist);this.inventorySaveTail=task;return task;
 				},
 
 				async createSafetySnapshot(state = this.getPersistableState(), reason = 'manual') {
@@ -4274,6 +4283,7 @@
 					ids(this.vehicles,'vehicle'); ids(this.logs,'service log'); ids(this.projects,'project'); ids(this.inventory,'inventory');
 					this.logs.forEach(l => { if (!l.vehicleId || !vehicleIds.has(l.vehicleId)) issues.push(`Service log ${l.id} references a missing vehicle.`); if (!l.serviceType) warnings.push(`Service log ${l.id} has no service type.`); if (Number.isNaN(Number(l.mileage))) warnings.push(`Service log ${l.id} has invalid mileage.`); });
 					this.projects.forEach(p => { if (!p.vehicleId || !vehicleIds.has(p.vehicleId)) issues.push(`Project ${p.id} references a missing vehicle.`); });
+					if(this.inventoryLedger?.length)warnings.push(...window.MotorNoteInventoryEngine.audit(this.inventoryLedger,this.inventory));
 					this.inventory.forEach(p => { if (Number(p.quantity) < 0) warnings.push(`Inventory ${p.id} has a negative quantity.`); if (Number(p.reservedQuantity || 0) > Number(p.quantity || 0)) warnings.push(`Inventory ${p.id} has more reserved than on-hand stock.`); });
 					let attachmentCount=0, attachmentKeys=[];
 					this.logs.forEach(l => (l.attachments || []).forEach(a => { attachmentCount++; if (a.storageKey) attachmentKeys.push(a.storageKey); }));
@@ -4516,7 +4526,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					projectPurchaseOrderTotal(order) { return (order?.lines||[]).reduce((sum,line)=>sum+Math.max(0,Number(line.quantity)||0)*Math.max(0,Number(line.unitCost)||0),0); },
 					async createProjectPurchaseOrder(project) { const vendor=String(this.projectPurchaseOrderDraft.vendor||'').trim(),ids=new Set(this.selectedProjectPurchasePartIds.map(String)); if(!project||!vendor||!ids.size)return; const requirements=this.projectOrderableParts(project).filter(req=>ids.has(String(req.id))); if(requirements.length!==ids.size){alert('One or more selected requirements are no longer available to order. Review the selection.');return;} const now=new Date().toISOString(),order={id:'project-po-'+Date.now(),vendor,orderNumber:String(this.projectPurchaseOrderDraft.orderNumber||'').trim(),orderedDate:this.projectPurchaseOrderDraft.orderedDate||now.slice(0,10),expectedDate:this.projectPurchaseOrderDraft.expectedDate||'',status:'Ordered',createdAt:now,updatedAt:now,lines:requirements.map(req=>({requirementId:req.id,partNumber:req.partNumber||'',description:req.description,quantity:Math.max(1,Number(req.quantity)||1),unitCost:Math.max(0,Number(req.unitCost)||0)}))}; if(!Array.isArray(project.purchaseOrders))project.purchaseOrders=[]; project.purchaseOrders.unshift(order); requirements.forEach(req=>{req.purchaseOrderId=order.id;req.status='On order';}); this.selectedProjectPurchasePartIds=[]; this.projectPurchaseOrderDraft={vendor:'Amazon',orderNumber:'',orderedDate:new Date().toISOString().split('T')[0],expectedDate:''}; await this.saveToStorage(); },
 					async setProjectPurchaseOrderStatus(project,orderId,status) { const order=(project?.purchaseOrders||[]).find(o=>String(o.id)===String(orderId)); if(!order||!['Ordered','Backordered','Received','Cancelled'].includes(status))return; order.status=status; order.updatedAt=new Date().toISOString(); (order.lines||[]).forEach(line=>{const req=(project.partRequirements||[]).find(p=>String(p.id)===String(line.requirementId)); if(!req)return; if(status==='Cancelled'){if(String(req.purchaseOrderId)===String(order.id)){req.purchaseOrderId=null;req.status='Required';}} else {req.purchaseOrderId=order.id;req.status=status==='Received'?'Received':status;}}); await this.saveToStorage(); },
-					async addReceivedProjectPartsToInventory(project,orderId) { const order=(project?.purchaseOrders||[]).find(o=>String(o.id)===String(orderId)); if(!project||!order||order.status!=='Received')return; const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); let added=0; for(const line of order.lines||[]){const req=(project.partRequirements||[]).find(p=>String(p.id)===String(line.requirementId)); if(!req||req.inventoryId||req.inventoryAddedAt)continue; const id='part-project-'+Date.now()+'-'+added; this.inventory.push({id,partNumber:line.partNumber||'',vendor:order.vendor||'Other',description:line.description,quantity:Math.max(1,Number(line.quantity)||1),reservedQuantity:0,unitCost:Math.max(0,Number(line.unitCost)||0),vehicleCompatibility:vehicle?.name||'Universal',projectId:project.id,purchaseOrderId:order.id}); req.inventoryId=id; req.inventoryAddedAt=new Date().toISOString(); req.status='Received · In inventory'; added++; } if(!added){alert('There are no new non-stock parts on this order to add to inventory.');return;} await this.saveToStorage(); alert(added+' received part requirement(s) added to inventory.'); },
+					async addReceivedProjectPartsToInventory(project,orderId) { const order=(project?.purchaseOrders||[]).find(o=>String(o.id)===String(orderId)); if(!project||!order||order.status!=='Received')return; const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); let added=0; for(const line of order.lines||[]){const req=(project.partRequirements||[]).find(p=>String(p.id)===String(line.requirementId)); if(!req||req.inventoryId||req.inventoryAddedAt)continue; const id='part-project-'+Date.now()+'-'+added; this.inventory.push({id,partNumber:line.partNumber||'',vendor:order.vendor||'Other',description:line.description,quantity:Math.max(1,Number(line.quantity)||1),reservedQuantity:0,unitCost:Math.max(0,Number(line.unitCost)||0),vehicleCompatibility:vehicle?.name||'Universal',projectId:project.id,purchaseOrderId:order.id}); req.inventoryId=id; req.inventoryAddedAt=new Date().toISOString(); req.status='Received · In inventory'; added++; } if(!added){alert('There are no new non-stock parts on this order to add to inventory.');return;} await this.saveToStorage("Purchase received",{projectId:project.id,orderId}); alert(added+' received part requirement(s) added to inventory.'); },
 					projectPartPickerSearch: '',
 					projectPartSelections: {},
 					projectCompatibleInventory(project) { const vehicle=this.vehicles.find(v=>String(v.id)===String(project?.vehicleId)); return this.inventory.filter(p=>!p.vehicleCompatibility || !vehicle || p.vehicleCompatibility===vehicle.name || p.vehicleCompatibility==='Universal'); },
@@ -4529,9 +4539,9 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					toggleProjectPartSelection(part,selected) { const id=String(part.id); if(!selected){delete this.projectPartSelections[id];return;} this.projectPartSelections[id]={selected:true,quantity:1}; },
 					setProjectPartSelectionQuantity(part,value) { const id=String(part.id); if(!this.projectPartSelections[id])return; this.projectPartSelections[id].quantity=Math.max(1,Math.floor(Number(value)||1)); },
 					async addSelectedProjectParts(project) { if(!project)return; const selected=Object.entries(this.projectPartSelections).filter(([,v])=>v?.selected); if(!selected.length)return; const additions=[]; for(const [id,draft] of selected){const part=this.inventory.find(p=>String(p.id)===id),qty=Math.max(1,Math.floor(Number(draft.quantity)||1)); if(!part || this.projectAvailableInventory(part)<qty){alert('Inventory changed or requested quantity exceeds available stock. Please review your selections.');return;} if((project.partRequirements||[]).some(req=>String(req.inventoryId)===id)){alert('An item in your selection is already on this project.');return;} additions.push({id:'project-part-'+Date.now()+'-'+id,inventoryId:part.id,partNumber:part.partNumber,description:part.description,quantity:qty,unitCost:Number(part.unitCost||0),status:'Required',reserved:false});} if(!Array.isArray(project.partRequirements))project.partRequirements=[]; project.partRequirements.push(...additions); this.closeProjectPartsPicker(); await this.saveToStorage(); },
-					async removeProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id); if(!req)return; if(req.purchaseOrderId){alert('Cancel or remove the supplier order before removing this part requirement.');return;} if(req.reserved){const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(part)part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));} project.partRequirements=project.partRequirements.filter(p=>p.id!==id); await this.saveToStorage(); },
-					async reserveProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||req.reserved||req.purchaseOrderId)return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||this.projectAvailableInventory(part)<Number(req.quantity||0)){alert('Not enough unreserved stock to reserve this quantity.');return;}part.reservedQuantity=Number(part.reservedQuantity||0)+Number(req.quantity||0);req.reserved=true;req.status='Reserved';await this.saveToStorage(); },
-					async useProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||!req.reserved||req.status==='Used')return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||Number(part.quantity||0)<Number(req.quantity||0)){alert('Inventory changed; cannot mark this part used.');return;}part.quantity=Math.max(0,Number(part.quantity||0)-Number(req.quantity||0));part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));req.reserved=false;req.status='Used';req.usedAt=new Date().toISOString();await this.saveToStorage(); },
+					async removeProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id); if(!req)return; if(req.purchaseOrderId){alert('Cancel or remove the supplier order before removing this part requirement.');return;} if(req.reserved){const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(part)part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));} project.partRequirements=project.partRequirements.filter(p=>p.id!==id); await this.saveToStorage("Project requirement removed",{projectId:project.id,requirementId:id}); },
+					async reserveProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||req.reserved||req.purchaseOrderId)return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||this.projectAvailableInventory(part)<Number(req.quantity||0)){alert('Not enough unreserved stock to reserve this quantity.');return;}part.reservedQuantity=Number(part.reservedQuantity||0)+Number(req.quantity||0);req.reserved=true;req.status='Reserved';await this.saveToStorage("Project stock reserved",{projectId:project.id,requirementId:id}); },
+					async useProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||!req.reserved||req.status==='Used')return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||Number(part.quantity||0)<Number(req.quantity||0)){alert('Inventory changed; cannot mark this part used.');return;}part.quantity=Math.max(0,Number(part.quantity||0)-Number(req.quantity||0));part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));req.reserved=false;req.status='Used';req.usedAt=new Date().toISOString();await this.saveToStorage("Project part installed or used",{projectId:project.id,requirementId:id}); },
 					async addProjectAttachments(project,event) {
 						const files=Array.from(event?.target?.files||[]); event.target.value=''; if(!project||!files.length)return;
 						const allowed=['image/jpeg','image/png','image/webp','application/pdf']; const valid=files.filter(file=>allowed.includes(file.type)&&file.size<=(this.garageDB?15:2)*1024*1024);
@@ -4627,7 +4637,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						const record={...(existing||{id:"part-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),reservedQuantity:0}),description,partNumber,vendor:String(f.vendor||"").trim(),quantity,unitCost,vehicleCompatibility};
 						const prior=this.inventory;this.inventorySaving=true;
 						this.inventory=existing?prior.map(p=>String(p.id)===String(id)?record:p):[...prior,record];
-						try{if(!await this.saveToStorage())throw Error("Inventory changes could not be saved.");this.modals.newPart=false;this.editingInventoryId=null;return true;}
+						try{if(!await this.saveToStorage(existing?"Manual stock correction":"Stock added",{itemId:record.id}))throw Error("Inventory changes could not be saved.");this.modals.newPart=false;this.editingInventoryId=null;return true;}
 						catch(e){this.inventory=prior;this.inventoryError=e.message;return false;}
 						finally{this.inventorySaving=false;}
 					},
@@ -4636,7 +4646,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						if(this.inventoryReservedCount(id)>0||this.inventoryHasActiveLinks(id)){alert("This part is reserved or linked to an active project. Release the requirement before deleting.");return;}
 						if(!confirm("Delete this inventory item?"))return;
 						const prior=this.inventory;this.inventorySaving=true;this.inventory=prior.filter(i=>String(i.id)!==String(id));
-						try{if(!await this.saveToStorage())throw Error("Inventory item could not be deleted.");}
+						try{if(!await this.saveToStorage("Inventory item removed",{itemId:id}))throw Error("Inventory item could not be deleted.");}
 						catch(e){this.inventory=prior;alert(e.message);}
 						finally{this.inventorySaving=false;}
 					},
@@ -4830,7 +4840,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						const log = { id: Date.now(), vehicleId: plan.vehicleId, vehicle: vehicle?.name || '', mileage: Number(f.mileage||0), date: f.date, serviceType: plan.title, category: 'Maintenance', cost: total, notes: f.notes || '', attachments: [], history: [], maintenancePlanId: plan.id };
 						this.logs.unshift(log); plan.status='Completed'; plan.completedAt=new Date().toISOString(); plan.actualCost=total; plan.completion=100; plan.tasks=(plan.tasks||[]).map(t=>({...t,done:true}));
 						if (vehicle && Number(f.mileage||0) > Number(vehicle.odometer||0)) vehicle.odometer=Number(f.mileage);
-						await this.saveToStorage(); this.modals.completeMaintenance=false; this.selectedMaintenancePlan=null; await this.runDatabaseHealthCheck();
+						await this.saveToStorage("Maintenance completed",{maintenancePlanId:plan.id}); this.modals.completeMaintenance=false; this.selectedMaintenancePlan=null; await this.runDatabaseHealthCheck();
 					},
 
 					async cancelMaintenancePlan(plan) { if (!plan) return; plan.parts?.forEach(p=>p.reserved=false); plan.status='Cancelled'; await this.saveToStorage(); },
@@ -4866,11 +4876,12 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							const validArray = key =>
 								candidate[key] === undefined || Array.isArray(candidate[key]);
 
-							if (!['vehicles', 'logs', 'serviceLogs', 'projects', 'inventory', 'partsInventory', 'toolInventory', 'maintenancePlans']
+							if (!['vehicles', 'logs', 'serviceLogs', 'projects', 'inventory', 'partsInventory', 'toolInventory', 'inventoryLedger', 'maintenancePlans']
 								.every(validArray)) {
 								throw new Error('One or more imported collections are invalid.');
 							}
 
+							if(Array.isArray(candidate.inventoryLedger)&&candidate.inventoryLedger.length){const stock=candidate.partsInventory||candidate.inventory;if(!Array.isArray(stock))throw Error('Inventory ledger import requires stock records.');const issues=window.MotorNoteInventoryEngine.audit(candidate.inventoryLedger,stock);if(issues.length)throw Error(issues.join('; '));}
 							await this.createSafetySnapshot(this.getPersistableState(), 'pre-import');
 
 							if (Array.isArray(candidate.vehicles)) this.vehicles = candidate.vehicles;
@@ -4880,6 +4891,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							if (Array.isArray(candidate.inventory)) this.inventory = candidate.inventory;
 							if (Array.isArray(candidate.partsInventory)) this.inventory = candidate.partsInventory;
 							if(Array.isArray(candidate.toolInventory))this.toolInventory=candidate.toolInventory;
+							if(Array.isArray(candidate.inventoryLedger)&&candidate.inventoryLedger.length)this.inventoryLedger=candidate.inventoryLedger;
 							if (Array.isArray(candidate.maintenancePlans)) this.maintenancePlans = candidate.maintenancePlans;
 
 							this.normalizeData();
@@ -4901,7 +4913,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							console.log('Timeline records:', this.filteredTimelineLogs.length);
 							console.log('Resolved vehicle mappings:', this.logs.reduce((a,l)=>{const id=this.resolveLogVehicleId(l)||'UNRESOLVED';a[id]=(a[id]||0)+1;return a;},{}));
 
-							await this.saveToStorage();
+							if(!await this.saveToStorage('Imported stock balances'))throw Error('Imported state could not be saved. Restore the pre-import snapshot if needed.');
 							await this.runDatabaseHealthCheck();
 
 							if (this.databaseHealth.status === 'error') {

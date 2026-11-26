@@ -41,3 +41,18 @@ test("search groups duplicate navigation entries but preserves distinct procedur
   assert.match(html, /<details class="search-duplicates">/);
   assert.match(html, /visible=grouped.slice/);
 });
+
+
+test("parts and labor search matches stay in a collapsed final section regardless of score", () => {
+ const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "utf8");
+ const source = html.slice(html.indexOf("function searchDuplicateKey"),html.indexOf("function searchv"));
+ const {groupSearchResults,partitionSearchResults}=new Function(source+";return {groupSearchResults,partitionSearchResults}")();
+ const vehicles=[{guides:[{title:"Repair and Diagnosis"},{title:"Labor Times"}]},{guides:[{title:"Repair and Diagnosis"},{title:"Parts and Labor"}]}];
+ const hit=(vi,gi,p,score)=>({item:[vi,gi,{p,n:"Alternator",path:["Electrical"]}],score});
+ const sections=partitionSearchResults(groupSearchResults([hit(1,1,110,900),hit(0,1,241,800),hit(1,0,1877,100),hit(1,0,7910,90),hit(0,0,6570,80)],vehicles),vehicles);
+ assert.deepEqual(sections.primary.map(g=>g.primary.item[2].p),[1877,6570]);
+ assert.deepEqual(sections.secondary.map(g=>g.primary.item[2].p),[110,241]);
+ assert.equal(sections.primary[0].alternates.length,1);
+ assert.match(html, /<details class="search-secondary"><summary>Parts &amp; Labor/);
+ assert.match(html, /visible=sections.primary.slice/);
+});

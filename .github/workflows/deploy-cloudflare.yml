@@ -103,4 +103,18 @@ jobs:
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
-          npx --yes wrangler@4 deploy --config wrangler.jsonc --name claude-manual-preview-scion-torque
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          case "$BRANCH" in
+            preview/scion-torque-sibling-fix-20261125) ALIAS=preview-scion-torque-sibling-fix-20261125 ;;
+            preview/repair-cart-scion-dedupe-20261125) ALIAS=preview-repair-cart-scion-dedupe-20261125 ;;
+            *) echo "Unexpected preview branch"; exit 1 ;;
+          esac
+          test -s public/vendor/pdfjs/pdf.mjs
+          test -s public/vendor/pdfjs/pdf.worker.mjs
+          npx --yes wrangler@4 versions upload --config wrangler.jsonc --preview-alias "$ALIAS"
+          BASE="https://$ALIAS-claude-manual.phillipstg.workers.dev"
+          for asset in pdf.mjs pdf.worker.mjs; do
+            curl --fail --silent --show-error --retry 5 --retry-delay 3 -D /tmp/pdf-headers -o /tmp/pdf-asset "$BASE/vendor/pdfjs/$asset"
+            grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/pdf-headers
+            cmp "/tmp/pdf-asset" "public/vendor/pdfjs/$asset"
+          done

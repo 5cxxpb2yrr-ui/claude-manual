@@ -3,10 +3,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { Script } from "node:vm";
 
-test("manual search prioritizes vehicle repair procedures over alternate-variant labor pages", () => {
+test("alternator search includes generator procedures and ranks service work above maps and DTCs", () => {
   const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "utf8");
-  assert.match(html, /guidePriority=\/\^repair and diagnosis\$\/i\.test\(g\.title\)\?350:0/);
-  assert.match(html, /otherVariantPenalty=.*?other variant.*?500/s);
+  assert.match(html, /termGroups=terms\.map\(t=>\/\^\(alternator\|alternators\)\$\/\.test\(t\)\?\["alternator","alternators","generator","generators"\]/);
+  assert.match(html, /serviceProcedureBonus=.*?removal\|installation\|inspection\|testing\|service and repair/s);
+  assert.match(html, /mapPenalty=.*?map - electrical systems.*?650/s);
+  assert.match(html, /dtcPenalty=.*?DTC.*?450/s);
   assert.match(html, /guides\[gi\]\.title\+" › "/);
 });
 

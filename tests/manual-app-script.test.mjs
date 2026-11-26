@@ -24,3 +24,20 @@ test("manual explorer inline application script parses before boot", () => {
     "manual explorer inline script should be valid JavaScript",
   );
 });
+
+
+test("search groups duplicate navigation entries but preserves distinct procedures and variants", () => {
+  const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "utf8");
+  const source = html.slice(html.indexOf("function searchDuplicateKey"), html.indexOf("function searchv"));
+  const group = new Function(source + ";return groupSearchResults")();
+  const vehicles = [{ guides: [{title:"Repair and Diagnosis"}] }, { guides: [{title:"Repair and Diagnosis"}, {title:"Parts and Labor"}] }];
+  const path = ["Electrical","Charging Systems","Charging (1NZ-FE)","Generator"];
+  const title = "Charging (1NZ-FE): Generator: Removal";
+  const hit = (vi, gi, p, n=title, breadcrumb=path) => ({item:[vi,gi,{p,n,path:breadcrumb}],score:1});
+  const groups = group([hit(1,0,1877),hit(1,0,7910),hit(1,0,1881,"Charging (1NZ-FE): Generator: Installation"),hit(1,0,999,title,[...path,"Other Variant"]),hit(0,0,1877),hit(1,1,110)],vehicles);
+  assert.equal(groups.length,5);
+  assert.equal(groups[0].primary.item[2].p,1877);
+  assert.deepEqual(groups[0].alternates.map(h=>h.item[2].p),[7910]);
+  assert.match(html, /<details class="search-duplicates">/);
+  assert.match(html, /visible=grouped.slice/);
+});

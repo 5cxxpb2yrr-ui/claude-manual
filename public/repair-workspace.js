@@ -232,13 +232,13 @@ function findScionSiblingSpecificationPages(tree,pageId){
  let component="";
  for(let i=targetPath.length-1;i>=0;i--){
   const name=String(targetPath[i].n||"");
-  const match=/^(.+?):\\s*(?:testing and inspection|service and repair|removal and installation|disassembly and reassembly|specifications)$/i.exec(name);
+  const match=/^(.+?):\s*(?:testing and inspection|service and repair|removal and installation|disassembly and reassembly|specifications)$/i.exec(name);
   if(match){component=match[1].trim();break;}
  }
  if(!component){
   for(let i=targetPath.length-1;i>=0;i--){
    const name=String(targetPath[i].n||"").trim();
-   if(name&&!/^(additional pages|part \\d+)/i.test(name)&&!/(testing and inspection|service and repair|removal and installation|disassembly and reassembly)$/i.test(name)){
+   if(name&&!/^(additional pages|part \d+)/i.test(name)&&!/(testing and inspection|service and repair|removal and installation|disassembly and reassembly)$/i.test(name)){
     component=name;break;
    }
   }
@@ -271,14 +271,14 @@ function findScionSiblingSpecificationPages(tree,pageId){
 }
 async function findScionSiblingSpecificationLinks(pageUrl){
  if(!/scion-service-manual/i.test(pageUrl.pathname))return [];
- const match=/\\/pages\\/(\\d+)\\.html$/i.exec(pageUrl.pathname);
+ const match=/\/pages\/(\d+)\.html$/i.exec(pageUrl.pathname);
  if(!match)return [];
  try{
   const response=await fetch("/api/navigation/scion-repair.json",{credentials:"same-origin",cache:"no-store"});
   if(!response.ok)return [];
   const tree=await response.json();
   return findScionSiblingSpecificationPages(tree,match[1]).map(page=>{
-   const url=new URL(pageUrl.href);url.pathname=url.pathname.replace(/\\/pages\\/\\d+\\.html$/i,"/pages/"+page.page+".html");
+   const url=new URL(pageUrl.href);url.pathname=url.pathname.replace(/\/pages\/\d+\.html$/i,"/pages/"+page.page+".html");
    return {...page,url:url.href};
   });
  }catch(_){return [];}

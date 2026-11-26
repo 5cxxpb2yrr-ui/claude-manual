@@ -2618,7 +2618,7 @@
 							<div><p class="text-xs text-zinc-400" x-text="'PHASE '+(guidedPhaseIndex+1)+' / '+projectGuidedPhases(selectedProject).length"></p><h3 class="text-2xl font-black" x-text="phase.title"></h3></div>
 							<p class="text-sm leading-relaxed text-zinc-200" x-text="phase.detail"></p>
 							<p x-show="phase.critical" class="rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 p-3 text-sm">Safety / verification gate. Review the linked factory instructions before continuing.</p>
-							<template x-if="phase.id==='readiness'"><div class="space-y-2"><h4 class="text-amber-300 font-bold">Parts and tools to verify</h4><template x-for="part in (selectedProject.repairPlan?.parts||[])" :key="part.name"><p class="text-sm" x-text="part.name+' · '+part.relationship"></p></template><template x-for="tool in (selectedProject.repairPlan?.tools||[])" :key="tool.name"><p class="text-sm text-zinc-300" x-text="tool.name"></p></template><p x-show="selectedProject.repairPlan?.unavailable?.length" class="text-rose-300">Some source documents were unavailable. Obtain and review them before proceeding.</p></div></template>
+							<template x-if="phase.id==='readiness'"><div class="space-y-2"><h4 class="text-amber-300 font-bold">Preparation checklist</h4><p class="text-xs text-zinc-400" x-text="projectReadiness(selectedProject).label"></p><p x-show="readinessError" class="text-xs text-rose-300" x-text="readinessError"></p><template x-for="item in projectReadiness(selectedProject).items" :key="item.id"><label class="flex items-start gap-2 border border-zinc-800 rounded-lg p-2 text-sm"><input type="checkbox" class="mt-1 accent-amber-500" :checked="item.done" :disabled="readinessSaving||item.blocked||projectGuidedPhaseDone(selectedProject,'readiness')" @change="setProjectReadiness(selectedProject,item.id,$event.target.checked)"><span><span x-text="item.name"></span><small class="block text-zinc-400" x-text="item.detail"></small></span></label></template><p x-show="!projectReadiness(selectedProject).ready" class="text-xs text-amber-300">Complete all preparation checks before continuing to physical work.</p></div></template>
 							<h4 class="font-bold text-amber-300">Factory source documents</h4>
 							<template x-for="doc in phase.documents" :key="doc.id">
 								<div class="rounded-xl border border-zinc-800 p-3 space-y-2">
@@ -2629,7 +2629,7 @@
 								</div>
 							</template>
 							<p class="text-xs text-zinc-400">Use the full factory procedure and diagrams; this screen organizes the work and records progress.</p>
-							<button type="button" @click="completeGuidedPhase()" :disabled="guidedSaving||projectGuidedPhaseDone(selectedProject,phase.id)" class="w-full rounded-xl bg-amber-500 py-4 text-zinc-950 font-black disabled:opacity-40" x-text="projectGuidedPhaseDone(selectedProject,phase.id)?'Phase completed ✓':guidedSaving?'Saving…':'Confirm phase complete →'"></button>
+							<button type="button" @click="completeGuidedPhase()" :disabled="guidedSaving||readinessSaving||projectGuidedPhaseDone(selectedProject,phase.id)||(phase.id==='readiness'&&!projectReadiness(selectedProject).ready)" class="w-full rounded-xl bg-amber-500 py-4 text-zinc-950 font-black disabled:opacity-40" x-text="projectGuidedPhaseDone(selectedProject,phase.id)?'Phase completed ✓':guidedSaving?'Saving…':'Confirm phase complete →'"></button>
 						</section>
 					</template>
 					<div class="space-y-2 border-t border-zinc-800 pt-3">
@@ -2854,6 +2854,14 @@
 						<button x-show="!selectedProject.maintenancePlanId" @click="linkProjectToMaintenance(selectedProject)" class="w-full py-2 bg-amber-500/10 text-amber-400 font-bold rounded-xl border border-amber-500/30">🔧 Link to Maintenance Workflow</button>
 						<div class="rounded-xl border border-amber-500/30 bg-zinc-950 p-3 space-y-3">
 							<div class="flex items-center justify-between gap-2"><strong class="text-amber-300">Guided Repair</strong><a :href="manualProjectLink(selectedProject)" class="text-amber-400 text-xs font-bold">Browse manual ↗</a></div>
+							<template x-if="selectedProject.repairPlan"><details class="rounded-lg border border-amber-500/30 p-3 space-y-2">
+								<summary class="cursor-pointer font-bold text-amber-300">Project readiness · <span x-text="projectReadiness(selectedProject).label"></span></summary>
+								<div class="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full bg-amber-500" :style="'width:'+projectReadiness(selectedProject).percent+'%'"></div></div>
+								<p class="text-xs text-zinc-400" x-text="'Next: '+projectReadiness(selectedProject).next"></p>
+								<p x-show="readinessError" class="text-xs text-rose-300" x-text="readinessError"></p>
+								<template x-for="item in projectReadiness(selectedProject).items" :key="item.id"><label class="flex items-start gap-2 py-1 text-xs"><input type="checkbox" class="mt-0.5 accent-amber-500" :checked="item.done" :disabled="readinessSaving||item.blocked||projectGuidedPhaseDone(selectedProject,'readiness')" @change="setProjectReadiness(selectedProject,item.id,$event.target.checked)"><span><span x-text="item.name"></span><small class="block text-zinc-500" x-text="item.detail"></small></span></label></template>
+								<p class="text-xs text-zinc-500">Verify ownership and fitment yourself; suggestions are not confirmed stock. Readiness is locked after its guided phase is confirmed.</p>
+							</details></template>
 							<div x-show="selectedProject.repairPlan" class="rounded-lg border border-amber-500/30 p-3 space-y-2">
 								<div class="font-semibold text-white">Complete repair plan</div>
 								<p class="text-xs text-zinc-400" x-text="projectGuidedPhases(selectedProject).length+' phases · '+projectGuidedDone(selectedProject)+' completed'"></p>
@@ -3114,7 +3122,7 @@
 					analyticsVehicleId: 'all',
 					activeVehicleId: 'scion-xb',
 					repairCartLinks: [],
-					guidedPhaseIndex:0,guidedSaving:false,guidedError:"",pendingRepairProjectDraft: null, repairIntent:"", repairPlan:null, repairPlanBusy:false, repairPlanError:"",repairPlanRun:0,
+					guidedPhaseIndex:0,guidedSaving:false,guidedError:"",readinessSaving:false,readinessError:"",pendingRepairProjectDraft: null, repairIntent:"", repairPlan:null, repairPlanBusy:false, repairPlanError:"",repairPlanRun:0,
 					sortOrder: 'desc',
 					smartQuery: '',
 					timelineSearch: '',
@@ -3673,6 +3681,27 @@
 						const q=String(record?.serviceType||'').trim();
 						return this.manualLibrary.base+'/manuals.html?'+params.toString()+'#/search'+(q?'/'+encodeURIComponent(q):'');
 					},
+					projectReadiness(project) {
+						const plan=project?.repairPlan;if(!plan)return {items:[],ready:false,percent:0,label:"No plan",next:"Generate a repair plan"};
+						const checked=project.readinessChecks||{},items=[],add=(id,name,detail,blocked=false)=>items.push({id,name,detail,blocked,done:!blocked&&!!checked[id]});
+						add("scope","Diagnosis and scope confirmed","Confirm the affected components and selected vehicle.");
+						add("fitment","Replacement part fitment verified","Confirm VIN-specific part numbers and supplier compatibility.");
+						for(const [i,part] of (plan.parts||[]).entries())add("part-"+i,part.name,"Confirm available in the required quantity; "+part.relationship);
+						for(const [i,tool] of (plan.tools||[]).entries())add("tool-"+i,tool.name,"Confirm suitable equipment is available.");
+						add("sources","Factory procedures and precautions reviewed",plan.unavailable?.length?"Missing source documents — regenerate or obtain a complete plan.":"Review diagrams, torque assignments and safe access.",!!plan.unavailable?.length);
+						const done=items.filter(i=>i.done).length,ready=items.length>0&&done===items.length;
+						return {items,ready,percent:Math.round(done/items.length*100),label:ready?"Ready":done+"/"+items.length+" confirmed",next:items.find(i=>!i.done)?.name||"Start guided repair"};
+					},
+					async setProjectReadiness(project,id,done) {
+						if(this.readinessSaving||this.projectGuidedPhaseDone(project,'readiness'))return;
+						const item=this.projectReadiness(project).items.find(i=>i.id===id);if(!item||item.blocked)return;
+						this.readinessSaving=true;this.readinessError="";
+						const prior=project.readinessChecks?{...project.readinessChecks}:null;
+						project.readinessChecks={...(prior||{}),[id]:!!done};
+						try{if(!await this.saveToStorage())throw Error("Could not save preparation check.");}
+						catch(error){project.readinessChecks=prior;this.readinessError=error.message;}
+						finally{this.readinessSaving=false;}
+					},
 					projectGuidedPhases(project) { return window.MotorNoteRepairPlanner?.buildGuidedPhases(project?.repairPlan)||[]; },
 					projectGuidedPhaseDone(project,id) { return !!project?.guidedExecution?.completed?.[id]; },
 					projectGuidedDone(project) { return this.projectGuidedPhases(project).filter(p=>this.projectGuidedPhaseDone(project,p.id)).length; },
@@ -3690,6 +3719,7 @@
 						if(this.guidedSaving)return;
 						const project=this.selectedProject,phases=this.projectGuidedPhases(project),index=this.guidedPhaseIndex,phase=phases[index];
 						if(!phase||!this.projectGuidedCanOpen(project,index)||this.projectGuidedPhaseDone(project,phase.id))return;
+						if(phase.id==="readiness"&&(this.readinessSaving||!this.projectReadiness(project).ready)){this.guidedError="Confirm all preparation requirements before continuing.";return;}
 						this.guidedSaving=true;this.guidedError="";
 						const prior=project.guidedExecution?JSON.parse(JSON.stringify(project.guidedExecution)):null;
 						const previousUpdatedAt=project.updatedAt;

@@ -245,7 +245,7 @@ function findScionSiblingSpecificationPages(tree,pageId){
  }
  if(!component)return [];
  const norm=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
- const componentKey=norm(component),containers=targetPath.slice(0,-1).reverse();
+ const componentKey=norm(component),containers=[...targetPath.slice(0,-1).reverse(),tree];
  for(const container of containers){
   const matches=[];
   function collect(node,path){

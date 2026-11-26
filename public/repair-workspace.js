@@ -94,7 +94,7 @@ if(re.test(work)){found.set(x.part.id,x.part);work=work.replace(re,m=>" ".repeat
 });
 return [...found.values()];
 }
-const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.\-•]?\s*m|kgf\s*[·.\-•]?\s*(?:m|cm)|ft\s*[·.\-•]?\s*(?:lbf?|lbs?)|in(?:ch)?\s*[·.\-•]?\s*(?:lbf?|lbs?))(?![a-z])/gi;
+const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.*\-•×]*\s*m|kgf\s*[·.*\-•×]*\s*(?:m|cm)|ft\s*[·.*\-•×]*\s*(?:lbf?|lbs?)|in(?:ch)?\s*[·.*\-•×]*\s*(?:lbf?|lbs?))(?![a-z])/gi;
 function normalizeTorqueUnit(raw){
  const u=raw.toLowerCase().replace(/[^a-z]/g,"");
  if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
@@ -138,11 +138,11 @@ function extractTorque(text){
  }
  return out;
 }
-function groupTorque(torque){
+function groupTorque(torque,text,title){
  const groups=[];
  torque.forEach(item=>{
   let group=groups[groups.length-1];
-  if(item.unit==="N·m"||!group||group.stepContext!==item.nearbyContext){
+  if(item.unit==="N·m"||!group||(group.lineIndex!==item.lineIndex&&group.stepContext!==item.nearbyContext)){
    group={id:"torque-"+groups.length,lineIndex:item.lineIndex,startIndex:item.matchIndex,context:item.context,nearbyContext:item.nearbyContext,stepContext:item.nearbyContext,values:[]};
    groups.push(group);
   }
@@ -151,7 +151,18 @@ function groupTorque(torque){
  return groups.map(group=>{
   const evidence=group.stepContext||group.nearbyContext||group.context;
   let association=null;
-  if(/install (?:the )?water pump assembly/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
+  // Toyota generator installation pages use HTML list items and explicit A/B labels.
+  // Do not infer a fastener from surrounding unrelated steps.
+  if(/\b(?:generator|alternator)\s*:\s*installation\b/i.test(title||"")){
+   const line=group.context;
+   const bolt=/\bfor bolt ([AB])\b/i.exec(line);
+   const preceding=String(text||"").slice(0,group.startIndex).split("\n");
+   const step=preceding.slice(0,-1).reverse().find(x=>/^\s*-\s/.test(x))||"";
+   if(bolt)association={component:"Alternator",fastener:"Bolt "+bolt[1].toUpperCase(),evidence:line,associationSource:"Explicit factory torque label"};
+   else if(/install the generator wire with the nut/i.test(line))association={component:"Alternator wire",fastener:"Nut",evidence:line,associationSource:"Explicit factory installation step"};
+   else if(/adjusting bar.*tighten the nut/i.test(step))association={component:"Alternator adjusting bar",fastener:"Nut",evidence:step+" "+line,associationSource:"Explicit preceding factory installation step"};
+  }
+  else if(/install (?:the )?water pump assembly/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
    association={component:"Water Pump Assembly",fastener:/\bnuts?\b/i.test(evidence)?"Bolts and nuts":"Bolts",evidence,associationSource:"Numbered installation step explicitly identifies the water pump assembly fasteners"};
   else if(/install (?:the )?(?:water )?pump pulley/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
    association={component:"Water Pump Pulley",fastener:"Bolts",evidence,associationSource:"Numbered installation step explicitly identifies the water pump pulley fasteners"};
@@ -326,7 +337,7 @@ const warnings=extractWarnings(lines);
 const isEyesight=/eyesight|stereo camera/i.test(title+" "+text),requiresCalibration=isEyesight&&/\bcalibrat/i.test(text);
 const requiredTools=requiresCalibration&&(/\bSSM\s?-?4\b|select monitor/i.test(text))?["subaru-ssm4"]:[];
 const torque=extractTorque(text);
-return {procedureId,title,pageText:text,parts,tools:toolDetails.map(t=>t.id),toolDetails,toolReferences,torque,torqueSpecs:groupTorque(torque),warnings,requiresCalibration,requiredTools};
+return {procedureId,title,pageText:text,parts,tools:toolDetails.map(t=>t.id),toolDetails,toolReferences,torque,torqueSpecs:groupTorque(torque,text,title),warnings,requiresCalibration,requiredTools};
 }
 function torqueAssignmentOptions(facts){const components=(facts.parts||[]).filter(p=>p.category!=="Consumable"&&(p.relationship!=="mention"||p.confidence>=0.6)).map(p=>p.name);const text=facts.pageText||"";const fasteners=[];[["Bolt(s)",/\bbolts?\b/i],["Nut(s)",/\bnuts?\b/i],["Screw(s)",/\bscrews?\b/i],["Stud(s)",/\bstuds?\b/i],["Plug(s)",/\bplugs?\b/i]].forEach(([name,re])=>{if(re.test(text))fasteners.push(name);});if(/PULLEY WRENCH PIN SET/i.test(text)&&/\bV[- ]BELTS?\b/i.test(text))fasteners.push("Pulley mounting fastener");if(/\bfastener\b/i.test(text))fasteners.push("Other fastener");return {components:[...new Set(components)],fasteners};}function toRelationships(facts,minConfidence){
 minConfidence=minConfidence===undefined?0.6:minConfidence;

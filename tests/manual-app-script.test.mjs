@@ -10,7 +10,7 @@ test("alternator search includes generator procedures and ranks service work abo
   assert.match(html, /serviceProcedureBonus=.*?repair and diagnosis.*?removal\|installation\|inspection\|testing\|service and repair/s);
   assert.match(html, /mapPenalty=.*?map - electrical systems.*?700/s);
   assert.match(html, /dtcPenalty=.*?dtc .*?700/s);
-  assert.match(html, /variantPenalty=.*?different variant\\\/trim.*?700/s);
+  assert.match(html, /variantPenalty=.*?different variant\/trim.*?700/s);
   assert.match(html, /guides\[gi\]\.title\+" › "/);
 });
 

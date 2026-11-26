@@ -47,9 +47,9 @@ test("Garage imports the full Repair Cart draft into the new vehicle project", (
   assert.match(html, /title:cart\?\x60\$\{procedure\} — \$\{vehicleName\}\x60:'Repair Project'/);
   assert.match(html, /cartSnapshot:cart/);
   assert.match(html, /specs:\[\.\.\.cartTorque\.map/);
-  assert.match(html, /procedures:\s*procedureRecord\?\s*\[\s*procedureRecord\s*\]\s*:\s*\[\s*\]/);
-  assert.match(html, /partRequirements: importedParts/);
-  assert.match(html, /tasks: importedTasks/);
+  assert.match(html, /procedures:\s*plan\?plan\.documents\.map\([^;\n]+?\):procedureRecord\?\[procedureRecord\]:\[\]/);
+  assert.match(html, /partRequirements:\s*plan\?plan\.parts\.map\([^\n]+\):importedParts/);
+  assert.match(html, /tasks:\s*plan\?plan\.tasks\.map\([^\n]+\):importedTasks/);
   assert.match(html, /projectId:p\.id/);
   assert.match(html, /localStorage\.removeItem\('lifeos\.repair\.project-draft\.v1'\)/);
 });

@@ -463,9 +463,30 @@ test("Garage guided repair launches the same procedure route once and keeps proj
  const link=mock.guidedRepairLink(entries[0],project);
  assert.match(link,/^\/manuals\.html\?guided=1&projectId=project-1&back=/);
  assert.ok(link.endsWith(entries[0].route));
- assert.match(workspace,/openWorkspace\(\{guided:true,projectId\}\)/);
+ assert.match(workspace,/openWorkspace\(\{guided:true,projectId,repairId\}\)/);
  assert.match(workspace,/url.searchParams.delete\("guided"\)/);
  assert.match(workspace,/if\(options.guided\)content.querySelector\("#rw-start-mode"\).click\(\)/);
  assert.match(workspace,/if\(returnToGarage\)location.assign\(returnToGarage\)/);
  assert.match(html,/document.dispatchEvent\(new Event\("manual-viewer-ready"\)\)/);
+});
+
+
+test("actual repair record modal exposes guided repair from record and linked project references", () => {
+ const garage=readFileSync(new URL("../public/garage.html",import.meta.url),"utf8");
+ const workspace=readFileSync(script,"utf8");
+ const modal=garage.slice(garage.indexOf('x-show="modals.repairDetail"'),garage.indexOf('<!-- 3-Column Responsive Grid -->'));
+ assert.match(modal,/guidedRepairRecordEntries\(selectedRepair\)/);
+ assert.match(modal,/guidedRepairRecordLink\(entry,selectedRepair\)/);
+ assert.match(modal,/repairRecordSearchLink\(selectedRepair\)/);
+ const methods=garage.slice(garage.indexOf("guidedRepairRoute(entry) {"),garage.indexOf("refreshRepairCartLinks() {"));
+ const loc={protocol:"https:",origin:"https://preview.example",pathname:"/garage"};
+ const vehicle={id:"scion-xb"},project={id:"p",vehicleId:vehicle.id,procedures:[{sourcePath:"/v/1/0/1881",title:"Install"}]};
+ const mock={...new Function("location","URLSearchParams","return ({"+methods+"})")(loc,URLSearchParams),projects:[project],vehicles:[vehicle],isLogForVehicle:(r,v)=>r.vehicleId===v.id,repairCartsForProject:()=>[],manualLibrary:{base:"",vehicles:{"scion-xb":{idx:1}}}};
+ const record={id:"r",projectId:"p",vehicleId:vehicle.id,procedureReferences:[{sourcePath:"/v/1/0/1877",title:"Remove"},{sourcePath:"/v/0/0/6570"}]};
+ const entries=mock.guidedRepairRecordEntries(record);
+ assert.deepEqual(entries.map(e=>e.route),["#/v/1/0/1881","#/v/1/0/1877"]);
+ assert.match(mock.guidedRepairRecordLink(entries[0],record),/guided=1&repairId=r&projectId=p/);
+ assert.deepEqual(mock.guidedRepairRecordEntries({...record,projectId:null,procedureReferences:[]}),[]);
+ assert.match(garage,/if\(requestedRepair\).*?this.openRepairDetail\(record\)/);
+ assert.match(workspace,/openWorkspace\(\{guided:true,projectId,repairId\}\)/);
 });

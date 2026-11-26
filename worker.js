@@ -1,4 +1,16 @@
 import { resolveManualRootPath, resolveScionPageKey } from "./manual-link-repairs.mjs";
+import { PDF_READER_FILES } from "./pdf-reader-data.mjs";
+
+export function servePdfReader(request, files = PDF_READER_FILES) {
+  const path = new URL(request.url).pathname;
+  const name = path.split("/").pop();
+  if (!["pdf.mjs", "pdf.worker.mjs", "LICENSE"].includes(name)) return new Response("Not found", { status: 404 });
+  if (!["GET", "HEAD"].includes(request.method)) return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+  const body = files[name];
+  if (typeof body !== "string" || !body.length) return new Response("PDF reader unavailable; build assets first", { status: 503, headers: { "content-type": "text/plain", "cache-control": "no-store" } });
+  return new Response(request.method === "HEAD" ? null : body, { headers: { "content-type": name === "LICENSE" ? "text/plain; charset=utf-8" : "text/javascript; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+}
+
 
 // /m/<manual-id>/<vehicle folder>/... -> R2 key manuals/<manual-id>/<vehicle folder>/...
 // Pages retain their real paths so relative stylesheets, images and icons continue to work.
@@ -113,6 +125,10 @@ function rewriteManualHtml(response, request, manualRoot, currentKey) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    if (url.pathname.startsWith("/api/receipt-pdf/4.10.38/") || url.pathname.startsWith("/vendor/pdfjs/")) {
+      return servePdfReader(request);
+    }
 
     if (url.pathname.startsWith("/api/navigation/")) {
       const filename = url.pathname.slice("/api/navigation/".length);

@@ -48,8 +48,8 @@ function parseAmazonText(text){
  return {vendor:"Amazon",orderNumber:order[1],orderedDate:d.toISOString().slice(0,10),lines:[{description:name,partNumber:mpn?.[1]||"",quantity:1,unitCost:price,unit:"each",vehicleCompatibility:"Not verified",inventoryId:"",demandKey:"",barcode:""}],receiptTotals:{subtotal,shipping,discount,tax,total},notice:"Review inferred quantity of one, fitment, discounts and totals. Order is not received."};
 }
 async function extractPdfText(file){
- const pdf=await import("/vendor/pdfjs/pdf.mjs");
- pdf.GlobalWorkerOptions.workerSrc="/vendor/pdfjs/pdf.worker.mjs";
+ const pdf=await import("/api/receipt-pdf/4.10.38/pdf.mjs");
+ pdf.GlobalWorkerOptions.workerSrc="/api/receipt-pdf/4.10.38/pdf.worker.mjs";
  const task=pdf.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});
  try{const doc=await task.promise;if(doc.numPages>20)throw Error("Receipt exceeds 20 pages.");const pages=[];
  for(let n=1;n<=doc.numPages;n++){const page=await doc.getPage(n),content=await page.getTextContent();pages.push(content.items.map(item=>item.str||"").join(" "));}

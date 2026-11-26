@@ -1125,16 +1125,11 @@
 						</button>
 					</div>
 
-					<div
-						x-show="lowInventoryCount > 0"
-						class="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-400 flex items-center justify-between"
-					>
-						<span
-							>⚠️ <strong>Low Inventory Alert:</strong> You have
-							<span x-text="lowInventoryCount"></span> part(s)
-							running low on stock (<= 2 remaining).</span
-						>
-					</div>
+					<details x-show="lowInventoryCount > 0" class="px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300">
+						<summary class="cursor-pointer font-bold">Low inventory · <span x-text="lowInventoryCount"></span> needed soon</summary>
+						<p class="text-zinc-400 mt-2">Low available stock for maintenance due within 20 days or active work.</p>
+						<template x-for="item in inventoryDemandAlerts()" :key="item.id"><div class="mt-2 border-t border-zinc-800 pt-2"><div class="flex justify-between gap-2"><span class="font-semibold text-white" x-text="item.name"></span><span x-text="item.available+' available'"></span></div><p class="text-zinc-400" x-text="item.reasons.join(' · ')"></p></div></template>
+					</details>
 
 					<details class="glass-panel px-3 py-2" open>
 						<summary class="cursor-pointer text-sm font-bold text-amber-300">Tool inventory · <span x-text="toolInventory.length"></span> recorded</summary>
@@ -3719,9 +3714,57 @@
 						return this.projects.filter(p => p.vehicleId === this.activeVehicleId);
 					},
 
-					get lowInventoryCount() {
-						return this.inventory.filter(i => i.quantity <= 2).length;
+					inventoryDemandAlerts() {
+						const inventory=this.inventory||[],vehicles=this.vehicles||[],projects=this.projects||[],plans=this.maintenancePlans||[];
+						const norm=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+						const number=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+						const active=p=>!["completed","cancelled","canceled","archived"].includes(String(p.status||"").toLowerCase());
+						const compatible=(part,v)=>!!v&&(String(part.vehicleId||"")===String(v.id)||part.vehicleCompatibility===v.name||part.vehicleCompatibility==="Universal");
+						const matchesRequirement=(part,req,v)=>{
+							if(req.used||/^(used|received|cancelled|canceled)(?:\b|$)/i.test(req.status||"")||req.reserved)return false;
+							if(req.inventoryId!=null&&String(req.inventoryId)!=="")return String(req.inventoryId)===String(part.id);
+							if(!compatible(part,v)&&part.vehicleCompatibility)return false;
+							const pn=number(req.partNumber),ipn=number(part.partNumber);
+							return pn&&ipn?pn===ipn:compatible(part,v)&&!!norm(req.description)&&norm(req.description)===norm(part.description);
+						};
+						const scheduleMatches=(part,item,v)=>{
+							const id=String(item.id||""),desc=norm(part.description),pn=number(part.partNumber),oilNumber=number(v.oilFilter);
+							// Only explicit replacement/consumable schedules; inspections do not imply buying parts.
+							if(/^(oil|subaru_oil)$/.test(id)&&oilNumber&&pn===oilNumber)return !part.vehicleCompatibility||compatible(part,v);
+							if(!compatible(part,v))return false;
+							switch(id){
+								case "oil":case "subaru_oil":return /\boil filter\b|\b(engine|motor|synthetic) oil\b/.test(desc)&&!/\b(transmission|gear|cvt|differential)\b/.test(desc);
+								case "air_filter":case "subaru_air_filter":return /\b(air filter|air cleaner element)\b/.test(desc)&&!/\b(cabin|a c|hvac)\b/.test(desc);
+								case "cabin_filter":case "subaru_cabin_filter":return /\bcabin\b/.test(desc)&&/\bfilter\b/.test(desc);
+								case "spark_plugs":case "subaru_spark_plugs":return /\bspark plugs?\b/.test(desc);
+								case "trans_fluid":return /\b(transmission fluid|atf)\b/.test(desc);
+								case "subaru_brake_fluid":return /\bbrake fluid\b/.test(desc);
+								case "subaru_fuel_filter":return /\bfuel filter\b/.test(desc);
+								default:return false;
+							}
+						};
+						const upcoming=vehicles.flatMap(v=>this.predictiveForVehicle(v).filter(item=>item.status==="Red"||(item.remainingDays!=null&&Number.isFinite(Number(item.remainingDays))&&Number(item.remainingDays)<=20)).map(item=>({v,item})));
+						const alerts=[];
+						for(const part of inventory){
+							const available=Math.max(0,Number(part.quantity||0)-Number(part.reservedQuantity||0));
+							if(available>2)continue;
+							const reasons=new Set();
+							for(const p of projects.filter(active)){
+								const v=vehicles.find(v=>String(v.id)===String(p.vehicleId));
+								if((p.partRequirements||[]).some(req=>matchesRequirement(part,req,v)))reasons.add(p.title||"Active project");
+							}
+							for(const p of plans.filter(active)){
+								const v=vehicles.find(v=>String(v.id)===String(p.vehicleId));
+								const due=upcoming.some(x=>String(x.v.id)===String(p.vehicleId)&&String(x.item.id)===String(p.scheduleId));
+								const days=p.targetDate?Math.ceil((new Date(p.targetDate).getTime()-Date.now())/86400000):Infinity;
+								if((due||days<=20||p.status==="In Progress")&&(p.parts||[]).some(req=>matchesRequirement(part,req,v)))reasons.add(p.title||"Maintenance plan");
+							}
+							for(const {v,item} of upcoming)if(scheduleMatches(part,item,v))reasons.add(v.name+" · "+item.serviceName+(item.status==="Red"?" (due/overdue)":" ("+Math.max(0,Math.ceil(item.remainingDays))+"d)"));
+							if(reasons.size)alerts.push({id:part.id,name:part.description||part.partNumber||"Inventory item",available,reasons:[...reasons]});
+						}
+						return alerts;
 					},
+					get lowInventoryCount() {return this.inventoryDemandAlerts().length;},
 
 					get maintenancePlannerItems() {
 						const v = this.activeVehicle;

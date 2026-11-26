@@ -16,6 +16,8 @@ test("Scion Repair Workspace discovers specification siblings from the navigatio
   assert.ok(waterPump.some(page => page.page === "6553" && /Water Pump: Specifications/i.test(page.label)));
   const alternator = Engine.findScionSiblingSpecificationPages(scionRepair, 5662);
   assert.ok(alternator.some(page => page.page === "5690" && /Alternator: Specifications/i.test(page.label)));
+  const alternatorLanding = Engine.findScionSiblingSpecificationPages(scionRepair, 2601);
+  assert.ok(alternatorLanding.some(page => page.page === "5690" && /Alternator: Specifications/i.test(page.label)));
 });
 
 test("Alternator contents page resolves its related factory procedure pages as one bundle", () => {

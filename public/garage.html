@@ -2669,6 +2669,44 @@
 				</div>
 			</div>
 
+			<!-- Project-level guided repair -->
+			<div x-show="modals.projectGuided" x-cloak class="fixed inset-0 z-[70] bg-zinc-950 text-zinc-100 flex flex-col overflow-hidden">
+				<header class="flex items-center justify-between gap-3 border-b border-zinc-800 px-4 py-4">
+					<div class="min-w-0"><p class="text-xs text-amber-300 font-bold uppercase tracking-wide">Guided Repair</p><h2 class="font-black truncate" x-text="selectedProject.title"></h2><p class="text-xs text-zinc-400" x-text="vehicleNameForProject(selectedProject)"></p></div>
+					<button type="button" @click="modals.projectGuided=false;modals.projectDetail=true" :disabled="guidedSaving" class="rounded-xl border border-zinc-700 px-3 py-2 text-sm">Exit</button>
+				</header>
+				<main class="flex-1 overflow-y-auto p-4 space-y-4 max-w-3xl w-full mx-auto">
+					<div class="flex justify-between text-xs text-zinc-400"><span x-text="projectGuidedDone(selectedProject)+' of '+projectGuidedPhases(selectedProject).length+' phases complete'"></span><span x-text="projectGuidedPercent(selectedProject)+'%'"></span></div>
+					<div class="h-2 bg-zinc-800 rounded-full overflow-hidden"><div class="h-full bg-amber-500" :style="'width:'+projectGuidedPercent(selectedProject)+'%'"></div></div>
+					<p x-show="guidedError" class="text-rose-300 text-sm" x-text="guidedError"></p>
+					<template x-if="projectGuidedPhases(selectedProject)[guidedPhaseIndex]">
+						<section class="space-y-4" x-data="{get phase(){return projectGuidedPhases(selectedProject)[guidedPhaseIndex]}}">
+							<div><p class="text-xs text-zinc-400" x-text="'PHASE '+(guidedPhaseIndex+1)+' / '+projectGuidedPhases(selectedProject).length"></p><h3 class="text-2xl font-black" x-text="phase.title"></h3></div>
+							<p class="text-sm leading-relaxed text-zinc-200" x-text="phase.detail"></p>
+							<p x-show="phase.critical" class="rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 p-3 text-sm">Safety / verification gate. Review the linked factory instructions before continuing.</p>
+							<template x-if="phase.id==='readiness'"><div class="space-y-2"><h4 class="text-amber-300 font-bold">Parts and tools to verify</h4><template x-for="part in (selectedProject.repairPlan?.parts||[])" :key="part.name"><p class="text-sm" x-text="part.name+' · '+part.relationship"></p></template><template x-for="tool in (selectedProject.repairPlan?.tools||[])" :key="tool.name"><p class="text-sm text-zinc-300" x-text="tool.name"></p></template><p x-show="selectedProject.repairPlan?.unavailable?.length" class="text-rose-300">Some source documents were unavailable. Obtain and review them before proceeding.</p></div></template>
+							<h4 class="font-bold text-amber-300">Factory source documents</h4>
+							<template x-for="doc in phase.documents" :key="doc.id">
+								<div class="rounded-xl border border-zinc-800 p-3 space-y-2">
+									<a :href="manualLink(doc.sourcePath)" target="_blank" rel="noopener" class="block text-amber-300 font-bold underline" x-text="doc.title+' ↗'"></a>
+									<p class="text-xs text-zinc-400" x-text="doc.sourceLabel"></p>
+									<template x-for="(spec,i) in (doc.specs||[])" :key="i"><p class="text-sm text-white" x-text="spec"></p></template>
+									<template x-for="(warning,i) in projectGuidedWarnings(selectedProject,doc)" :key="i"><p class="text-xs text-amber-200" x-text="warning.text"></p></template>
+								</div>
+							</template>
+							<p class="text-xs text-zinc-400">Use the full factory procedure and diagrams; this screen organizes the work and records progress.</p>
+							<button type="button" @click="completeGuidedPhase()" :disabled="guidedSaving||projectGuidedPhaseDone(selectedProject,phase.id)" class="w-full rounded-xl bg-amber-500 py-4 text-zinc-950 font-black disabled:opacity-40" x-text="projectGuidedPhaseDone(selectedProject,phase.id)?'Phase completed ✓':guidedSaving?'Saving…':'Confirm phase complete →'"></button>
+						</section>
+					</template>
+					<div class="space-y-2 border-t border-zinc-800 pt-3">
+						<template x-for="(phase,i) in projectGuidedPhases(selectedProject)" :key="phase.id"><button type="button" :disabled="guidedSaving||!projectGuidedCanOpen(selectedProject,i)" @click="guidedPhaseIndex=i" class="w-full text-left rounded-xl border border-zinc-800 p-3 text-sm disabled:opacity-40" :class="i===guidedPhaseIndex?'border-amber-500 text-amber-300':''"><span x-text="projectGuidedPhaseDone(selectedProject,phase.id)?'✓ ':(!projectGuidedCanOpen(selectedProject,i)?'🔒 ':'○ ')"></span><span x-text="phase.title"></span></button></template>
+					</div>
+				</main>
+				<footer class="border-t border-zinc-800 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] flex gap-3">
+					<button type="button" @click="guidedPhaseIndex--" :disabled="guidedPhaseIndex===0||guidedSaving" class="flex-1 rounded-xl border border-zinc-700 py-3 disabled:opacity-40">Previous</button>
+					<button type="button" @click="guidedPhaseIndex++" :disabled="guidedSaving||!projectGuidedCanOpen(selectedProject,guidedPhaseIndex+1)" class="flex-1 rounded-xl border border-amber-500/50 py-3 text-amber-300 disabled:opacity-40">Next</button>
+				</footer>
+			</div>
 			<!-- 5. NEW PART MODAL -->
 			<div
 				x-show="modals.newPart"
@@ -2882,6 +2920,11 @@
 						<button x-show="!selectedProject.maintenancePlanId" @click="linkProjectToMaintenance(selectedProject)" class="w-full py-2 bg-amber-500/10 text-amber-400 font-bold rounded-xl border border-amber-500/30">🔧 Link to Maintenance Workflow</button>
 						<div class="rounded-xl border border-amber-500/30 bg-zinc-950 p-3 space-y-3">
 							<div class="flex items-center justify-between gap-2"><strong class="text-amber-300">Guided Repair</strong><a :href="manualProjectLink(selectedProject)" class="text-amber-400 text-xs font-bold">Browse manual ↗</a></div>
+							<div x-show="selectedProject.repairPlan" class="rounded-lg border border-amber-500/30 p-3 space-y-2">
+								<div class="font-semibold text-white">Complete repair plan</div>
+								<p class="text-xs text-zinc-400" x-text="projectGuidedPhases(selectedProject).length+' phases · '+projectGuidedDone(selectedProject)+' completed'"></p>
+								<button type="button" @click="openProjectGuided(selectedProject)" :disabled="!projectGuidedPhases(selectedProject).length" class="w-full bg-amber-500 text-zinc-950 rounded-xl py-3 font-black disabled:opacity-40" x-text="projectGuidedDone(selectedProject) ? 'Resume / review complete repair →' : 'Start complete guided repair →'"></button>
+							</div>
 							<template x-for="entry in guidedRepairEntries(selectedProject)" :key="entry.route">
 								<div class="rounded-lg border border-zinc-800 p-3 space-y-2">
 									<div class="font-semibold text-white" x-text="entry.title"></div>
@@ -3137,7 +3180,7 @@
 					analyticsVehicleId: 'all',
 					activeVehicleId: 'scion-xb',
 					repairCartLinks: [],
-					pendingRepairProjectDraft: null, repairIntent:"", repairPlan:null, repairPlanBusy:false, repairPlanError:"",repairPlanRun:0,
+					guidedPhaseIndex:0,guidedSaving:false,guidedError:"",pendingRepairProjectDraft: null, repairIntent:"", repairPlan:null, repairPlanBusy:false, repairPlanError:"",repairPlanRun:0,
 					sortOrder: 'desc',
 					smartQuery: '',
 					timelineSearch: '',
@@ -3200,7 +3243,7 @@
 						newRepair: false,
 						repairDetail: false,
 						newProject: false,
-						projectDetail: false,
+						projectDetail: false, projectGuided:false,
 						projectNotes: false,
 						projectPartsPicker: false,
 				projectCompletion: false,
@@ -3695,6 +3738,32 @@
 						if(/^https?:$/.test(location.protocol))params.set('back',location.origin+location.pathname);
 						const q=String(record?.serviceType||'').trim();
 						return this.manualLibrary.base+'/manuals.html?'+params.toString()+'#/search'+(q?'/'+encodeURIComponent(q):'');
+					},
+					projectGuidedPhases(project) { return window.MotorNoteRepairPlanner?.buildGuidedPhases(project?.repairPlan)||[]; },
+					projectGuidedPhaseDone(project,id) { return !!project?.guidedExecution?.completed?.[id]; },
+					projectGuidedDone(project) { return this.projectGuidedPhases(project).filter(p=>this.projectGuidedPhaseDone(project,p.id)).length; },
+					projectGuidedPercent(project) { const total=this.projectGuidedPhases(project).length;return total?Math.round(this.projectGuidedDone(project)/total*100):0; },
+					projectGuidedCanOpen(project,index) { const phases=this.projectGuidedPhases(project);return index>=0&&index<phases.length&&phases.slice(0,index).every(p=>this.projectGuidedPhaseDone(project,p.id)); },
+					projectGuidedWarnings(project,doc) { return (project?.repairPlan?.warnings||[]).filter(w=>w.source===doc.sourceLabel); },
+					openProjectGuided(project) {
+						const phases=this.projectGuidedPhases(project);if(!phases.length)return;
+						this.selectedProject=project;this.guidedError="";
+						const next=phases.findIndex(p=>!this.projectGuidedPhaseDone(project,p.id));
+						this.guidedPhaseIndex=next<0?phases.length-1:next;
+						this.modals.projectDetail=false;this.modals.projectGuided=true;
+					},
+					async completeGuidedPhase() {
+						if(this.guidedSaving)return;
+						const project=this.selectedProject,phases=this.projectGuidedPhases(project),index=this.guidedPhaseIndex,phase=phases[index];
+						if(!phase||!this.projectGuidedCanOpen(project,index)||this.projectGuidedPhaseDone(project,phase.id))return;
+						this.guidedSaving=true;this.guidedError="";
+						const prior=project.guidedExecution?JSON.parse(JSON.stringify(project.guidedExecution)):null;
+						const previousUpdatedAt=project.updatedAt;
+						const completed={...(prior?.completed||{}),[phase.id]:new Date().toISOString()};
+						project.guidedExecution={completed,status:phases.every(p=>completed[p.id])?"completed":"in-progress",updatedAt:new Date().toISOString()};project.updatedAt=project.guidedExecution.updatedAt;
+						try{if(!await this.saveToStorage())throw Error("Could not save progress. Try again.");if(index<phases.length-1)this.guidedPhaseIndex=index+1;}
+						catch(error){project.guidedExecution=prior;project.updatedAt=previousUpdatedAt;this.guidedError=error.message;}
+						finally{this.guidedSaving=false;}
 					},
 					guidedRepairProgress(entry) { const steps=entry.execution?.steps||[];return steps.filter(s=>s.status==='done').length+' of '+steps.length+' steps complete'; },
 					refreshRepairCartLinks() { try { const saved=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'); this.repairCartLinks=Object.entries(saved).map(([cartKey,cart])=>({...cart,cartKey})).filter(cart=>cart&&cart.projectId); } catch { this.repairCartLinks=[]; } },

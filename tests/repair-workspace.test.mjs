@@ -433,3 +433,19 @@ test("Scion generator installation recognizes star-separated torque units and ex
   ["Alternator wire", "Nut", 9.8, 100, 7, true]
  ]);
 });
+
+
+test("guided repair reads Scion factory ordered-list steps without losing nested instructions", () => {
+ const html = '<h1>Generator: Installation</h1><ol class="ARABICNUM"><li><span class="clsEmphBOLD">INSTALL GENERATOR ASSEMBLY</span><ol class="LOWERALPHA"><li>Tighten bolt A.<p>Torque: 18.5 N*m</p></li><li>Tighten bolt B.<p>54 N*m</p><div>NOTE: Verify tension.</div></li></ol></li><li><span class="clsEmphBOLD">ADJUST GENERATOR V BELT (see <a href="../pages/7891.html">INSTALLATION</a>)</span></li><li><span class="clsEmphBOLD">CONNECT CABLE TO NEGATIVE BATTERY TERMINAL</span></li></ol>';
+ const steps = Engine.extractRepairSteps(Engine.htmlToText(html), html);
+ assert.equal(steps.length, 3);
+ assert.equal(steps[0].title, "INSTALL GENERATOR ASSEMBLY");
+ assert.ok(steps[0].detail.includes("18.5 N*m"));
+ assert.ok(steps[0].detail.includes("54 N*m"));
+ assert.ok(steps[0].detail.includes("Verify tension"));
+ assert.ok(steps[1].title.includes("ADJUST GENERATOR V BELT"));
+ assert.equal(steps[2].safetyCritical, true);
+ assert.equal(Engine.repairStepCanOpen(steps, {}, 1), false);
+ assert.equal(Engine.repairStepCanOpen(steps, {}, 2), false);
+ assert.equal(Engine.extractRepairSteps("Parts list", '<ol><li>Alternator</li></ol>').length, 0);
+});

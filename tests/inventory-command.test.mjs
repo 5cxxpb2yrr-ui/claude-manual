@@ -13,7 +13,7 @@ test("command center uses actual stock, project requirements and open orders",()
  assert.equal(mock.inventoryProjectReview.length,2);
  assert.equal(mock.inventoryForecast(20).shortages.length,2);
  assert.equal(mock.inventoryOpenOrders.length,1);
- assert.equal(mock.inventoryCommandNext.view,"review");
+ assert.equal(mock.inventoryCommandNext.view,"shopping");
  assert.equal(mock.inventoryVisibleStock[0].id,1);
  mock.inventorySearch="scion";
  assert.equal(mock.inventoryVisibleStock.length,1);

@@ -39,7 +39,7 @@ test("search groups duplicate navigation entries but preserves distinct procedur
   assert.equal(groups[0].primary.item[2].p,1877);
   assert.deepEqual(groups[0].alternates.map(h=>h.item[2].p),[7910]);
   assert.match(html, /<details class="search-duplicates">/);
-  assert.match(html, /visible=grouped.slice/);
+  assert.match(html, /grouped=groupSearchResults\(pg,M.vehicles\)/);
 });
 
 
@@ -54,5 +54,23 @@ test("parts and labor search matches stay in a collapsed final section regardles
  assert.deepEqual(sections.secondary.map(g=>g.primary.item[2].p),[110,241]);
  assert.equal(sections.primary[0].alternates.length,1);
  assert.match(html, /<details class="search-secondary"><summary>Parts &amp; Labor/);
- assert.match(html, /visible=sections.primary.slice/);
+ assert.match(html, /visible=primarySections.slice/);
+});
+
+
+test("search groups matching sibling pages in factory order, keeping vehicles and variants separate", () => {
+ const html=readFileSync(new URL("../public/manuals.html",import.meta.url),"utf8");
+ const source=html.slice(html.indexOf("function searchDuplicateKey"),html.indexOf("function searchv"));
+ const {groupSearchResults,groupSearchSiblings}=new Function(source+";return {groupSearchResults,groupSearchSiblings}")();
+ const vehicles=[{guides:[{title:"Repair and Diagnosis"}]},{guides:[{title:"Repair and Diagnosis"},{title:"Parts and Labor"}]}];
+ const path=["Electrical","Charging","Generator"];
+ const hit=(vi,gi,p,n,ix,score,pa=path)=>({item:[vi,gi,{p,n,path:pa,ix}],score});
+ const groups=groupSearchSiblings(groupSearchResults([hit(1,0,1881,"Installation",[0,0,5],900),hit(1,0,1877,"Removal",[0,0,1],800),hit(1,0,7910,"Removal",[0,0,7],790),hit(1,0,1876,"Components",[0,0,0],100),hit(0,0,6570,"Removal",[0,0,0],90),hit(1,0,123,"Removal",[1,1,0],80,["Electrical","Other Variant","Generator"])],vehicles),vehicles);
+ assert.equal(groups.length,3);
+ assert.deepEqual(groups[0].pages.map(g=>g.primary.item[2].p),[1876,1877,1881]);
+ assert.deepEqual(groups[0].pages[1].alternates.map(h=>h.item[2].p),[7910]);
+ assert.equal(groups[1].vi,0);
+ assert.equal(groups[2].path[1],"Other Variant");
+ assert.match(html, /<details class="search-siblings"/);
+ assert.match(html, /primarySections=groupSearchSiblings\(sections.primary/);
 });

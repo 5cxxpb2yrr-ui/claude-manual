@@ -1202,7 +1202,7 @@
 									<div class="mt-2 pt-2 border-t border-zinc-800 space-y-2">
 										<div class="grid grid-cols-3 gap-1 text-center"><template x-for="cell in [{label:'Required',value:item.required},{label:'Stock covered',value:item.stock},{label:'Incoming / received',value:item.incoming+item.received}]" :key="cell.label"><div class="bg-zinc-900 rounded p-1"><div class="text-xs font-bold text-white" x-text="cell.value"></div><div class="text-[9px] text-zinc-400" x-text="cell.label"></div></div></template></div>
 										<template x-for="source in item.sources" :key="source.key"><div class="flex justify-between items-center gap-2 text-xs"><div><span class="text-zinc-200" x-text="source.source"></span><div class="text-[10px] text-zinc-400" x-text="'Uncovered: '+source.quantity+(source.kind==='project'?' · Active project':' · '+source.days+'d')"></div></div><button type="button" x-show="source.projectId!=null" @click="const p=projects.find(p=>String(p.id)===String(source.projectId));if(p){currentTab='projects';openProjectDetail(p)}" class="text-amber-300 text-[10px] font-bold">Project →</button></div></template>
-										<p class="text-[10px] text-amber-300" x-show="item.needsReview">Confirm part identity, fitment and quantity before ordering.</p>
+										<p class="text-[10px] text-amber-300" x-show="item.needsReview">Confirm part identity, fitment and quantity before ordering.</p><button type="button" @click="openVendorDraft(item)" class="w-full rounded-lg border border-amber-500/40 text-amber-300 text-xs font-bold py-2">Record vendor order →</button>
 									</div>
 								</details>
 							</template>
@@ -1210,7 +1210,25 @@
 							<template x-if="inventoryShoppingList.reviews.length"><details class="rounded-lg border border-zinc-800 p-2"><summary class="text-xs font-bold text-amber-300 cursor-pointer">Confirm before buying · <span x-text="inventoryShoppingList.reviews.length"></span></summary><template x-for="item in inventoryShoppingList.reviews" :key="item.key"><div class="border-t border-zinc-800 py-2 mt-1"><p class="text-xs font-semibold text-white" x-text="item.name"></p><p class="text-[10px] text-zinc-400" x-text="item.source+' · '+item.reason"></p></div></template></details></template>
 							<details class="rounded-lg border border-zinc-800 p-2"><summary class="cursor-pointer text-xs font-bold text-amber-300">Copy shopping list</summary><textarea readonly :value="inventoryShoppingText" class="w-full bg-zinc-950 text-xs text-zinc-200 border border-zinc-800 rounded-lg mt-2 p-2" rows="6" @focus="$event.target.select()"></textarea><button type="button" @click="copyInventoryShopping()" class="w-full mt-1 rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2">Copy list</button><p class="text-[10px] text-zinc-400 mt-1" x-text="inventoryShoppingMessage"></p></details>
 						</div>
-						<div x-show="inventoryView==='orders'" class="space-y-2">
+						<div x-show="inventoryView==='orders'" class="space-y-3">
+							<button type="button" @click="openVendorDraft()" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2">+ Import receipt / record order</button>
+							<p class="text-[10px] text-zinc-400">Amazon or any vendor. Review item rows and record delivery separately. No retailer login required.</p>
+							<p x-show="vendorError" x-text="vendorError" class="text-xs text-rose-300" role="alert"></p>
+							<template x-if="vendorDraft"><div class="rounded-xl border border-amber-500/40 p-3 space-y-2">
+								<div class="flex justify-between"><h4 class="text-sm font-bold text-white">Review purchase</h4><button type="button" @click="vendorDraft=null;vendorError=''" :disabled="vendorBusy" class="text-xs text-zinc-400">Cancel</button></div>
+								<div class="grid grid-cols-2 gap-2"><label class="block text-[10px] text-zinc-400">Vendor<input x-model="vendorDraft.vendor" placeholder="Amazon" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label><label class="block text-[10px] text-zinc-400">Order / receipt #<input x-model="vendorDraft.orderNumber"  class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label><label class="block text-[10px] text-zinc-400">Purchased<input x-model="vendorDraft.orderedDate" type="date" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label><label class="block text-[10px] text-zinc-400">Expected<input x-model="vendorDraft.expectedDate" type="date" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label></div>
+								<details class="border border-zinc-800 rounded-lg p-2"><summary class="text-xs text-amber-300 cursor-pointer">Import CSV / copied item rows</summary><p class="text-[10px] text-zinc-400 mt-1">Header: description, part number, quantity, unit price, unit. Import replaces draft lines only. PDF and photo extraction not supported yet.</p><input type="file" accept=".csv,.tsv,.txt,text/csv,text/plain" @change="readVendorFile($event)" class="w-full text-xs text-zinc-400 mt-2"><textarea x-model="vendorPaste" rows="4" placeholder="description,part number,quantity,unit price,unit" class="w-full bg-zinc-950 rounded border border-zinc-800 p-2 text-xs mt-2"></textarea><button type="button" @click="importVendorRows()" class="text-xs text-amber-300 font-bold py-1">Parse item rows</button></details>
+								<template x-for="(line,i) in vendorDraft.lines" :key="i"><div class="rounded-lg border border-zinc-800 p-2 space-y-2"><div class="flex justify-between"><span class="text-[10px] text-zinc-400" x-text="'Item '+(i+1)"></span><button type="button" @click="vendorDraft.lines.splice(i,1)" class="text-rose-300 text-xs">Remove</button></div><label class="block text-[10px] text-zinc-400">Description<input x-model="line.description"  class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label><label class="block text-[10px] text-zinc-400">Manufacturer part number<input x-model="line.partNumber"  class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label>
+									<div class="grid grid-cols-3 gap-1"><label class="block text-[10px] text-zinc-400">Qty<input x-model="line.quantity" type="number" inputmode="decimal" min="0" step="any" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label><label class="block text-[10px] text-zinc-400">Unit cost $<input x-model="line.unitCost" type="number" inputmode="decimal" min="0" step="0.01" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label><label class="block text-[10px] text-zinc-400">Unit<input x-model="line.unit"  class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white"></label></div>
+									<label class="text-[10px] text-zinc-400">Confirmed compatibility<select x-model="line.vehicleCompatibility" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs"><option>Not verified</option><option>Universal</option><template x-for="v in vehicles" :key="v.id"><option :value="v.name" x-text="v.name"></option></template></select></label>
+									<label class="text-[10px] text-zinc-400">Match existing stock (optional)<select x-model="line.inventoryId" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs"><option value="">New / exact part match</option><template x-for="p in inventory" :key="p.id"><option :value="String(p.id)" x-text="p.description+' · '+(p.partNumber||'No #')"></option></template></select></label>
+									<label class="text-[10px] text-zinc-400">Cover existing demand (optional)<select x-model="line.demandKey" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-xs"><option value="">Unlinked stock purchase</option><template x-for="r in vendorDemandChoices" :key="r.key"><option :value="r.key" x-text="r.name+' · '+r.source+' · '+r.shortage+' uncovered'"></option></template></select></label>
+								</div></template>
+								<button type="button" @click="vendorDraft.lines.push(newVendorLine())" class="text-xs text-amber-300 font-bold">+ Item</button>
+								<button type="button" @click="saveVendorDraft()" :disabled="vendorBusy" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2">Record order (no stock added)</button>
+							</div></template>
+							<template x-for="order in vendorOrders" :key="order.id"><details class="border border-zinc-800 rounded-lg p-2"><summary class="cursor-pointer flex justify-between text-xs gap-2"><span class="text-white font-bold" x-text="order.vendor+' · '+order.orderNumber"></span><span class="text-amber-300" x-text="order.status"></span></summary><div class="space-y-2 mt-2"><template x-for="line in order.lines" :key="line.id"><div class="text-xs flex justify-between gap-2"><span x-text="line.description"></span><span class="text-zinc-400" x-text="line.receivedQuantity+'/'+line.quantity+' received'"></span></div></template><button type="button" x-show="['Ordered','Partially received'].includes(order.status)&&vendorReceiveId!==order.id" @click="openVendorReceive(order)" class="w-full rounded-lg border border-emerald-500/40 text-emerald-300 text-xs font-bold py-2">Receive items</button><template x-if="vendorReceiveId===order.id"><div class="space-y-2"><p class="text-[10px] text-amber-300">Enter only quantities physically received and checked.</p><template x-for="line in order.lines" :key="line.id"><label class="flex justify-between items-center gap-2 text-xs"><span x-text="line.description"></span><input type="number" min="0" step="any" :max="line.quantity-line.receivedQuantity" x-model="vendorReceiveAmounts[line.id]" class="w-24 bg-zinc-950 border border-zinc-800 rounded p-2 text-xs"></label></template><button type="button" @click="confirmVendorReceive(order)" :disabled="vendorBusy" class="w-full bg-emerald-500 text-zinc-950 rounded-lg py-2 text-xs font-bold">Confirm received & update stock</button><button type="button" @click="vendorReceiveId=null" :disabled="vendorBusy" class="text-xs text-zinc-400">Cancel</button></div></template></div></details></template>
+							<h4 class="text-xs font-bold text-zinc-400">Existing project orders</h4>
 							<template x-for="entry in inventoryOpenOrders" :key="entry.key"><button type="button" @click="currentTab='projects';openProjectDetail(entry.project)" class="w-full text-left border border-zinc-800 rounded-lg p-2"><div class="flex justify-between text-xs gap-2"><span class="font-bold text-white" x-text="entry.order.vendor||'Supplier'"></span><span class="text-amber-300" x-text="entry.order.status"></span></div><p class="text-[10px] text-zinc-400" x-text="entry.project.title+' · '+(entry.order.lines||[]).length+' lines · '+inventoryMoney(projectPurchaseOrderTotal(entry.order))"></p><p class="text-[10px] text-zinc-400" x-text="entry.order.expectedDate?'Expected '+entry.order.expectedDate:'No expected date'"></p></button></template>
 							<p x-show="!inventoryOpenOrders.length" class="text-xs text-zinc-400">No open purchase orders.</p>
 						</div>
@@ -2994,6 +3012,7 @@
 		<script src="/repair-planner.js"></script>
 		<script src="/inventory-engine.js"></script>
 		<script src="/inventory-demand.js"></script>
+		<script src="/inventory-purchasing.js"></script>
 		<script>
 			function garageApp() {
 				return {
@@ -3022,7 +3041,7 @@
 					showLightbox: false,
 					lightboxImage: '',
 					isEditingRepair: false,
-					appSchemaVersion: 8, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
+					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
 					garageDB: null,
 					saveState: 'saved',
 					lastSavedAt: null,
@@ -3722,7 +3741,52 @@
 					},
 					inventoryForecast(days=20){
 						const predictions=(this.vehicles||[]).flatMap(v=>this.predictiveForVehicle(v).map(item=>({...item,vehicleId:v.id})));
-						return window.MotorNoteDemandEngine.forecast({inventory:this.inventory||[],vehicles:this.vehicles||[],projects:this.projects||[],maintenancePlans:this.maintenancePlans||[],predictions,horizon:Number(days)});
+						return window.MotorNoteDemandEngine.forecast({inventory:this.inventory||[],vehicles:this.vehicles||[],projects:this.projects||[],maintenancePlans:this.maintenancePlans||[],predictions,vendorOrders:this.vendorOrders||[],horizon:Number(days)});
+					},
+					newVendorLine(){return {description:"",partNumber:"",quantity:1,unitCost:"",unit:"each",vehicleCompatibility:"Not verified",demandKey:"",inventoryId:""};},
+					openVendorDraft(item=null){
+						this.inventoryView="orders";this.vendorError="";this.vendorPaste="";
+						const lines=item?item.sources.map(src=>({...this.newVendorLine(),description:item.name,partNumber:item.partNumber,quantity:src.quantity,unit:item.unit==="recorded unit"?"each":item.unit,vehicleCompatibility:item.vehicleName==="Vehicle not recorded"?"Not verified":item.vehicleName,demandKey:src.key})):[this.newVendorLine()];
+						this.vendorDraft={vendor:"",orderNumber:"",orderedDate:new Date().toISOString().slice(0,10),expectedDate:"",lines};
+					},
+					importVendorRows(){
+						try{this.vendorDraft.lines=window.MotorNotePurchasing.parseRows(this.vendorPaste).map(l=>({...l,vehicleCompatibility:"Not verified"}));this.vendorError="";}catch(e){this.vendorError=e.message;}
+					},
+					async readVendorFile(event){
+						const file=event.target.files?.[0];event.target.value="";if(!file)return;
+						try{if(file.size>500000)throw Error("Use a CSV or text file under 500 KB.");this.vendorPaste=await file.text();this.importVendorRows();}catch(e){this.vendorError=e.message;}
+					},
+					get vendorDemandChoices(){return this.inventoryForecast(365).shortages;},
+					async saveVendorDraft(){
+						if(this.vendorBusy||!this.vendorDraft)return;this.vendorBusy=true;this.vendorError="";
+						const prior=this.vendorOrders||[];
+						try{
+							const order=window.MotorNotePurchasing.validateDraft(this.vendorDraft,prior,(this.projects||[]).flatMap(p=>p.purchaseOrders||[]));
+							const demand=this.vendorDemandChoices,totals=new Map(),norm=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+							for(const l of order.lines){
+								if(l.inventoryId){const part=this.inventory.find(p=>String(p.id)===String(l.inventoryId));if(!part)throw Error("Selected inventory record does not exist.");if((part.vehicleCompatibility||"Not verified")!==l.vehicleCompatibility||norm(part.unit||"each")!==norm(l.unit)||(l.partNumber&&norm(part.partNumber)!==norm(l.partNumber)))throw Error("Stock identity, unit or compatibility differs.");}
+								if(!l.demandKey)continue;
+								const row=demand.find(r=>r.key===l.demandKey);if(!row)throw Error("Linked demand changed. Review the shopping list.");
+								const v=this.vehicles.find(v=>String(v.id)===String(row.vehicleId));
+								if(!v||![v.name,"Universal"].includes(l.vehicleCompatibility))throw Error("Confirm correct vehicle fitment.");
+								if(row.partNumber&&norm(row.partNumber)!==norm(l.partNumber))throw Error("Part number differs from requirement.");
+								if(row.unit!=="recorded unit"&&norm(row.unit)!==norm(l.unit))throw Error("Unit differs from requirement.");
+								const n=(totals.get(l.demandKey)||0)+l.quantity;totals.set(l.demandKey,n);if(n>row.shortage)throw Error("Linked quantity exceeds uncovered demand. Record extras on an unlinked line.");
+							}
+							const saved={...order,id:"vendor-"+Date.now()+"-"+Math.random().toString(36).slice(2,9),createdAt:new Date().toISOString(),receipts:[]};
+							this.vendorOrders=[saved,...prior];if(!await this.saveToStorage("Vendor order recorded",{orderId:saved.id}))throw Error("Order could not be saved.");
+							this.vendorDraft=null;this.vendorPaste="";
+						}catch(e){this.vendorOrders=prior;this.vendorError=e.message;}finally{this.vendorBusy=false;}
+					},
+					openVendorReceive(order){this.vendorReceiveId=order.id;this.vendorReceiveAmounts=Object.fromEntries(order.lines.map(l=>[l.id,0]));this.vendorError="";},
+					async confirmVendorReceive(order){
+						if(this.vendorBusy)return;this.vendorBusy=true;this.vendorError="";
+						const prior=this.vendorOrders,stock=this.inventory;
+						try{const live=prior.find(o=>o.id===order.id),result=window.MotorNotePurchasing.receive(live,stock,this.vendorReceiveAmounts);
+							this.inventory=result.inventory;this.vendorOrders=prior.map(o=>o.id===order.id?result.order:o);
+							if(!await this.saveToStorage("Vendor receipt confirmed",{orderId:order.id,lines:result.changed}))throw Error("Receipt could not be saved.");
+							this.vendorReceiveId=null;this.vendorReceiveAmounts={};
+						}catch(e){this.inventory=stock;this.vendorOrders=prior;this.vendorError=e.message;}finally{this.vendorBusy=false;}
 					},
 					get inventoryShoppingList(){
 						return window.MotorNoteDemandEngine.shoppingList(this.inventoryForecast(this.inventoryForecastHorizon||20),this.vehicles||[]);
@@ -3733,16 +3797,16 @@
 						catch(e){this.inventoryShoppingMessage="Clipboard unavailable. Select the text below to copy.";}
 					},
 					get inventoryCommandTiles(){
-						const stock=this.inventory||[],value=stock.reduce((sum,p)=>sum+Math.max(0,Number(p.quantity)||0)*Math.max(0,Number(p.unitCost)||0),0),forecast=this.inventoryForecast(20),soon=forecast.rows.filter(r=>r.kind!=="project").length+forecast.reviews.length,review=forecast.shortages.length,orders=this.inventoryOpenOrders.length;
+						const stock=this.inventory||[],value=stock.reduce((sum,p)=>sum+Math.max(0,Number(p.quantity)||0)*Math.max(0,Number(p.unitCost)||0),0),forecast=this.inventoryForecast(20),soon=forecast.rows.filter(r=>r.kind!=="project").length+forecast.reviews.length,review=forecast.shortages.length,orders=this.inventoryOpenOrders.length+(this.vendorOrders||[]).filter(o=>["Ordered","Partially received"].includes(o.status)).length;
 						const neutral="border-zinc-700 bg-zinc-950 text-zinc-100",blue="border-sky-500/30 bg-sky-500/5 text-sky-300",amber="border-amber-500/40 bg-amber-500/10 text-amber-300",green="border-emerald-500/30 bg-emerald-500/5 text-emerald-300";
 						return [{id:"stock",view:"stock",label:"Stock items",value:stock.length,detail:"Part records",tone:blue},{id:"tools",view:"tools",label:"Owned tools",value:(this.toolInventory||[]).length,detail:"Equipment",tone:blue},{id:"value",view:"value",label:"Stock value",value:this.inventoryMoney(value),detail:"Recorded cost",tone:green},{id:"soon",view:"soon",label:"Needed soon",value:soon,detail:"20 days / projects",tone:soon?amber:neutral},{id:"review",view:"review",label:"Shortages",value:review,detail:"Uncovered demand",tone:review?amber:neutral},{id:"orders",view:"orders",label:"On order",value:orders,detail:"Purchase orders",tone:orders?"border-violet-500/30 bg-violet-500/5 text-violet-300":neutral}];
 					},
-					get inventoryViewTitle(){return ({stock:"Parts inventory",tools:"Owned tools",value:"Stock by value",soon:"Needed soon",review:"Uncovered demand",shopping:"Consolidated shopping list",orders:"Open purchase orders",history:"Stock movement history"})[this.inventoryView]||"Parts inventory";},
+					get inventoryViewTitle(){return ({stock:"Parts inventory",tools:"Owned tools",value:"Stock by value",soon:"Needed soon",review:"Uncovered demand",shopping:"Consolidated shopping list",orders:"Purchases & receiving",history:"Stock movement history"})[this.inventoryView]||"Parts inventory";},
 					get inventoryCommandNext(){
 						const f=this.inventoryForecast(20);
 						if(f.shortages.length)return {view:"shopping",title:"Review shopping list",detail:window.MotorNoteDemandEngine.shoppingList(f,this.vehicles||[]).items.length+" uncovered purchase lines · confirm fitment"};
 						if(f.reviews.length)return {view:"soon",title:"Confirm upcoming maintenance requirements",detail:f.reviews.length+" quantities or specifications to review"};
-						if(this.inventoryOpenOrders.length)return {view:"orders",title:"Check incoming orders",detail:this.inventoryOpenOrders.length+" open orders"};
+						const open=this.inventoryOpenOrders.length+(this.vendorOrders||[]).filter(o=>["Ordered","Partially received"].includes(o.status)).length;if(open)return {view:"orders",title:"Check incoming orders",detail:open+" open orders"};
 						return null;
 					},
 					inventoryDemandAlerts() {
@@ -4235,6 +4299,7 @@
 						if (Array.isArray(saved.projects)) this.projects = saved.projects;
 						if (Array.isArray(saved.inventory)) this.inventory = saved.inventory;
 						this.inventoryLedger=Array.isArray(saved.inventoryLedger)?saved.inventoryLedger:[];
+						this.vendorOrders=Array.isArray(saved.vendorOrders)?saved.vendorOrders:[];
 						this.toolInventory = Array.isArray(saved.toolInventory)?saved.toolInventory:[];
 						if (Array.isArray(saved.maintenancePlans)) this.maintenancePlans = saved.maintenancePlans;
 						if (Array.isArray(saved.archivedMaintenance)) this.archivedMaintenance = saved.archivedMaintenance;
@@ -4260,7 +4325,7 @@
 
 				getPersistableState() {
 					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? undefined : val));
-					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), inventoryLedger:strip(this.inventoryLedger||[]), toolInventory:strip(this.toolInventory||[]), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
+					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), inventoryLedger:strip(this.inventoryLedger||[]), vendorOrders:strip(this.vendorOrders||[]), toolInventory:strip(this.toolInventory||[]), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
 				},
 
 				loadGarageState() {
@@ -4895,7 +4960,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							const validArray = key =>
 								candidate[key] === undefined || Array.isArray(candidate[key]);
 
-							if (!['vehicles', 'logs', 'serviceLogs', 'projects', 'inventory', 'partsInventory', 'toolInventory', 'inventoryLedger', 'maintenancePlans']
+							if (!['vehicles', 'logs', 'serviceLogs', 'projects', 'inventory', 'partsInventory', 'toolInventory', 'inventoryLedger', 'vendorOrders', 'maintenancePlans']
 								.every(validArray)) {
 								throw new Error('One or more imported collections are invalid.');
 							}
@@ -4910,6 +4975,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							if (Array.isArray(candidate.inventory)) this.inventory = candidate.inventory;
 							if (Array.isArray(candidate.partsInventory)) this.inventory = candidate.partsInventory;
 							if(Array.isArray(candidate.toolInventory))this.toolInventory=candidate.toolInventory;
+							if(Array.isArray(candidate.vendorOrders))this.vendorOrders=candidate.vendorOrders;
 							if(Array.isArray(candidate.inventoryLedger)&&candidate.inventoryLedger.length)this.inventoryLedger=candidate.inventoryLedger;
 							if (Array.isArray(candidate.maintenancePlans)) this.maintenancePlans = candidate.maintenancePlans;
 

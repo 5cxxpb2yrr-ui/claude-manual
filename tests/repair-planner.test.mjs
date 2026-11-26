@@ -20,13 +20,18 @@ test("missing supporting sources do not produce a prescriptive oxygen sensor seq
  assert.ok(!phases.some(p=>p.id==="install"));
 });
 test("Garage guided phases persist, lock later phases and roll back failed saves",async()=>{
- const code=garage.slice(garage.indexOf("projectGuidedPhases(project) {"),garage.indexOf("guidedRepairProgress(entry) {"));
+ const code=garage.slice(garage.indexOf("projectReadiness(project) {"),garage.indexOf("guidedRepairProgress(entry) {"));
  const mock={...new Function("window","return ({"+code+"})")({MotorNoteRepairPlanner:planner}),selectedProject:{repairPlan:plan},modals:{},guidedSaving:false,saveToStorage:async()=>true};
  mock.openProjectGuided(mock.selectedProject);
  assert.equal(mock.projectGuidedCanOpen(mock.selectedProject,1),false);
  await mock.completeGuidedPhase();
  assert.equal(mock.guidedPhaseIndex,1);
  assert.equal(mock.projectGuidedDone(mock.selectedProject),1);
+ await mock.completeGuidedPhase();
+ assert.equal(mock.projectGuidedDone(mock.selectedProject),1);
+ assert.match(mock.guidedError,/Confirm all preparation/);
+ for(const item of mock.projectReadiness(mock.selectedProject).items)await mock.setProjectReadiness(mock.selectedProject,item.id,true);
+ assert.equal(mock.projectReadiness(mock.selectedProject).ready,true);
  mock.saveToStorage=async()=>false;
  await mock.completeGuidedPhase();
  assert.equal(mock.projectGuidedDone(mock.selectedProject),1);
@@ -34,4 +39,24 @@ test("Garage guided phases persist, lock later phases and roll back failed saves
  mock.selectedProject=JSON.parse(JSON.stringify(mock.selectedProject));
  mock.openProjectGuided(mock.selectedProject);
  assert.equal(mock.guidedPhaseIndex,1);
+});
+
+test("readiness uses explicit checks and missing source documents block completion",async()=>{
+ const code=garage.slice(garage.indexOf("projectReadiness(project) {"),garage.indexOf("guidedRepairProgress(entry) {"));
+ const mock={...new Function("window","return ({"+code+"})")({MotorNoteRepairPlanner:planner}),saveToStorage:async()=>true};
+ const project={repairPlan:{...plan,parts:[{name:"Sensor",relationship:"candidate"}],tools:[{name:"Socket"}],unavailable:[]}};
+ assert.equal(mock.projectReadiness(project).ready,false);
+ for(const item of mock.projectReadiness(project).items)await mock.setProjectReadiness(project,item.id,true);
+ assert.equal(mock.projectReadiness(project).ready,true);
+ project.repairPlan.unavailable=[{page:14661}];
+ assert.equal(mock.projectReadiness(project).ready,false);
+ assert.equal(mock.projectReadiness(project).items.find(i=>i.id==="sources").blocked,true);
+});
+test("dashboard maintenance indicator reflects overdue and unknown history without expanded cards",()=>{
+ const source=garage.slice(garage.indexOf("get predictiveStatus() {"),garage.indexOf("get nextScheduledMaintenance() {"));
+ const get=Object.getOwnPropertyDescriptor(new Function("return ({"+source+"})")(),"predictiveStatus").get;
+ assert.equal(get.call({predictiveItems:[]}).label,"No schedules");
+ assert.equal(get.call({predictiveItems:[{status:"Green",hasHistory:true}]}).tone,"bg-emerald-400");
+ assert.equal(get.call({predictiveItems:[{status:"Red",hasHistory:true},{status:"Green",hasHistory:false}]}).label,"1 overdue · 1 history unconfirmed");
+ assert.doesNotMatch(garage,/predictiveItems\.slice\(0, 4\)/);
 });

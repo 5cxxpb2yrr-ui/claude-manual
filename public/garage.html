@@ -1136,6 +1136,25 @@
 						>
 					</div>
 
+					<details class="glass-panel px-3 py-2" open>
+						<summary class="cursor-pointer text-sm font-bold text-amber-300">Tool inventory · <span x-text="toolInventory.length"></span> recorded</summary>
+						<div class="space-y-3 mt-3 border-t border-zinc-800 pt-3">
+							<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+								<template x-for="tool in toolInventory" :key="tool.id">
+									<div class="min-w-0 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
+										<div class="text-xs font-bold text-emerald-300 break-words" x-text="tool.name"></div>
+										<p class="text-[10px] text-zinc-400 break-words" x-text="tool.notes"></p>
+										<button type="button" @click="removeOwnedTool(tool.id)" :disabled="toolInventoryBusy" class="text-[10px] text-zinc-400 mt-1 underline">Remove</button>
+									</div>
+								</template>
+							</div>
+							<p x-show="!toolInventory.length" class="text-xs text-zinc-400">Record the tools you own so repair plans can suggest matching equipment.</p>
+							<input x-model="toolDraftName" placeholder="Tool name (e.g. torque wrench)" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-sm text-white">
+							<input x-model="toolDraftNotes" placeholder="Size, range, condition (optional)" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white">
+							<button type="button" @click="addOwnedTool(toolDraftName,toolDraftNotes)" :disabled="toolInventoryBusy||!toolDraftName.trim()" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2 disabled:opacity-40">Add owned tool</button>
+							<p x-show="toolInventoryError" x-text="toolInventoryError" class="text-xs text-rose-300"></p>
+						</div>
+					</details>
 					<!-- Mobile: one card per part -->
 					<div class="sm:hidden space-y-2">
 						<template x-for="item in inventory" :key="'inv-card-'+item.id">
@@ -2752,10 +2771,15 @@
 							<template x-if="selectedProject.repairPlan"><details class="rounded-lg border border-amber-500/30 p-3 space-y-2">
 								<summary class="cursor-pointer font-bold text-amber-300">Project readiness · <span x-text="projectReadiness(selectedProject).label"></span></summary>
 								<div class="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full bg-amber-500" :style="'width:'+projectReadiness(selectedProject).percent+'%'"></div></div>
+								<div class="grid grid-cols-3 gap-1.5 text-center">
+									<div class="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2"><div class="text-lg font-black text-emerald-300" x-text="projectReadiness(selectedProject).matched"></div><div class="text-[10px] text-zinc-400">Stock/tool matches</div></div>
+									<div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2"><div class="text-lg font-black text-amber-300" x-text="projectReadiness(selectedProject).unmatched"></div><div class="text-[10px] text-zinc-400">Not matched</div></div>
+									<div class="rounded-lg border border-zinc-700 bg-zinc-950 p-2"><div class="text-lg font-black text-white" x-text="projectReadiness(selectedProject).confirmed"></div><div class="text-[10px] text-zinc-400">Checks confirmed</div></div>
+								</div>
 								<p class="text-xs text-zinc-400" x-text="'Next: '+projectReadiness(selectedProject).next"></p>
 								<p x-show="readinessError" class="text-xs text-rose-300" x-text="readinessError"></p>
 								<template x-for="item in projectReadiness(selectedProject).items" :key="item.id"><label class="flex items-start gap-2 py-1 text-xs"><input type="checkbox" class="mt-0.5 accent-amber-500" :checked="item.done" :disabled="readinessSaving||item.blocked||projectGuidedPhaseDone(selectedProject,'readiness')" @change="setProjectReadiness(selectedProject,item.id,$event.target.checked)"><span><span x-text="item.name"></span><small class="block text-zinc-500" x-text="item.detail"></small></span></label></template>
-								<p class="text-xs text-zinc-500">Verify ownership and fitment yourself; suggestions are not confirmed stock. Readiness is locked after its guided phase is confirmed.</p>
+								<p class="text-xs text-zinc-500">Inventory matches are suggestions only. Confirm actual access, fitment and quantities. No parts are reserved or deducted automatically. Readiness is locked after its guided phase is confirmed.</p>
 							</details></template>
 							<div x-show="selectedProject.repairPlan" class="rounded-lg border border-amber-500/30 p-3 space-y-2">
 								<div class="font-semibold text-white">Complete repair plan</div>
@@ -3139,6 +3163,7 @@
 					archivedMaintenance: [],
 					maintenanceSetupVersion: 0,
 
+					toolInventory: [], toolDraftName:"",toolDraftNotes:"",toolInventoryBusy:false,toolInventoryError:"",
 					inventory: [
 						{ id: 301, partNumber: '90915-YZZF2', description: 'Toyota OEM Oil Filter', vendor: 'Toyota Direct', quantity: 4, unitCost: 6.50, purchaseDate: '2026-01-10', vehicleCompatibility: '2006 Scion xB' },
 						{ id: 302, partNumber: '15208AA15A', description: 'Subaru OEM Oil Filter', vendor: 'Subaru Parts Direct', quantity: 1, unitCost: 8.20, purchaseDate: '2026-02-05', vehicleCompatibility: '2019 Subaru Crosstrek' }
@@ -3576,16 +3601,57 @@
 						const q=String(record?.serviceType||'').trim();
 						return this.manualLibrary.base+'/manuals.html?'+params.toString()+'#/search'+(q?'/'+encodeURIComponent(q):'');
 					},
+					inventoryMatchKey(value) {return String(value||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();},
+					planToolMatches(name) {
+						const key=this.inventoryMatchKey(String(name||"").replace(/\([^)]*\)/g,""));
+						return (this.toolInventory||[]).filter(t=>{const n=this.inventoryMatchKey(t.name);return key&&n&&(n===key||(n.length>=5&&(" "+key+" ").includes(" "+n+" "))||(key.length>=5&&(" "+n+" ").includes(" "+key+" ")));});
+					},
+					planPartMatches(project,part,index) {
+						const req=(project?.partRequirements||[]).find(r=>r.id===project.id+"-plan-part-"+index),key=this.inventoryMatchKey(part.name),pn=this.inventoryMatchKey(req?.partNumber);
+						const vehicle=(this.vehicles||[]).find(v=>String(v.id)===String(project?.vehicleId));
+						return (this.inventory||[]).filter(p=>!p.vehicleCompatibility||p.vehicleCompatibility==="Universal"||p.vehicleCompatibility===vehicle?.name||String(p.vehicleId||"")===String(project?.vehicleId)).filter(p=>{
+							const desc=this.inventoryMatchKey(p.description),num=this.inventoryMatchKey(p.partNumber);
+							// No upstream/downstream guesses or automatic compatibility claims.
+							return (pn&&num===pn)||(key&&desc===key)||(req?.inventoryId!=null&&String(req.inventoryId)===String(p.id));
+						}).map(p=>({id:p.id,name:p.description,partNumber:p.partNumber,available:Math.max(0,Number(p.quantity||0)-Number(p.reservedQuantity||0))+(req?.reserved&&String(req.inventoryId)===String(p.id)?Number(req.quantity||0):0)}));
+					},
+					async addOwnedTool(name,notes="") {
+						name=String(name||"").trim();if(!name||this.toolInventoryBusy)return false;
+						if((this.toolInventory||[]).some(t=>this.inventoryMatchKey(t.name)===this.inventoryMatchKey(name))){this.toolInventoryError="Tool already recorded.";return false;}
+						this.toolInventoryBusy=true;this.toolInventoryError="";
+						const prior=this.toolInventory||[];
+						this.toolInventory=[...prior,{id:"tool-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),name,notes:String(notes||"").trim()}];
+						try{if(!await this.saveToStorage())throw Error("Tool could not be saved.");this.toolDraftName="";this.toolDraftNotes="";return true;}
+						catch(e){this.toolInventory=prior;this.toolInventoryError=e.message;return false;}
+						finally{this.toolInventoryBusy=false;}
+					},
+					async removeOwnedTool(id) {
+						if(this.toolInventoryBusy)return;
+						const prior=this.toolInventory||[];this.toolInventoryBusy=true;this.toolInventoryError="";
+						this.toolInventory=prior.filter(t=>String(t.id)!==String(id));
+						try{if(!await this.saveToStorage())throw Error("Tool could not be removed.");}
+						catch(e){this.toolInventory=prior;this.toolInventoryError=e.message;}
+						finally{this.toolInventoryBusy=false;}
+					},
 					projectReadiness(project) {
 						const plan=project?.repairPlan;if(!plan)return {items:[],ready:false,percent:0,label:"No plan",next:"Generate a repair plan"};
 						const checked=project.readinessChecks||{},items=[],add=(id,name,detail,blocked=false)=>items.push({id,name,detail,blocked,done:!blocked&&!!checked[id]});
 						add("scope","Diagnosis and scope confirmed","Confirm the affected components and selected vehicle.");
 						add("fitment","Replacement part fitment verified","Confirm VIN-specific part numbers and supplier compatibility.");
-						for(const [i,part] of (plan.parts||[]).entries())add("part-"+i,part.name,"Confirm available in the required quantity; "+part.relationship);
-						for(const [i,tool] of (plan.tools||[]).entries())add("tool-"+i,tool.name,"Confirm suitable equipment is available.");
+						for(const [i,part] of (plan.parts||[]).entries()){
+							const matches=this.planPartMatches(project,part,i),qty=Math.max(1,Number(part.quantity)||1),available=matches.some(m=>m.available>=qty);
+							add("part-"+i,part.name,(available?"Possible stock match: "+matches.filter(m=>m.available>=qty).map(m=>m.name+" ("+m.available+" available)").join(", "):matches.length?"Matching stock insufficient":"No matching stock recorded")+". Verify quantity and fitment; "+part.relationship);
+							Object.assign(items.at(-1),{kind:"part",inventoryMatch:available,quantity:qty,matches});
+						}
+						for(const [i,tool] of (plan.tools||[]).entries()){
+							const matches=this.planToolMatches(tool.name);
+							add("tool-"+i,tool.name,matches.length?"Possible owned tool: "+matches.map(t=>t.name+(t.notes?" ("+t.notes+")":"")).join(", ")+". Verify size, range and condition.":"Not recorded in tool inventory; confirm access.");
+							Object.assign(items.at(-1),{kind:"tool",inventoryMatch:matches.length>0,matches});
+						}
 						add("sources","Factory procedures and precautions reviewed",plan.unavailable?.length?"Missing source documents — regenerate or obtain a complete plan.":"Review diagrams, torque assignments and safe access.",!!plan.unavailable?.length);
 						const done=items.filter(i=>i.done).length,ready=items.length>0&&done===items.length;
-						return {items,ready,percent:Math.round(done/items.length*100),label:ready?"Ready":done+"/"+items.length+" confirmed",next:items.find(i=>!i.done)?.name||"Start guided repair"};
+						const resources=items.filter(i=>i.kind),matched=resources.filter(i=>i.inventoryMatch).length;
+						return {items,ready,percent:Math.round(done/items.length*100),label:ready?"Ready":done+"/"+items.length+" confirmed",next:items.find(i=>!i.done)?.name||"Start guided repair",matched,unmatched:resources.length-matched,confirmed:done};
 					},
 					async setProjectReadiness(project,id,done) {
 						if(this.readinessSaving||this.projectGuidedPhaseDone(project,'readiness'))return;
@@ -4089,6 +4155,7 @@
 						if (Array.isArray(saved.logs)) this.logs = saved.logs;
 						if (Array.isArray(saved.projects)) this.projects = saved.projects;
 						if (Array.isArray(saved.inventory)) this.inventory = saved.inventory;
+						this.toolInventory = Array.isArray(saved.toolInventory)?saved.toolInventory:[];
 						if (Array.isArray(saved.maintenancePlans)) this.maintenancePlans = saved.maintenancePlans;
 						if (Array.isArray(saved.archivedMaintenance)) this.archivedMaintenance = saved.archivedMaintenance;
 						this.maintenanceSetupVersion = Number(saved.maintenanceSetupVersion || 0);
@@ -4104,6 +4171,7 @@
 					const resolve = (...refs) => { for (const ref of refs) { const id=aliases.get(normalize(ref)); if (id) return id; } return fallback; };
 					this.logs = (Array.isArray(this.logs)?this.logs:[]).map((l,i)=>({...l,id:l?.id||makeId('log',i),vehicleId:resolve(l?.vehicleId,l?.vehicle),attachments:Array.isArray(l?.attachments)?l.attachments:[],history:Array.isArray(l?.history)?l.history:[]}));
 					this.projects = (Array.isArray(this.projects)?this.projects:[]).map((p,i)=>({...p,id:p?.id||makeId('project',i),vehicleId:resolve(p?.vehicleId,p?.vehicle),tasks:Array.isArray(p?.tasks)?p.tasks:[],milestones:Array.isArray(p?.milestones)?p.milestones:[],procedures:Array.isArray(p?.procedures)?p.procedures:[],attachments:Array.isArray(p?.attachments)?p.attachments:[],partRequirements:(Array.isArray(p?.partRequirements)?p.partRequirements:[]).map(req=>({...req,quantity:Math.max(1,Number(req?.quantity)||1),unitCost:Math.max(0,Number(req?.unitCost)||0),reserved:!!req?.reserved,status:req?.status||'Required'})),purchaseOrders:Array.isArray(p?.purchaseOrders)?p.purchaseOrders:[],costEntries:Array.isArray(p?.costEntries)?p.costEntries:[]}));
+					this.toolInventory=(Array.isArray(this.toolInventory)?this.toolInventory:[]).filter(t=>t&&String(t.name||"").trim()).map((t,i)=>({...t,id:t.id||makeId("tool",i),name:String(t.name).trim(),notes:String(t.notes||"")}));
 					this.inventory = (Array.isArray(this.inventory)?this.inventory:[]).map((p,i)=>({...p,id:p?.id||makeId('part',i),quantity:Number.isFinite(Number(p?.quantity))?Number(p.quantity):0,reservedQuantity:Math.max(0,Number(p?.reservedQuantity||0)),unitCost:Number.isFinite(Number(p?.unitCost))?Number(p.unitCost):0}));
 					this.maintenancePlans = (Array.isArray(this.maintenancePlans)?this.maintenancePlans:[]).map((p,i)=>({...p,id:p?.id||makeId('maint',i),vehicleId:resolve(p?.vehicleId,p?.vehicle),status:['Planned','Parts Reserved','In Progress','Paused','Completed','Cancelled'].includes(p?.status)?p.status:'Planned',tasks:Array.isArray(p?.tasks)?p.tasks:[],parts:Array.isArray(p?.parts)?p.parts:[],actualCost:Number(p?.actualCost||0),estimatedMin:Number(p?.estimatedMin||0),estimatedMax:Number(p?.estimatedMax||0)}));
 					this.archivedMaintenance = (Array.isArray(this.archivedMaintenance) ? this.archivedMaintenance : []).filter(item => item && item.vehicleId && item.scheduleId);
@@ -4112,7 +4180,7 @@
 
 				getPersistableState() {
 					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? undefined : val));
-					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
+					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), toolInventory:strip(this.toolInventory||[]), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
 				},
 
 				loadGarageState() {
@@ -4736,7 +4804,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							const validArray = key =>
 								candidate[key] === undefined || Array.isArray(candidate[key]);
 
-							if (!['vehicles', 'logs', 'serviceLogs', 'projects', 'inventory', 'partsInventory', 'maintenancePlans']
+							if (!['vehicles', 'logs', 'serviceLogs', 'projects', 'inventory', 'partsInventory', 'toolInventory', 'maintenancePlans']
 								.every(validArray)) {
 								throw new Error('One or more imported collections are invalid.');
 							}
@@ -4749,6 +4817,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							if (Array.isArray(candidate.projects)) this.projects = candidate.projects;
 							if (Array.isArray(candidate.inventory)) this.inventory = candidate.inventory;
 							if (Array.isArray(candidate.partsInventory)) this.inventory = candidate.partsInventory;
+							if(Array.isArray(candidate.toolInventory))this.toolInventory=candidate.toolInventory;
 							if (Array.isArray(candidate.maintenancePlans)) this.maintenancePlans = candidate.maintenancePlans;
 
 							this.normalizeData();

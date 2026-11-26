@@ -407,13 +407,13 @@ test("Repair Workspace can create a new Garage project for the active vehicle an
 test("Repair Workspace merges Scion sibling specification pages with links on the active page", () => {
   const source = readFileSync(script, "utf8");
   assert.match(source, /findScionSiblingSpecificationLinks\(pageUrl\)/);
-  assert.match(source, /linkedPages,scionSpecPages,relatedLinks/);
+  assert.match(source, /linkedPages=findRelatedProcedureLinks\(pageHtml,pageUrl\.href\),scionSpecPages=await findScionSiblingSpecificationLinks\(pageUrl\),relatedLinks=/);
   assert.match(source, /new Map\(\[\.\.\.linkedPages,\.\.\.scionSpecPages\]/);
 });
 
 test("Repair Workspace keeps the active manual URL in scope while loading related factory pages", () => {
   const source = readFileSync(script, "utf8");
-  const start = source.indexOf("async function openWorkspace()");
+  const start = source.indexOf("async function openWorkspace(options={})");
   const end = source.indexOf('document.addEventListener("click"', start);
   assert.ok(start >= 0 && end > start);
   const handler = source.slice(start, end);

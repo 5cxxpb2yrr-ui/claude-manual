@@ -121,3 +121,14 @@ jobs:
             done
             test "$verified" = true || { echo "::error::Preview asset verification failed: $asset"; exit 1; }
           done
+          for asset in tesseract.min.js worker.min.js tesseract-core-lstm.wasm.js tesseract-core-lstm.wasm eng.traineddata.gz; do
+            echo "Checking OCR asset $asset"
+            curl --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ocr-headers -o /tmp/ocr-asset "$BASE/receipt-ocr-v6/$asset?verify=$GITHUB_SHA"
+            grep -Ei '^(HTTP/|content-type:)' /tmp/ocr-headers
+            case "$asset" in
+              *.js) grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/ocr-headers ;;
+              *.wasm) grep -Eiq '^content-type: *application/wasm' /tmp/ocr-headers ;;
+              *.gz) grep -Eiq '^content-type: *application/octet-stream' /tmp/ocr-headers ;;
+            esac
+            cmp "/tmp/ocr-asset" "public/receipt-ocr-v6/$asset"
+          done

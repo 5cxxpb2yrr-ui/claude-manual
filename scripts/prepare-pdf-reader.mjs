@@ -1,15 +1,17 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const dependency = new URL("../node_modules/pdfjs-dist/", import.meta.url);
 const version = "4.10.38";
-let installed = "";
-try { installed = JSON.parse(readFileSync(new URL("package.json", dependency), "utf8")).version; } catch {}
-if (installed !== version) {
-  const result = spawnSync("npm", ["install", "--no-save", "--package-lock=false", "--ignore-scripts", "pdfjs-dist@" + version], { cwd: root, stdio: "inherit", shell: process.platform === "win32" });
-  if (result.status !== 0) throw new Error("PDF reader dependency installation failed");
+const pins = {"pdfjs-dist":"4.10.38","tesseract.js":"6.0.1","tesseract.js-core":"6.0.0","@tesseract.js-data/eng":"1.0.0"};
+const pkg = name => new URL("../node_modules/" + name + "/", import.meta.url);
+const installed = name => { try { return JSON.parse(readFileSync(new URL("package.json", pkg(name)), "utf8")).version; } catch { return ""; } };
+if (Object.entries(pins).some(([name,v]) => installed(name) !== v)) {
+ const result=spawnSync("npm",["install","--no-save","--package-lock=false","--ignore-scripts",...Object.entries(pins).map(([name,v])=>name+"@"+v)],{cwd:root,stdio:"inherit",shell:process.platform==="win32"});
+ if(result.status!==0)throw Error("Receipt dependency installation failed");
 }
+for(const [name,v] of Object.entries(pins))if(installed(name)!==v)throw Error("Unexpected dependency version: "+name);
 const files = {};
 for (const [name, path] of [["pdf.mjs", "legacy/build/pdf.mjs"], ["pdf.worker.mjs", "legacy/build/pdf.worker.mjs"], ["LICENSE", "LICENSE"]]) {
   const content = readFileSync(new URL(path, dependency), "utf8");
@@ -18,3 +20,14 @@ for (const [name, path] of [["pdf.mjs", "legacy/build/pdf.mjs"], ["pdf.worker.mj
   console.log("Prepared", name, Buffer.byteLength(content), "bytes");
 }
 writeFileSync(new URL("../pdf-reader-data.mjs", import.meta.url), "// Generated; do not commit.\nexport const PDF_READER_FILES = " + JSON.stringify(files) + ";\n");
+
+const dest=new URL("../public/receipt-ocr-v6/",import.meta.url);
+mkdirSync(dest,{recursive:true});
+const assets=[
+["tesseract.js","dist/tesseract.min.js","tesseract.min.js"],
+["tesseract.js","dist/worker.min.js","worker.min.js"],
+["tesseract.js-core","tesseract-core-lstm.wasm.js","tesseract-core-lstm.wasm.js"],
+["tesseract.js-core","tesseract-core-lstm.wasm","tesseract-core-lstm.wasm"],
+["@tesseract.js-data/eng","4.0.0_best_int/eng.traineddata.gz","eng.traineddata.gz"]];
+for(const [name,source,target] of assets){const output=new URL(target,dest);copyFileSync(new URL(source,pkg(name)),output);console.log("Prepared OCR",target,readFileSync(output).length,"bytes");}
+for(const name of ["tesseract.js","tesseract.js-core","@tesseract.js-data/eng"]){const license=readdirSync(pkg(name)).find(x=>/^licen[cs]e(?:\.|$)/i.test(x));if(license)copyFileSync(new URL(license,pkg(name)),new URL(name.replace(/[^a-z0-9-]/gi,"-")+"-LICENSE.txt",dest));}

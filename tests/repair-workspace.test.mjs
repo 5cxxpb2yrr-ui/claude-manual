@@ -449,3 +449,23 @@ test("guided repair reads Scion factory ordered-list steps without losing nested
  assert.equal(Engine.repairStepCanOpen(steps, {}, 2), false);
  assert.equal(Engine.extractRepairSteps("Parts list", '<ol><li>Alternator</li></ol>').length, 0);
 });
+
+
+test("Garage guided repair launches the same procedure route once and keeps project context", () => {
+ const garage=readFileSync(new URL("../public/garage.html",import.meta.url),"utf8");
+ const workspace=readFileSync(script,"utf8");
+ const methods=garage.slice(garage.indexOf("guidedRepairRoute(entry) {"),garage.indexOf("refreshRepairCartLinks() {"));
+ const loc={protocol:"https:",origin:"https://preview.example",pathname:"/garage"};
+ const mock={...new Function("location","URLSearchParams","return ({"+methods+"})")(loc,URLSearchParams),manualLibrary:{base:"",vehicles:{"scion-xb":{idx:1}}},repairCartsForProject:()=>[{route:"#/v/1/0/1881",procedure:"Generator"}]};
+ const project={id:"project-1",vehicleId:"scion-xb",procedures:[{sourcePath:"/v/1/0/1881"},{sourcePath:"/v/1/0/1877"},{sourcePath:"/v/0/0/6570"},{sourcePath:"https://example.com/"}]};
+ const entries=mock.guidedRepairEntries(project);
+ assert.deepEqual(entries.map(e=>e.route),["#/v/1/0/1881","#/v/1/0/1877"]);
+ const link=mock.guidedRepairLink(entries[0],project);
+ assert.match(link,/^\/manuals\.html\?guided=1&projectId=project-1&back=/);
+ assert.ok(link.endsWith(entries[0].route));
+ assert.match(workspace,/openWorkspace\(\{guided:true,projectId\}\)/);
+ assert.match(workspace,/url.searchParams.delete\("guided"\)/);
+ assert.match(workspace,/if\(options.guided\)content.querySelector\("#rw-start-mode"\).click\(\)/);
+ assert.match(workspace,/if\(returnToGarage\)location.assign\(returnToGarage\)/);
+ assert.match(html,/document.dispatchEvent\(new Event\("manual-viewer-ready"\)\)/);
+});

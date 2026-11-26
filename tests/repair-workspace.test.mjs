@@ -49,7 +49,7 @@ test("Alternator contents page resolves its related factory procedure pages as o
 
 test("Repair Workspace fetches and displays linked factory pages and preserves their source references", () => {
   const source = readFileSync(script, "utf8");
-  assert.match(source, /const relatedLinks=findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
+  assert.match(source, /const linkedPages=findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
   assert.match(source, /Promise\.all\(relatedLinks\.map/);
   assert.match(source, /const combinedHtml=pageHtml/);
   assert.match(source, /Related factory manual pages/);
@@ -420,4 +420,16 @@ test("Repair Workspace keeps the active manual URL in scope while loading relate
   assert.match(handler, /let doc,pageUrl,pageHtml;\s*try\{\s*pageUrl=new URL/);
   assert.match(handler, /pageHtml=await response\.text\(\)/);
   assert.match(handler, /findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
+});
+
+
+test("Scion generator installation recognizes star-separated torque units and explicit fasteners", () => {
+ const html = '<h1>Charging (1NZ-FE): Generator: Installation</h1><ol><li>Temporarily install the adjusting bar with bolt A, and tighten the nut to the specified torque.<div>Fig 2: adjusting bar</div><p>Torque: 11 N*m (112 kgf*cm, 8 ft.*lbf)</p></li><li>First tighten bolt A, and then tighten bolt B.<p>Torque: 18.5 N*m (189 kgf*cm, 14 ft.*lbf) for bolt A</p><p>54 N*m (551 kgf*cm, 40 ft.*lbf) for bolt B</p></li><li>Install the generator wire with the nut.<p>Torque: 9.8 N*m (100 kgf*cm, 7 ft.*lbf)</p></li></ol>';
+ const groups = Engine.extractProcedure(html, {}).torqueSpecs;
+ assert.deepEqual(groups.map(g => [g.association?.component, g.association?.fastener, ...g.values.map(v => v.value), g.selectable]), [
+  ["Alternator adjusting bar", "Nut", 11, 112, 8, true],
+  ["Alternator", "Bolt A", 18.5, 189, 14, true],
+  ["Alternator", "Bolt B", 54, 551, 40, true],
+  ["Alternator wire", "Nut", 9.8, 100, 7, true]
+ ]);
 });

@@ -32,5 +32,29 @@ async function scanImage(file){
  const bitmap=await root.createImageBitmap(file);
  try{const detector=new root.BarcodeDetector();const results=await detector.detect(bitmap);const values=[...new Set(results.map(r=>barcode(r.rawValue)))];if(values.length!==1)throw Error(values.length?"Multiple barcodes found. Capture a single label.":"No barcode found. Enter it manually.");return values[0];}finally{bitmap.close?.();}
 }
-const api={barcode,matches,applyBarcode,receiptFile,duplicateReceipt,scanImage};root.MotorNoteCapture=api;if(typeof module!=="undefined")module.exports=api;
+
+function parseAmazonText(text){
+ const raw=String(text||""),flat=raw.replace(/\s+/g," ").trim();
+ const order=flat.match(/Order\s*#\s*(\d{3}-\d{7}-\d{7})/i),placed=flat.match(/Order placed\s+([A-Za-z]+\s+\d{1,2},\s+\d{4})/i);
+ if(!order||!placed)throw Error("Receipt format not recognized. Enter reviewed item details manually.");
+ const d=new Date(placed[1]+" UTC");if(!Number.isFinite(d.getTime()))throw Error("Check order date.");
+ const money=label=>{const m=flat.match(new RegExp(label+"\\s*:?\\s*(-?\\$[\\d,]+\\.\\d{2})","i"));return m?Number(m[1].replace(/[$,]/g,"")):null;};
+ const subtotal=money("Item\\(s\\) Subtotal"),shipping=money("Shipping & Handling"),discount=money("Subscribe & Save"),tax=money("Estimated tax to be collected"),total=money("Grand Total");
+ const matches=[...flat.matchAll(/\b(?:Arriving\s+(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|tomorrow|today)|Delivered\s+[A-Za-z]+\s+\d{1,2})\s+(.{3,500}?)\s+Sold by:\s*([^$]{1,200}?)\s*(\$[\d,]+\.\d{2})/gi)];
+ if(matches.length!==1||(flat.match(/Sold by:/gi)||[]).length!==1)throw Error("Order recognized; item layout requires manual review.");
+ const m=matches[0],name=m[1].trim(),price=Number(m[3].replace(/[$,]/g,""));
+ if(subtotal===null||Math.abs(price-subtotal)>.005)throw Error("Item price and subtotal do not reconcile. Enter reviewed quantities.");
+ const mpn=name.match(/\bWIX\s+(\d{4,}[A-Z0-9]*)\b/i);
+ return {vendor:"Amazon",orderNumber:order[1],orderedDate:d.toISOString().slice(0,10),lines:[{description:name,partNumber:mpn?.[1]||"",quantity:1,unitCost:price,unit:"each",vehicleCompatibility:"Not verified",inventoryId:"",demandKey:"",barcode:""}],receiptTotals:{subtotal,shipping,discount,tax,total},notice:"Review inferred quantity of one, fitment, discounts and totals. Order is not received."};
+}
+async function extractPdfText(file){
+ const pdf=await import("/vendor/pdfjs/pdf.mjs");
+ pdf.GlobalWorkerOptions.workerSrc="/vendor/pdfjs/pdf.worker.mjs";
+ const task=pdf.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});
+ try{const doc=await task.promise;if(doc.numPages>20)throw Error("Receipt exceeds 20 pages.");const pages=[];
+ for(let n=1;n<=doc.numPages;n++){const page=await doc.getPage(n),content=await page.getTextContent();pages.push(content.items.map(item=>item.str||"").join(" "));}
+ const text=pages.join("\n");if(!text.trim())throw Error("No embedded text. Scanned PDF OCR is not available yet.");return text;
+ }finally{await task.destroy();}
+}
+const api={parseAmazonText,extractPdfText,barcode,matches,applyBarcode,receiptFile,duplicateReceipt,scanImage};root.MotorNoteCapture=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

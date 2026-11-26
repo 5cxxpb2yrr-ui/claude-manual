@@ -2833,7 +2833,7 @@
 						<h4 class="text-sm font-bold text-white">Parts & procurement</h4>
 						<p class="text-zinc-500">Select stocked parts. Inventory is reserved only when requested and deducted only when marked used.</p>
 						<button @click="openProjectPartsPicker(selectedProject)" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-500/50 bg-purple-500/10 text-purple-200 font-semibold"><span class="text-lg">＋</span> Browse & add inventory parts</button>
-						<template x-for="part in (selectedProject.partRequirements||[])" :key="part.id"><div class="bg-zinc-950 rounded-lg p-2"><div class="flex justify-between gap-2"><span class="text-white" x-text="part.description+' × '+part.quantity+' · '+String.fromCharCode(36)+Number(part.unitCost||0).toFixed(2)"></span><button @click="removeProjectPart(selectedProject,part.id)" class="text-rose-400">Remove</button></div><div class="flex justify-between mt-2"><span class="text-amber-300" x-text="part.status"></span><div class="flex gap-2"><button x-show="part.inventoryId&&!part.reserved&&part.status!=='Used'&&!part.purchaseOrderId" @click="reserveProjectPart(selectedProject,part.id)" class="text-amber-300">Reserve</button><button x-show="part.reserved&&part.inventoryId" @click="useProjectPart(selectedProject,part.id)" class="text-emerald-300">Mark used</button></div></div></div></template>
+						<template x-for="part in (selectedProject.partRequirements||[])" :key="part.id"><div class="bg-zinc-950 rounded-lg p-2"><div class="flex justify-between gap-2"><span class="text-white" x-text="part.description+' × '+part.quantity+' · '+String.fromCharCode(36)+Number(part.unitCost||0).toFixed(2)"></span><button @click="removeProjectPart(selectedProject,part.id)" class="text-rose-400">Remove</button></div><div class="flex justify-between mt-2"><span class="text-amber-300" x-text="part.status+(part.consumedQuantity?' · Used '+part.consumedQuantity+'/'+part.quantity:'')"></span><div class="flex gap-2"><button x-show="part.inventoryId&&!part.reserved&&part.status!=='Used'&&(!part.purchaseOrderId||part.inventoryAddedAt)" @click="reserveProjectPart(selectedProject,part.id)" class="text-amber-300">Reserve</button><button x-show="part.reserved&&part.inventoryId" @click="useProjectPart(selectedProject,part.id)" class="text-emerald-300" :disabled="projectStockBusy">Record use</button><button x-show="part.reserved" @click="releaseProjectPart(selectedProject,part.id)" :disabled="projectStockBusy" class="text-zinc-300">Release</button></div></div></div></template>
 						<div class="flex justify-between text-zinc-300"><span>Parts estimate</span><strong x-text="String.fromCharCode(36)+projectPartsEstimate(selectedProject).toFixed(2)"></strong></div>
 					</div>
 					<div class="border-t border-zinc-800 pt-3 space-y-3">
@@ -2881,7 +2881,7 @@
 						<div class="grid grid-cols-2 gap-2"><select x-model="projectCostDraft.category" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option>Labor</option><option>Parts</option><option>Shop supplies</option><option>Other</option></select><input type="date" x-model="projectCostDraft.date" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></div>
 						<button @click="addProjectCostEntry(selectedProject)" class="w-full py-2 border border-emerald-500/40 text-emerald-300 rounded-lg">Record expense</button>
 						<template x-for="entry in (selectedProject.costEntries||[])" :key="entry.id"><div class="flex justify-between border-b border-zinc-800 py-1"><span class="text-zinc-300" x-text="entry.description+' · '+entry.category"></span><strong class="text-emerald-300" x-text="String.fromCharCode(36)+Number(entry.amount).toFixed(2)"></strong></div></template>
-						<div class="flex justify-between text-white"><span>Actual total</span><strong x-text="String.fromCharCode(36)+projectActualCost(selectedProject).toFixed(2)"></strong></div>
+						<div class="flex justify-between text-zinc-400"><span>Material consumed (not additional cash expense)</span><strong x-text="String.fromCharCode(36)+projectMaterialCost(selectedProject).toFixed(2)"></strong></div><div class="flex justify-between text-white"><span>Actual total</span><strong x-text="String.fromCharCode(36)+projectActualCost(selectedProject).toFixed(2)"></strong></div>
 					</div>
 					<div x-show="selectedProject.status !== 'Completed'" class="border-t border-emerald-500/20 pt-3 space-y-2"><p class="text-[11px] text-zinc-500">Finish every project task, then record the completed work in this vehicle's service history. Existing expenses and inventory usage are not added again.</p><p x-show="(selectedProject.tasks||[]).some(task=>!task.done)" class="text-[11px] text-amber-300">Complete all remaining tasks before closing this project.</p><button @click="openProjectCompletion(selectedProject)" :disabled="!projectReadyToComplete(selectedProject)" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">✓ Complete Project & Record Service</button></div>
 					<div x-show="selectedProject.status === 'Completed'" class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-emerald-300"><strong>Project completed</strong><p class="text-[11px] text-zinc-400 mt-1">A service-history record has been created for this project.</p></div>
@@ -3374,7 +3374,7 @@
 					editRepairForm: { id: null, vehicle: '', mileage: 0, date: '', serviceType: '', cost: 0, notes: '', attachments: [] },
 					newRepairForm: { vehicle: '2006 Scion xB', mileage: 212000, date: new Date().toISOString().split('T')[0], serviceTitle: '', category: 'Scheduled Maintenance', cost: 0, notes: '', procedureReference: null },
 					newProjectForm: { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' },
-					editingInventoryId:null,inventorySaving:false,inventoryError:"",newPartForm: { partNumber: '', vendor: '', description: '', quantity: 1, unitCost: 10.00 },
+					editingInventoryId:null,projectStockBusy:false,inventorySaving:false,inventoryError:"",newPartForm: { partNumber: '', vendor: '', description: '', quantity: 1, unitCost: 10.00 },
 					maintenancePlanForm: { scheduleId: '', vehicleId: '', title: '', priority: 'Medium', targetMileage: 0, targetDate: '', estimatedMin: 0, estimatedMax: 0, notes: '', parts: [] },
 					selectedMaintenancePlan: null,
 					completeMaintenanceForm: { mileage: 0, date: '', partsCost: 0, labor: 0, other: 0, notes: '' },
@@ -3729,7 +3729,7 @@
 							for(const [i,req] of (project.partRequirements||[]).entries()){
 								if(req.used||req.reserved||/^(used|received|cancelled|canceled)(?:\b|$)/i.test(req.status||""))continue;
 								if((project.purchaseOrders||[]).some(o=>/^(ordered|backordered|on order)$/i.test(o.status||"")&&(o.lines||[]).some(l=>String(l.requirementId)===String(req.id))))continue;
-								const qty=Math.max(1,Number(req.quantity)||1),matches=(this.inventory||[]).filter(p=>{
+								const qty=this.projectRemainingPart(req),matches=(this.inventory||[]).filter(p=>{
 									if(req.inventoryId!=null&&String(req.inventoryId)!=="")return String(p.id)===String(req.inventoryId);
 									if(!v||!(p.vehicleCompatibility===v.name||p.vehicleCompatibility==="Universal"||String(p.vehicleId||"")===String(v.id)))return false;
 									const pn=norm(req.partNumber);return pn?pn===norm(p.partNumber):!!norm(req.description)&&norm(req.description)===norm(p.description);
@@ -3741,7 +3741,7 @@
 					},
 					inventoryForecast(days=20){
 						const predictions=(this.vehicles||[]).flatMap(v=>this.predictiveForVehicle(v).map(item=>({...item,vehicleId:v.id})));
-						return window.MotorNoteDemandEngine.forecast({inventory:this.inventory||[],vehicles:this.vehicles||[],projects:this.projects||[],maintenancePlans:this.maintenancePlans||[],predictions,vendorOrders:this.vendorOrders||[],horizon:Number(days)});
+						return window.MotorNoteDemandEngine.forecast({inventory:this.inventory||[],vehicles:this.vehicles||[],projects:(this.projects||[]).map(p=>({...p,partRequirements:(p.partRequirements||[]).map(r=>({...r,quantity:this.projectRemainingPart(r)}))})),maintenancePlans:this.maintenancePlans||[],predictions,vendorOrders:this.vendorOrders||[],horizon:Number(days)});
 					},
 					newVendorLine(){return {description:"",partNumber:"",quantity:1,unitCost:"",unit:"each",vehicleCompatibility:"Not verified",demandKey:"",inventoryId:""};},
 					openVendorDraft(item=null){
@@ -3758,7 +3758,7 @@
 					},
 					get vendorDemandChoices(){return this.inventoryForecast(365).shortages;},
 					async saveVendorDraft(){
-						if(this.vendorBusy||!this.vendorDraft)return;this.vendorBusy=true;this.vendorError="";
+						if(this.inventorySaving||this.vendorBusy||!this.vendorDraft)return;this.vendorBusy=true;this.vendorError="";
 						const prior=this.vendorOrders||[];
 						try{
 							const order=window.MotorNotePurchasing.validateDraft(this.vendorDraft,prior,(this.projects||[]).flatMap(p=>p.purchaseOrders||[]));
@@ -3780,7 +3780,7 @@
 					},
 					openVendorReceive(order){this.vendorReceiveId=order.id;this.vendorReceiveAmounts=Object.fromEntries(order.lines.map(l=>[l.id,0]));this.vendorError="";},
 					async confirmVendorReceive(order){
-						if(this.vendorBusy)return;this.vendorBusy=true;this.vendorError="";
+						if(this.inventorySaving||this.vendorBusy)return;this.vendorBusy=true;this.vendorError="";
 						const prior=this.vendorOrders,stock=this.inventory;
 						try{const live=prior.find(o=>o.id===order.id),result=window.MotorNotePurchasing.receive(live,stock,this.vendorReceiveAmounts);
 							this.inventory=result.inventory;this.vendorOrders=prior.map(o=>o.id===order.id?result.order:o);
@@ -4605,10 +4605,10 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					async addProjectMilestone(project) { const title=this.projectMilestoneDraft.trim(); if(!title||!project)return; project.milestones.push({id:'milestone-'+Date.now(),title,status:'Planned',createdAt:new Date().toISOString()}); this.projectMilestoneDraft=''; await this.saveToStorage(); },
 					async removeProjectMilestone(project,index) { if(!project?.milestones?.[index])return; project.milestones.splice(index,1); await this.saveToStorage(); },
 					async addProjectManualPart(project) { const d=this.projectManualPartDraft,description=String(d.description||'').trim(),quantity=Math.max(1,Math.floor(Number(d.quantity)||1)),unitCost=Math.max(0,Number(d.unitCost)||0); if(!project||!description){alert('Enter a part description.');return;} if(!Array.isArray(project.partRequirements))project.partRequirements=[]; project.partRequirements.push({id:'project-part-manual-'+Date.now(),inventoryId:null,partNumber:String(d.partNumber||'').trim(),description,quantity,unitCost,status:'Required',reserved:false,source:'manual'}); this.projectManualPartDraft={partNumber:'',description:'',quantity:1,unitCost:0}; this.syncProjectMaintenancePlan(project); await this.saveToStorage(); },
-					projectOrderableParts(project) { return (project?.partRequirements||[]).filter(req=>!req.reserved&&req.status!=='Used'&&!req.purchaseOrderId&&!(project?.purchaseOrders||[]).some(order=>order.status!=='Cancelled'&&(order.lines||[]).some(line=>String(line.requirementId)===String(req.id)))); },
+					projectOrderableParts(project) { return (project?.partRequirements||[]).filter(req=>!req.reserved&&this.projectRemainingPart(req)>0&&!req.purchaseOrderId&&!(project?.purchaseOrders||[]).some(order=>order.status!=='Cancelled'&&(order.lines||[]).some(line=>String(line.requirementId)===String(req.id)))); },
 					toggleProjectPurchasePart(id,selected) { const key=String(id); this.selectedProjectPurchasePartIds=selected?[...new Set([...this.selectedProjectPurchasePartIds,key])]:this.selectedProjectPurchasePartIds.filter(x=>x!==key); },
 					projectPurchaseOrderTotal(order) { return (order?.lines||[]).reduce((sum,line)=>sum+Math.max(0,Number(line.quantity)||0)*Math.max(0,Number(line.unitCost)||0),0); },
-					async createProjectPurchaseOrder(project) { const vendor=String(this.projectPurchaseOrderDraft.vendor||'').trim(),ids=new Set(this.selectedProjectPurchasePartIds.map(String)); if(!project||!vendor||!ids.size)return; const requirements=this.projectOrderableParts(project).filter(req=>ids.has(String(req.id))); if(requirements.length!==ids.size){alert('One or more selected requirements are no longer available to order. Review the selection.');return;} const now=new Date().toISOString(),order={id:'project-po-'+Date.now(),vendor,orderNumber:String(this.projectPurchaseOrderDraft.orderNumber||'').trim(),orderedDate:this.projectPurchaseOrderDraft.orderedDate||now.slice(0,10),expectedDate:this.projectPurchaseOrderDraft.expectedDate||'',status:'Ordered',createdAt:now,updatedAt:now,lines:requirements.map(req=>({requirementId:req.id,partNumber:req.partNumber||'',description:req.description,quantity:Math.max(1,Number(req.quantity)||1),unitCost:Math.max(0,Number(req.unitCost)||0)}))}; if(!Array.isArray(project.purchaseOrders))project.purchaseOrders=[]; project.purchaseOrders.unshift(order); requirements.forEach(req=>{req.purchaseOrderId=order.id;req.status='On order';}); this.selectedProjectPurchasePartIds=[]; this.projectPurchaseOrderDraft={vendor:'Amazon',orderNumber:'',orderedDate:new Date().toISOString().split('T')[0],expectedDate:''}; await this.saveToStorage(); },
+					async createProjectPurchaseOrder(project) { const vendor=String(this.projectPurchaseOrderDraft.vendor||'').trim(),ids=new Set(this.selectedProjectPurchasePartIds.map(String)); if(!project||!vendor||!ids.size)return; const requirements=this.projectOrderableParts(project).filter(req=>ids.has(String(req.id))); if(requirements.length!==ids.size){alert('One or more selected requirements are no longer available to order. Review the selection.');return;} const now=new Date().toISOString(),order={id:'project-po-'+Date.now(),vendor,orderNumber:String(this.projectPurchaseOrderDraft.orderNumber||'').trim(),orderedDate:this.projectPurchaseOrderDraft.orderedDate||now.slice(0,10),expectedDate:this.projectPurchaseOrderDraft.expectedDate||'',status:'Ordered',createdAt:now,updatedAt:now,lines:requirements.map(req=>({requirementId:req.id,partNumber:req.partNumber||'',description:req.description,quantity:this.projectRemainingPart(req),unitCost:Math.max(0,Number(req.unitCost)||0)}))}; if(!Array.isArray(project.purchaseOrders))project.purchaseOrders=[]; project.purchaseOrders.unshift(order); requirements.forEach(req=>{req.purchaseOrderId=order.id;req.status='On order';}); this.selectedProjectPurchasePartIds=[]; this.projectPurchaseOrderDraft={vendor:'Amazon',orderNumber:'',orderedDate:new Date().toISOString().split('T')[0],expectedDate:''}; await this.saveToStorage(); },
 					async setProjectPurchaseOrderStatus(project,orderId,status) { const order=(project?.purchaseOrders||[]).find(o=>String(o.id)===String(orderId)); if(!order||!['Ordered','Backordered','Received','Cancelled'].includes(status))return; order.status=status; order.updatedAt=new Date().toISOString(); (order.lines||[]).forEach(line=>{const req=(project.partRequirements||[]).find(p=>String(p.id)===String(line.requirementId)); if(!req)return; if(status==='Cancelled'){if(String(req.purchaseOrderId)===String(order.id)){req.purchaseOrderId=null;req.status='Required';}} else {req.purchaseOrderId=order.id;req.status=status==='Received'?'Received':status;}}); await this.saveToStorage(); },
 					async addReceivedProjectPartsToInventory(project,orderId) { const order=(project?.purchaseOrders||[]).find(o=>String(o.id)===String(orderId)); if(!project||!order||order.status!=='Received')return; const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); let added=0; for(const line of order.lines||[]){const req=(project.partRequirements||[]).find(p=>String(p.id)===String(line.requirementId)); if(!req||req.inventoryId||req.inventoryAddedAt)continue; const id='part-project-'+Date.now()+'-'+added; this.inventory.push({id,partNumber:line.partNumber||'',vendor:order.vendor||'Other',description:line.description,quantity:Math.max(1,Number(line.quantity)||1),reservedQuantity:0,unitCost:Math.max(0,Number(line.unitCost)||0),vehicleCompatibility:vehicle?.name||'Universal',projectId:project.id,purchaseOrderId:order.id}); req.inventoryId=id; req.inventoryAddedAt=new Date().toISOString(); req.status='Received · In inventory'; added++; } if(!added){alert('There are no new non-stock parts on this order to add to inventory.');return;} await this.saveToStorage("Purchase received",{projectId:project.id,orderId}); alert(added+' received part requirement(s) added to inventory.'); },
 					projectPartPickerSearch: '',
@@ -4623,10 +4623,67 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					toggleProjectPartSelection(part,selected) { const id=String(part.id); if(!selected){delete this.projectPartSelections[id];return;} this.projectPartSelections[id]={selected:true,quantity:1}; },
 					setProjectPartSelectionQuantity(part,value) { const id=String(part.id); if(!this.projectPartSelections[id])return; this.projectPartSelections[id].quantity=Math.max(1,Math.floor(Number(value)||1)); },
 					async addSelectedProjectParts(project) { if(!project)return; const selected=Object.entries(this.projectPartSelections).filter(([,v])=>v?.selected); if(!selected.length)return; const additions=[]; for(const [id,draft] of selected){const part=this.inventory.find(p=>String(p.id)===id),qty=Math.max(1,Math.floor(Number(draft.quantity)||1)); if(!part || this.projectAvailableInventory(part)<qty){alert('Inventory changed or requested quantity exceeds available stock. Please review your selections.');return;} if((project.partRequirements||[]).some(req=>String(req.inventoryId)===id)){alert('An item in your selection is already on this project.');return;} additions.push({id:'project-part-'+Date.now()+'-'+id,inventoryId:part.id,partNumber:part.partNumber,description:part.description,quantity:qty,unitCost:Number(part.unitCost||0),status:'Required',reserved:false});} if(!Array.isArray(project.partRequirements))project.partRequirements=[]; project.partRequirements.push(...additions); this.closeProjectPartsPicker(); await this.saveToStorage(); },
-					async removeProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id); if(!req)return; if(req.purchaseOrderId){alert('Cancel or remove the supplier order before removing this part requirement.');return;} if(req.reserved){const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(part)part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));} project.partRequirements=project.partRequirements.filter(p=>p.id!==id); await this.saveToStorage("Project requirement removed",{projectId:project.id,requirementId:id}); },
-					async reserveProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||req.reserved||req.purchaseOrderId)return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||this.projectAvailableInventory(part)<Number(req.quantity||0)){alert('Not enough unreserved stock to reserve this quantity.');return;}part.reservedQuantity=Number(part.reservedQuantity||0)+Number(req.quantity||0);req.reserved=true;req.status='Reserved';await this.saveToStorage("Project stock reserved",{projectId:project.id,requirementId:id}); },
-					async useProjectPart(project,id) { const req=project?.partRequirements?.find(p=>p.id===id);if(!req||!req.reserved||req.status==='Used')return;const part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));if(!part||Number(part.quantity||0)<Number(req.quantity||0)){alert('Inventory changed; cannot mark this part used.');return;}part.quantity=Math.max(0,Number(part.quantity||0)-Number(req.quantity||0));part.reservedQuantity=Math.max(0,Number(part.reservedQuantity||0)-Number(req.quantity||0));req.reserved=false;req.status='Used';req.usedAt=new Date().toISOString();await this.saveToStorage("Project part installed or used",{projectId:project.id,requirementId:id}); },
-					async addProjectAttachments(project,event) {
+					projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,Number(req?.quantity||0)-Number(req?.consumedQuantity||0));},
+                    projectMaterialCost(project) {return (project?.partRequirements||[]).reduce((sum,r)=>sum+(r.consumptionHistory||[]).reduce((n,e)=>n+Number(e.materialCost||0),0),0);},
+                    async changeProjectStock(project,id,action,amount) {
+                        if(this.inventorySaving||this.vendorBusy||this.projectStockBusy)return false;
+                        const live=(this.projects||[]).find(p=>String(p.id)===String(project?.id));
+                        const req=live?.partRequirements?.find(r=>String(r.id)===String(id));
+                        if(!req||/^(completed|cancelled|canceled|archived)$/i.test(live.status||""))return false;
+                        const remaining=this.projectRemainingPart(req),part=this.inventory.find(p=>String(p.id)===String(req.inventoryId));
+                        const fail=message=>{alert(message);return false;};
+                        if(!remaining)return fail("This requirement is already used.");
+                        if(action==="remove"&&(req.purchaseOrderId||Number(req.consumedQuantity||0)>0||(this.vendorOrders||[]).some(o=>(o.lines||[]).some(l=>l.demandKey==="project:"+live.id+":"+req.id))))return fail("Keep this requirement to preserve its purchase or consumption history.");
+                        if((action!=="remove"||req.reserved)&&!part)return fail("Linked inventory item is missing.");
+                        const onHand=Number(part?.quantity||0),held=Number(part?.reservedQuantity||0);
+                        if(part&&(!Number.isFinite(onHand)||!Number.isFinite(held)||held<0||held>onHand))return fail("Inventory balances need review.");
+                        if(req.reserved&&held<remaining)return fail("Reservation balance is inconsistent. Review inventory before continuing.");
+                        if(action==="reserve"){
+                            if(req.reserved)return false;
+                            if(req.purchaseOrderId&&!req.inventoryAddedAt)return fail("Receive the ordered stock first.");
+                            if(onHand-held<remaining)return fail("Not enough unreserved stock.");
+                        }
+                        if(["consume","release"].includes(action)&&!req.reserved)return false;
+                        const qty=action==="consume"?Number(amount):remaining;
+                        if(action==="consume"&&(!Number.isFinite(qty)||qty<=0||qty>remaining||qty>held||qty>onHand))return fail("Enter a positive quantity no greater than the remaining reserved stock.");
+                        const unit=String(part?.unit||req.unit||"each").toLowerCase();
+                        if(action==="consume"&&["each","ea","piece","pieces"].includes(unit)&&!Number.isInteger(qty))return fail("Enter a whole number for individually counted parts.");
+                        const oldRequirements=live.partRequirements,oldStock=this.inventory,now=new Date().toISOString();
+                        const next={...req};
+                        let stockChange=null;
+                        if(action==="reserve"){next.reserved=true;next.status="Reserved";stockChange={...part,reservedQuantity:held+remaining};}
+                        else if(action==="consume"){
+                            const unitCost=Number(part.unitCost||0);if(!Number.isFinite(unitCost)||unitCost<0)return fail("Review the stock unit cost.");
+                            next.consumedQuantity=Number(req.consumedQuantity||0)+qty;
+                            next.consumptionHistory=[...(req.consumptionHistory||[]),{timestamp:now,quantity:qty,unit:part.unit||req.unit||"each",unitCost,materialCost:qty*unitCost,itemId:part.id}];
+                            next.reserved=qty<remaining;next.status=next.reserved?"Partially used":"Used";if(!next.reserved)next.usedAt=now;
+                            stockChange={...part,quantity:onHand-qty,reservedQuantity:held-qty};
+                        }else if(action==="release"||action==="remove"){
+                            if(req.reserved)stockChange={...part,reservedQuantity:held-remaining};
+                            next.reserved=false;next.status=Number(req.consumedQuantity||0)>0?"Partially used":"Required";
+                        }else return false;
+                        this.projectStockBusy=true;this.inventorySaving=true;
+                        try{
+                            if(stockChange)this.inventory=oldStock.map(p=>String(p.id)===String(part.id)?stockChange:p);
+                            live.partRequirements=action==="remove"?oldRequirements.filter(r=>String(r.id)!==String(id)):oldRequirements.map(r=>String(r.id)===String(id)?next:r);
+                            if(project!==live)project.partRequirements=live.partRequirements;
+                            const reasons={reserve:"Project stock reserved",consume:"Project material consumed",release:"Unused project reservation released",remove:"Project requirement removed"};
+                            if(!await this.saveToStorage(reasons[action],{projectId:live.id,requirementId:req.id,itemId:part?.id||null,quantity:qty,action}))throw Error("Could not save project stock transaction.");
+                            return true;
+                        }catch(e){this.inventory=oldStock;live.partRequirements=oldRequirements;if(project!==live)project.partRequirements=oldRequirements;return fail(e.message);}
+                        finally{this.projectStockBusy=false;this.inventorySaving=false;}
+                    },
+                    async removeProjectPart(project,id) {return this.changeProjectStock(project,id,"remove");},
+                    async reserveProjectPart(project,id) {return this.changeProjectStock(project,id,"reserve");},
+                    async releaseProjectPart(project,id) {return this.changeProjectStock(project,id,"release");},
+                    async useProjectPart(project,id) {
+                        const req=project?.partRequirements?.find(r=>String(r.id)===String(id));if(!req?.reserved)return false;
+                        const remaining=this.projectRemainingPart(req);
+                        const value=prompt("Quantity actually used (remaining reserved: "+remaining+")",String(remaining));
+                        if(value===null||!String(value).trim())return false;
+                        return this.changeProjectStock(project,id,"consume",Number(value));
+                    },
+                    async addProjectAttachments(project,event) {
 						const files=Array.from(event?.target?.files||[]); event.target.value=''; if(!project||!files.length)return;
 						const allowed=['image/jpeg','image/png','image/webp','application/pdf']; const valid=files.filter(file=>allowed.includes(file.type)&&file.size<=(this.garageDB?15:2)*1024*1024);
 						if(valid.length!==files.length)alert(this.garageDB?'Only JPG, PNG, WebP, and PDF files up to 15 MB each are accepted. Unsupported files were skipped.':'Without IndexedDB, local fallback is limited to 2 MB per file. Unsupported or oversized files were skipped.');
@@ -4638,8 +4695,8 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					async removeProjectAttachment(project,id) { const att=(project?.attachments||[]).find(item=>String(item.id)===String(id)); if(!att)return; if(att.data?.startsWith('blob:'))URL.revokeObjectURL(att.data); if(att.storageKey&&this.garageDB){try{await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').delete(att.storageKey);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Attachment delete failed'));});}catch(error){alert('The stored file could not be deleted.');return;}} project.attachments=project.attachments.filter(item=>String(item.id)!==String(id)); await this.saveToStorage(); },
 					async hydrateProjectAttachments(project) { if(!project||!Array.isArray(project.attachments)||!this.garageDB)return; for(const att of project.attachments){if(att.data||att.dataUrl||!att.storageKey)continue; try{const record=await new Promise((resolve,reject)=>{const req=this.garageDB.transaction('attachments','readonly').objectStore('attachments').get(att.storageKey);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});if(record?.blob)att.data=URL.createObjectURL(record.blob);}catch(error){console.warn('Project attachment hydrate failed',error);}} },
 					async addProjectCostEntry(project) { const d=this.projectCostDraft,amount=Number(d.amount);if(!project||!d.description.trim()||!Number.isFinite(amount)||amount<=0){alert('Enter an expense description and an amount greater than zero.');return;}if(!Array.isArray(project.costEntries))project.costEntries=[];project.costEntries.unshift({id:'cost-'+Date.now(),description:d.description.trim(),category:d.category,amount,date:d.date||new Date().toISOString().split('T')[0],createdAt:new Date().toISOString()});project.actualCost=this.projectActualCost(project);this.syncProjectMaintenancePlan(project);this.projectCostDraft={description:'',category:'Labor',amount:0,date:new Date().toISOString().split('T')[0]};await this.saveToStorage(); },
-					projectReadyToComplete(project) { if(!project || project.status==='Completed' || !this.vehicles.some(v=>String(v.id)===String(project.vehicleId)))return false; const tasks=Array.isArray(project.tasks)?project.tasks:[]; return tasks.every(task=>!!task.done); },
-					openProjectCompletion(project) { if(!this.projectReadyToComplete(project)){alert('Complete all project tasks and link a vehicle before recording service.');return;} const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); this.projectCompletionForm={mileage:Number(vehicle?.odometer||0),date:new Date().toISOString().slice(0,10),notes:project.description||'',verified:false}; this.modals.projectCompletion=true; },
+					projectReadyToComplete(project) { if(!project || project.status==='Completed' || !this.vehicles.some(v=>String(v.id)===String(project.vehicleId)))return false; if((project.partRequirements||[]).some(r=>r.reserved))return false; const tasks=Array.isArray(project.tasks)?project.tasks:[]; return tasks.every(task=>!!task.done); },
+					openProjectCompletion(project) { if(!this.projectReadyToComplete(project)){alert('Complete all tasks, link a vehicle, and record use or release remaining stock reservations before recording service.');return;} const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); this.projectCompletionForm={mileage:Number(vehicle?.odometer||0),date:new Date().toISOString().slice(0,10),notes:project.description||'',verified:false}; this.modals.projectCompletion=true; },
 					async completeProjectAndRecordService(project) { if(!project || !this.projectReadyToComplete(project))return; const f=this.projectCompletionForm,vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)),mileage=Number(f.mileage); if(!vehicle || !f.verified || !f.date || !Number.isFinite(mileage) || mileage<0){alert('Confirm the work, date, and a valid odometer reading.');return;} const existing=this.logs.find(log=>String(log.projectId||'')===String(project.id)); if(existing){project.maintenanceLogId=existing.id;project.status='Completed';project.completion=100;project.completedAt=project.completedAt||new Date().toISOString();await this.saveToStorage();this.modals.projectCompletion=false;this.modals.projectDetail=false;return;} const now=new Date().toISOString(),cost=this.projectActualCost(project),plan=this.maintenancePlans.find(item=>String(item.id)===String(project.maintenancePlanId)); const log={id:'project-service-'+project.id,projectId:project.id,maintenancePlanId:plan?.id||null,vehicleId:vehicle.id,vehicle:vehicle.name,mileage,date:f.date,serviceType:project.title||'Completed vehicle project',category:'Maintenance',cost,notes:String(f.notes||'').trim(),attachments:[],history:[],projectCategory:project.category||'General',procedureReferences:(project.procedures||[]).map(item=>({id:item.id,title:item.title,sourceLabel:item.sourceLabel,sourcePath:item.sourcePath})),projectAttachmentIds:(project.attachments||[]).map(item=>item.id),projectCostEntryIds:(project.costEntries||[]).map(item=>item.id)}; this.logs.unshift(log); project.status='Completed';project.completion=100;project.completedAt=now;project.maintenanceLogId=log.id;project.actualCost=cost;project.updatedAt=now; if(mileage>Number(vehicle.odometer||0))vehicle.odometer=mileage; if(plan && plan.status!=='Cancelled'){plan.status='Completed';plan.completedAt=now;plan.completion=100;plan.actualCost=cost;plan.tasks=(plan.tasks||[]).map(task=>({...task,done:true}));} const saved=await this.saveToStorage(); if(saved){this.modals.projectCompletion=false;this.modals.projectDetail=false;this.selectedProject=project;this.selectedMaintenancePlan=plan||null;}else{alert('The service record could not be saved. The project is still open; try confirming again.');} },
 					async saveProjectWorkspace(project) { if(!project)return; const canonical=this.projects.find(item=>String(item.id)===String(project.id)); const target=canonical||project; if(target!==project){ Object.assign(target,project); } if(!Array.isArray(target.partRequirements))target.partRequirements=[]; if(!Array.isArray(target.purchaseOrders))target.purchaseOrders=[]; if(!Array.isArray(target.costEntries))target.costEntries=[]; target.completion=this.projectCompletion(target); target.updatedAt=new Date().toISOString(); target.budget=Math.max(0,Number(target.budget)||0); target.actualCost=this.projectActualCost(target); this.syncProjectMaintenancePlan(target); const saved=await this.saveToStorage(); if(saved){this.selectedProject=target;this.modals.projectDetail=false;} else {alert('Project could not be saved. Your project remains open; try saving again.');} },
 
@@ -4692,6 +4749,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						},
 
 					deleteProjectRecord(id) {
+                        const project=this.projects.find(p=>String(p.id)===String(id));if(this.projectStockBusy||(project?.partRequirements||[]).some(r=>r.reserved||r.status==='Used'||r.consumedQuantity>0)){alert('Release reserved stock and preserve projects with recorded material use.');return;}
 						this.projects = this.projects.filter(p => p.id !== id);
 						this.saveToStorage();
 						this.modals.projectDetail = false;
@@ -4710,7 +4768,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						this.newPartForm={partNumber:item.partNumber||"",vendor:item.vendor||"",description:item.description||"",quantity:Number(item.quantity||0),unitCost:Number(item.unitCost||0),vehicleCompatibility:item.vehicleCompatibility||""};this.modals.newPart=true;
 					},
 					async saveNewPart() {
-						if(this.inventorySaving)return false;
+						if(this.inventorySaving||this.vendorBusy)return false;
 						const f=this.newPartForm,id=this.editingInventoryId,existing=id!==null?this.inventory.find(p=>String(p.id)===String(id)):null;
 						const description=String(f.description||"").trim(),quantity=Number(f.quantity),unitCost=Number(f.unitCost),partNumber=String(f.partNumber||"").trim(),vehicleCompatibility=String(f.vehicleCompatibility||"");
 						this.inventoryError="";
@@ -4726,7 +4784,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						finally{this.inventorySaving=false;}
 					},
 					async deleteInventoryItem(id) {
-						if(this.inventorySaving)return;
+						if(this.inventorySaving||this.vendorBusy)return;
 						if(this.inventoryReservedCount(id)>0||this.inventoryHasActiveLinks(id)){alert("This part is reserved or linked to an active project. Release the requirement before deleting.");return;}
 						if(!confirm("Delete this inventory item?"))return;
 						const prior=this.inventory;this.inventorySaving=true;this.inventory=prior.filter(i=>String(i.id)!==String(id));

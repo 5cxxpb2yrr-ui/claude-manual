@@ -519,80 +519,14 @@
 						</template>
 					</div>
 
-					<!-- Predictive Maintenance Deck -->
-					<div>
-						<div class="flex items-center justify-between mb-3">
-							<h3
-								class="text-xs font-bold uppercase tracking-wider text-zinc-400 flex items-center space-x-2"
-							>
-								<span
-									class="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.8)]"
-								></span>
-								<span>Predictive Maintenance Status</span>
-							</h3>
-							<button
-								@click="currentTab = 'predictive'"
-								class="text-xs text-amber-400 font-bold hover:underline"
-							>
-								View All Schedules →
-							</button>
+					<!-- Compact predictive maintenance status -->
+					<button type="button" @click="currentTab = 'predictive'" class="glass-panel w-full px-3 py-2 flex items-center justify-between gap-3 text-left hover:border-amber-500/50">
+						<div class="flex items-center gap-2 min-w-0">
+							<span class="w-2.5 h-2.5 shrink-0 rounded-full" :class="predictiveStatus.tone"></span>
+							<div class="min-w-0"><span class="text-xs font-bold text-zinc-200">Maintenance</span><span class="block text-[11px] text-zinc-400" x-text="predictiveStatus.label"></span></div>
 						</div>
-
-						<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-							<template
-								x-for="item in predictiveItems.slice(0, 4)"
-								:key="item.id"
-							>
-								<div
-									@click="triggerUpcomingService(activeVehicle.name, item.serviceName)"
-									class="glass-panel p-4 cursor-pointer hover:border-amber-500/50 flex justify-between items-center group"
-								>
-									<div class="flex-1 pr-3">
-										<div
-											class="flex items-center space-x-2 mb-1"
-										>
-											<span
-												class="text-[10px] font-bold px-2 py-0.5 rounded uppercase border"
-												:class="getStatusBadgeClass(item.status)"
-												x-text="item.status"
-											></span>
-											<span
-												class="text-xs font-bold text-white"
-												x-text="item.serviceName"
-											></span>
-										</div>
-
-										<!-- Visual Bar -->
-										<div
-											class="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800 my-2"
-										>
-											<div
-												class="h-full transition-all duration-500"
-												:class="getBarBgClass(item.status)"
-												:style="`width: ${item.urgencyScore}%`"
-											></div>
-										</div>
-
-										<div
-											class="flex justify-between text-[11px] text-zinc-400 font-mono"
-										>
-											<span
-												x-text="item.remainingMiles > 0 ? item.remainingMiles.toLocaleString() + ' mi remaining' : Math.abs(item.remainingMiles).toLocaleString() + ' mi overdue'"
-											></span>
-											<span
-												x-text="'Due @ ' + item.nextDueMileage.toLocaleString() + ' mi'"
-											></span>
-										</div>
-									</div>
-									<div
-										class="text-amber-400 group-hover:translate-x-1 transition font-bold text-sm"
-									>
-										Log →
-									</div>
-								</div>
-							</template>
-						</div>
-					</div>
+						<span class="text-xs font-bold text-amber-400 shrink-0">Schedules →</span>
+					</button>
 
 					<!-- Recent Service Activity & Active Projects Grid -->
 					<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -3812,6 +3746,11 @@
 
 					get predictiveItems() {
 						return this.predictiveForVehicle(this.activeVehicle);
+					},
+					get predictiveStatus() {
+						const items=this.predictiveItems||[],overdue=items.filter(i=>i.status==='Red').length,due=items.filter(i=>i.status==='Orange'||i.status==='Yellow').length,unknown=items.filter(i=>!i.hasHistory).length;
+						const label=[overdue?overdue+' overdue':'',due?due+' due soon':'',unknown?unknown+' history unconfirmed':''].filter(Boolean).join(' · ');
+						return {label:!items.length?'No schedules':label||'On track',tone:overdue?'bg-rose-500':due||unknown?'bg-amber-400':items.length?'bg-emerald-400':'bg-zinc-500'};
 					},
 					get nextScheduledMaintenance() {
 						return this.predictiveItems

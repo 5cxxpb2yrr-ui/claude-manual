@@ -324,160 +324,46 @@
 					x-transition.opacity
 					class="space-y-6"
 				>
-					<!-- Active Vehicle Snapshot -->
-					<div class="glass-panel p-5 relative overflow-hidden group">
-						<div
-							class="absolute top-0 right-0 w-48 h-48 bg-amber-500/10 rounded-full blur-3xl pointer-events-none group-hover:bg-amber-500/20 transition-all duration-500"
-						></div>
-						<div
-							class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 relative z-10"
-						>
-							<div>
-								<div class="flex items-center space-x-2 mb-1">
-									<span
-										class="text-[10px] font-extrabold tracking-wider uppercase px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/30"
-										>Active Rig Snapshot</span
-									>
-									<span
-										class="text-xs text-zinc-400"
-										x-text="'VIN: ' + activeVehicle.vin"
-									></span>
+					<!-- Active Vehicle Snapshot: compact summary, expanded health tiles -->
+					<details class="glass-panel px-3 py-2 group">
+						<summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2 min-h-11">
+							<div class="min-w-0 flex-1">
+								<div class="text-[10px] uppercase tracking-wider font-extrabold text-amber-400">Active Rig Snapshot</div>
+								<div class="flex items-center gap-1.5 mt-1 text-xs text-zinc-300">
+									<span class="truncate" x-text="activeVehicle?.name || 'No vehicle selected'"></span>
+									<span class="shrink-0 text-[10px] text-zinc-500" x-text="dynamicHealth.confidence+' confidence'"></span>
 								</div>
-								<h2
-									class="text-2xl font-black text-white"
-									x-text="activeVehicle.name"
-								></h2>
-								<p
-									class="text-xs text-zinc-400 font-medium mt-0.5"
-									x-text="activeVehicle.engine + ' • ' + activeVehicle.oilType + ' (' + activeVehicle.oilCapacity + ')'"
-								></p>
+								<div x-show="nextHealthArea" class="mt-1 text-[11px] flex flex-wrap items-center gap-1">
+									<span class="text-zinc-400">Review next:</span>
+									<span class="font-bold" :class="healthScoreTone(nextHealthArea?.score).text" x-text="nextHealthArea ? nextHealthArea.name+' '+nextHealthArea.score+'%' : ''"></span>
+									<span x-show="healthAreaTieCount>1" class="text-zinc-500" x-text="'· '+healthAreaTieCount+' tied'"></span>
+								</div>
 							</div>
-
-							<!-- Dynamic Health Progress Meter -->
-							<div
-								class="flex items-center space-x-4 bg-zinc-950/80 p-3 rounded-xl border border-zinc-800/80 w-full md:w-auto justify-between"
-							>
-								<div>
-									<div
-										class="text-[10px] uppercase font-bold text-zinc-500 tracking-wider"
-									>
-										Overall Rig Health
+							<div class="shrink-0 flex flex-col items-end">
+								<span class="text-[9px] uppercase font-bold text-zinc-500">Overall</span>
+								<span class="font-mono text-2xl font-black leading-tight" :class="healthScoreTone(activeVehicle ? dynamicHealth.overallHealth : null).text" x-text="activeVehicle ? dynamicHealth.overallHealth+'%' : '—'"></span>
+							</div>
+							<svg class="w-4 h-4 shrink-0 text-zinc-400 transition-transform group-open:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
+						</summary>
+						<div class="mt-2 pt-3 border-t border-zinc-800 space-y-3" x-show="activeVehicle">
+							<div class="flex items-center justify-between gap-2">
+								<div class="min-w-0 text-[11px] text-zinc-400">
+									<div x-text="(activeVehicle?.engine || '')+' · '+(activeVehicle?.oilType || '')+' ('+(activeVehicle?.oilCapacity || '')+')'"></div>
+									<div class="break-all text-[10px] text-zinc-500" x-text="'VIN: '+(activeVehicle?.vin || 'Not recorded')"></div>
+								</div>
+								<button type="button" @click="modals.updateMileage = true" class="shrink-0 px-2.5 py-2 rounded-lg bg-amber-500/15 text-xs font-bold text-amber-400 border border-amber-500/30">Odometer</button>
+							</div>
+							<div class="grid grid-cols-5 gap-1.5" aria-label="Vehicle health area estimates">
+								<template x-for="area in healthAreaTiles" :key="area.name">
+									<div class="min-w-0 rounded-lg border py-2 px-0.5 text-center" :class="healthScoreTone(area.score).tile" :title="area.name+' '+area.score+'% estimated health'" :aria-label="area.name+' '+area.score+'% estimated health'">
+										<div class="text-[9px] sm:text-[10px] font-semibold truncate" x-text="area.short"></div>
+										<div class="font-mono font-black text-sm sm:text-lg" x-text="area.score+'%'"></div>
 									</div>
-									<div
-										class="text-2xl font-black font-mono text-emerald-400 drop-shadow-[0_0_12px_rgba(16,185,129,0.3)]"
-										x-text="dynamicHealth.overallHealth + ' / 100'"
-									></div>
-								</div>
-								<button
-									@click="modals.updateMileage = true"
-									class="px-3 py-2 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-xs font-bold text-amber-400 border border-amber-500/30 transition active:scale-95"
-								>
-									Update Odometer
-								</button>
+								</template>
 							</div>
+							<p class="text-[10px] text-zinc-500">Estimated from maintenance and service history, not a mechanical diagnosis. Review the lowest-scoring area first.</p>
 						</div>
-
-						<!-- Health Breakdown Progress Bars -->
-						<div
-							class="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t border-zinc-800/80 text-xs"
-						>
-							<div>
-								<div
-									class="flex justify-between text-[11px] mb-1"
-								>
-									<span class="text-zinc-400">Engine</span
-									><span
-										class="font-bold text-white"
-										x-text="dynamicHealth.engineHealth + '%'"
-									></span>
-								</div>
-								<div
-									class="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800"
-								>
-									<div
-										class="bg-emerald-400 h-full"
-										:style="`width: ${dynamicHealth.engineHealth}%`"
-									></div>
-								</div>
-							</div>
-							<div>
-								<div
-									class="flex justify-between text-[11px] mb-1"
-								>
-									<span class="text-zinc-400">Brakes</span
-									><span
-										class="font-bold text-white"
-										x-text="dynamicHealth.brakeHealth + '%'"
-									></span>
-								</div>
-								<div
-									class="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800"
-								>
-									<div
-										class="bg-emerald-400 h-full"
-										:style="`width: ${dynamicHealth.brakeHealth}%`"
-									></div>
-								</div>
-							</div>
-							<div>
-								<div
-									class="flex justify-between text-[11px] mb-1"
-								>
-									<span class="text-zinc-400">Suspension</span
-									><span
-										class="font-bold text-white"
-										x-text="dynamicHealth.suspensionHealth + '%'"
-									></span>
-								</div>
-								<div
-									class="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800"
-								>
-									<div
-										class="bg-amber-400 h-full"
-										:style="`width: ${dynamicHealth.suspensionHealth}%`"
-									></div>
-								</div>
-							</div>
-							<div>
-								<div
-									class="flex justify-between text-[11px] mb-1"
-								>
-									<span class="text-zinc-400">Electrical</span
-									><span
-										class="font-bold text-white"
-										x-text="dynamicHealth.electricalHealth + '%'"
-									></span>
-								</div>
-								<div
-									class="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800"
-								>
-									<div
-										class="bg-emerald-400 h-full"
-										:style="`width: ${dynamicHealth.electricalHealth}%`"
-									></div>
-								</div>
-							</div>
-							<div>
-								<div
-									class="flex justify-between text-[11px] mb-1"
-								>
-									<span class="text-zinc-400">Fluids</span
-									><span
-										class="font-bold text-white"
-										x-text="dynamicHealth.fluidsHealth + '%'"
-									></span>
-								</div>
-								<div
-									class="w-full bg-zinc-900 h-1.5 rounded-full overflow-hidden border border-zinc-800"
-								>
-									<div
-										class="bg-emerald-400 h-full"
-										:style="`width: ${dynamicHealth.fluidsHealth}%`"
-									></div>
-								</div>
-							</div>
-						</div>
-					</div>
+					</details>
 
 					<div class="glass-panel p-4 mb-4">
 						<div class="flex items-center justify-between mb-2"><span class="text-[10px] uppercase font-bold text-zinc-500">Health Evidence</span><span class="text-[10px] text-zinc-500" x-text="dynamicHealth.confidence + ' confidence'"></span></div>
@@ -3881,6 +3767,24 @@
 					},
 
 					get dynamicHealth() { return this.healthForVehicleDetailed(this.activeVehicle); },
+					healthScoreTone(value) {
+						if(value==null||!Number.isFinite(Number(value)))return {text:'text-zinc-400',tile:'border-zinc-700 bg-zinc-900 text-zinc-400'};
+						const score=Number(value);
+						if(score>=95)return {text:'text-emerald-400',tile:'border-emerald-500/40 bg-emerald-500/10 text-emerald-400'};
+						if(score>=80)return {text:'text-amber-400',tile:'border-amber-500/40 bg-amber-500/10 text-amber-400'};
+						return {text:'text-rose-400',tile:'border-rose-500/40 bg-rose-500/10 text-rose-400'};
+					},
+					get healthAreaTiles() {
+						if(!this.activeVehicle)return [];
+						const h=this.dynamicHealth;
+						return [{name:'Engine',short:'Engine',score:h.engineHealth},{name:'Brakes',short:'Brakes',score:h.brakeHealth},{name:'Suspension',short:'Susp.',score:h.suspensionHealth},{name:'Electrical',short:'Elec.',score:h.electricalHealth},{name:'Fluids',short:'Fluids',score:h.fluidsHealth}].filter(a=>a.score!=null&&Number.isFinite(Number(a.score)));
+					},
+					get nextHealthArea() {
+						return this.healthAreaTiles.reduce((lowest,area)=>!lowest||area.score<lowest.score?area:lowest,null);
+					},
+					get healthAreaTieCount() {
+						const lowest=this.nextHealthArea;return lowest?this.healthAreaTiles.filter(a=>a.score===lowest.score).length:0;
+					},
 
 					healthForVehicleDetailed(vehicle) {
 						if(!vehicle)return {overallHealth:0,engineHealth:0,brakeHealth:0,suspensionHealth:0,electricalHealth:0,fluidsHealth:0,reasons:[],confidence:'Low'};

@@ -488,7 +488,7 @@ const startRepairMode=()=>{
  const sessionKey=key+"::"+facts.procedureId,prior=sessions[sessionKey]||{},states={};
  steps.forEach(step=>{states[step.id]=prior.states&&prior.states[step.id]||{status:"pending"};});
  let current=steps.findIndex(step=>step.id===prior.currentStepId);if(current<0)current=steps.findIndex(step=>states[step.id].status!=="done"&&states[step.id].status!=="skipped");if(current<0)current=0;
- const persist=()=>{const updatedAt=new Date().toISOString(),execution={status:"in-progress",updatedAt,currentStepId:steps[current].id,steps:steps.map(step=>({id:step.id,number:step.number,title:step.title,safetyCritical:step.safetyCritical,requiresPrevious:step.requiresPrevious,...states[step.id]}))};sessions[sessionKey]={procedure:title,vehicle,source:frame.src,updatedAt,currentStepId:steps[current].id,states};try{localStorage.setItem(sessionStore,JSON.stringify(sessions));all[key]={...snapshot(),execution};save(all);}catch(error){alert("Repair progress could not be saved locally: "+error.message);}};
+ const persist=()=>{if(all[key]?.execution?.status==="completed"&&JSON.stringify(states)===JSON.stringify(prior.states||{}))return;const updatedAt=new Date().toISOString(),execution={status:"in-progress",updatedAt,currentStepId:steps[current].id,steps:steps.map(step=>({id:step.id,number:step.number,title:step.title,safetyCritical:step.safetyCritical,requiresPrevious:step.requiresPrevious,...states[step.id]}))};sessions[sessionKey]={procedure:title,vehicle,source:frame.src,updatedAt,currentStepId:steps[current].id,states};try{localStorage.setItem(sessionStore,JSON.stringify(sessions));all[key]={...snapshot(),execution};save(all);}catch(error){alert("Repair progress could not be saved locally: "+error.message);}};
  let mode=document.getElementById("repair-mode");
  if(!mode){mode=document.createElement("section");mode.id="repair-mode";mode.setAttribute("role","dialog");mode.setAttribute("aria-modal","true");document.body.append(mode);}
  const progress=()=>repairProgress(steps,states);
@@ -522,6 +522,7 @@ content.querySelector("#rw-save").onclick=()=>{all[key]=snapshot();save(all);ale
 content.querySelector("#rw-export").onclick=()=>{const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="repair-cart.json";a.click();URL.revokeObjectURL(url);};
 content.querySelector("#rw-clear").onclick=()=>{content.querySelectorAll("[data-part],[data-tool],[data-torque]").forEach(x=>x.checked=false);snapshot();};
 shell.classList.add("open");
+if(returnToGarage){const back=document.createElement("a");back.href=returnToGarage;back.textContent="← Return to Garage project";back.style.cssText="display:block;color:#ffb066;padding:10px 0;text-decoration:underline";content.prepend(back);}
 if(options.guided)content.querySelector("#rw-start-mode").click();
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-repair-workspace]");if(b){e.preventDefault();openWorkspace();}});

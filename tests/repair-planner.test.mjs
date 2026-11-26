@@ -78,3 +78,35 @@ test("stock and tool suggestions respect compatibility, reservations and explici
  await mock.removeOwnedTool("t");
  assert.equal(mock.toolInventory.length,2);
 });
+
+
+test("editing inventory preserves identity and reservations and rolls back failed saves",async()=>{
+ const code=garage.slice(garage.indexOf("inventoryCompatibilityOptions() {"),garage.indexOf("handleFileUpload(event) {"));
+ const mock={...new Function("return ({"+code+"})")(),inventory:[{id:1,description:"Filter",quantity:4,reservedQuantity:2,unitCost:6,partNumber:"A",vehicleCompatibility:"Scion",custom:"keep"}],projects:[],vehicles:[{name:"Scion"}],modals:{},saveToStorage:async()=>true};
+ mock.openEditPartModal(mock.inventory[0]);
+ mock.newPartForm.quantity=1;
+ assert.equal(await mock.saveNewPart(),false);
+ mock.newPartForm.quantity=3;mock.newPartForm.unitCost=7;
+ assert.equal(await mock.saveNewPart(),true);
+ assert.equal(mock.inventory[0].id,1);
+ assert.equal(mock.inventory[0].reservedQuantity,2);
+ assert.equal(mock.inventory[0].custom,"keep");
+ mock.openEditPartModal(mock.inventory[0]);mock.newPartForm.partNumber="B";
+ assert.equal(await mock.saveNewPart(),false);
+ mock.newPartForm.partNumber="A";mock.newPartForm.quantity=5;mock.saveToStorage=async()=>false;
+ assert.equal(await mock.saveNewPart(),false);
+ assert.equal(mock.inventory[0].quantity,3);
+});
+test("owned tool editing keeps its ID and rejects duplicate names",async()=>{
+ const code=garage.slice(garage.indexOf("inventoryMatchKey(value) {"),garage.indexOf("guidedRepairProgress(entry) {"));
+ const mock={...new Function("return ({"+code+"})")(),toolInventory:[{id:"a",name:"Torque wrench",notes:""},{id:"b",name:"Ratchet",notes:""}],saveToStorage:async()=>true};
+ mock.editOwnedTool(mock.toolInventory[0]);mock.toolDraftName="Ratchet";
+ assert.equal(await mock.saveOwnedTool(),false);
+ mock.toolDraftName="Torque wrench";mock.toolDraftNotes="5–50 N·m";
+ assert.equal(await mock.saveOwnedTool(),true);
+ assert.equal(mock.toolInventory[0].id,"a");
+ assert.equal(mock.toolInventory[0].notes,"5–50 N·m");
+ mock.editOwnedTool(mock.toolInventory[0]);mock.toolDraftNotes="changed";mock.saveToStorage=async()=>false;
+ assert.equal(await mock.saveOwnedTool(),false);
+ assert.equal(mock.toolInventory[0].notes,"5–50 N·m");
+});

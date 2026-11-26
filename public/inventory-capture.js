@@ -47,6 +47,69 @@ function parseAmazonText(text){
  const mpn=name.match(/\bWIX\s+(\d{4,}[A-Z0-9]*)\b/i);
  return {vendor:"Amazon",orderNumber:order[1],orderedDate:d.toISOString().slice(0,10),lines:[{description:name,partNumber:mpn?.[1]||"",quantity:1,unitCost:price,unit:"each",vehicleCompatibility:"Not verified",inventoryId:"",demandKey:"",barcode:""}],receiptTotals:{subtotal,shipping,discount,tax,total},notice:"Review inferred quantity of one, fitment, discounts and totals. Order is not received."};
 }
+
+function detectReceiptVendor(text){
+ const header=String(text||"").split(/\r?\n/).slice(0,12).join(" ");
+ const vendors=[["AutoZone",/\bauto\s*zone\b/i],["O'Reilly Auto Parts",/\bo[’']?\s*reilly(?:\s+auto\s+parts)?\b/i],["Advance Auto Parts",/\badvance\s+auto\s+parts\b/i],["NAPA Auto Parts",/\bnapa(?:\s+auto\s+parts)?\b/i]];
+ const hits=vendors.filter(([,pattern])=>pattern.test(header));
+ if(hits.length===1)return hits[0][0];
+ if(/\bOrder\s*#\s*\d{3}-\d{7}-\d{7}\b/i.test(text)&&/\bOrder placed\b/i.test(text))return "Amazon";
+ return "";
+}
+function parseRetailText(text){
+ const raw=String(text||"").slice(0,50000),rows=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ const vendor=detectReceiptVendor(raw);
+ if(!vendor||vendor==="Amazon")throw Error("Retailer not recognized. Enter reviewed item details manually.");
+ if(/\b(?:return receipt|refund|exchange|credit memo|void|core charge|core deposit|core return)\b/i.test(raw))throw Error("Return, exchange or core-charge receipt needs manual review.");
+ const unique=(pattern,label)=>{
+  const matches=rows.map(row=>row.match(pattern)).filter(Boolean).map(m=>m[1]);
+  const values=[...new Set(matches)];
+  if(values.length>1)throw Error("Multiple "+label+" values. Review manually.");
+  return values[0]??null;
+ };
+ const receipt=unique(/^(?:receipt|invoice|order|transaction)(?:\s*(?:number|no\.?|#))?\s*[:#]?\s+([A-Z0-9][A-Z0-9-]{2,39})$/i,"receipt numbers");
+ const store=unique(/^store\s*(?:number|no\.?|#)\s*[:#]?\s*(\d{1,8})$/i,"store numbers");
+ const date=unique(/^(?:date|purchase date|transaction date)\s*:\s*(\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}\/\d{4})(?:\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)?$/i,"dates");
+ if(!receipt||!store||!date)throw Error(vendor+" recognized. Confirm store number, receipt number and full date before importing items.");
+ const pieces=date.includes("/")?date.split("/").map(Number):date.split("-").map(Number);
+ const [year,month,day]=date.includes("/")?[pieces[2],pieces[0],pieces[1]]:pieces;
+ const d=new Date(Date.UTC(year,month-1,day));
+ if(year<2000||year>2100||d.getUTCFullYear()!==year||d.getUTCMonth()!==month-1||d.getUTCDate()!==day)throw Error("Invalid receipt date. Review manually.");
+ const cents=s=>Math.round(Number(s.replace(/[$,]/g,""))*100);
+ const money=(pattern,label)=>{const v=unique(pattern,label);return v===null?null:cents(v);};
+ const subtotal=money(/^(?:sub\s*total|merchandise subtotal)\s*:?\s*(\$?[\d,]+\.\d{2})$/i,"subtotals");
+ const tax=money(/^(?:sales tax|tax)\s*:?\s*(\$?[\d,]+\.\d{2})$/i,"tax amounts");
+ const shipping=money(/^shipping(?:\s*&\s*handling)?\s*:?\s*(\$?[\d,]+\.\d{2})$/i,"shipping amounts");
+ const discount=money(/^(?:discount|total discount|coupon)\s*:?\s*(-\$?[\d,]+\.\d{2})$/i,"discount amounts");
+ const total=money(/^(?:grand total|total|total sale|amount due)\s*:?\s*(\$?[\d,]+\.\d{2})$/i,"totals");
+ if(subtotal===null||tax===null||total===null)throw Error("Receipt subtotal, tax and total must be readable before item extraction.");
+ if(/\b(?:discount|coupon|savings|promotion)\b/i.test(raw)&&discount===null)throw Error("Discount amount is ambiguous. Review manually.");
+ if(subtotal+(shipping??0)+(discount??0)+tax!==total)throw Error("Printed subtotal, tax, discounts and total do not reconcile.");
+ // Narrow, explicitly labeled item grammar. Never infer quantity or convert retailer SKU to MPN.
+ const items=[];
+ for(let i=0;i<rows.length;i++){
+  const row=rows[i];
+  const item=row.match(/^(?:item|sku|part(?:\s*(?:number|no\.?|#))?)\s*[:#]?\s+([A-Z0-9][A-Z0-9-]{1,39})\s+(.{2,160})$/i);
+  if(!item)continue;
+  const amounts=rows[i+1]?.match(/^(?:qty|quantity)\s*:?\s*(\d{1,4})\s+(?:@|x|unit(?:\s+price)?\s*:?)\s*(\$?[\d,]+\.\d{2})\s+(?:=|ext(?:ended)?\s*:?)\s*(\$?[\d,]+\.\d{2})$/i);
+  if(!amounts)throw Error("Item quantity or unit price is not explicit. Review manually.");
+  const qty=Number(amounts[1]),price=cents(amounts[2]),extension=cents(amounts[3]);
+  if(qty<1||qty*price!==extension)throw Error("Item extension does not match quantity times unit price.");
+  items.push({description:item[2],partNumber:"",retailerItemCode:item[1],quantity:qty,unitCost:price/100,unit:"each",vehicleCompatibility:"Not verified",inventoryId:"",demandKey:"",barcode:""});
+  i++;
+ }
+ if(!items.length||items.length>100||items.reduce((n,x)=>n+Math.round(x.unitCost*100)*x.quantity,0)!==subtotal)throw Error("Item rows do not reconcile with subtotal. Review recognized text and enter items manually.");
+ if(/\b(?:qty|quantity)\b/i.test(raw)&&rows.filter(row=>/^(?:qty|quantity)\b/i.test(row)).length!==items.length)throw Error("Unmatched quantity rows. Review manually.");
+ const amount=n=>n===null?null:n/100;
+ return {vendor,orderNumber:"store-"+store+"-"+d.toISOString().slice(0,10)+"-"+receipt,orderedDate:d.toISOString().slice(0,10),lines:items,receiptTotals:{subtotal:amount(subtotal),shipping:amount(shipping),discount:amount(discount),tax:amount(tax),total:amount(total)},notice:"Review all extracted rows against the receipt. Retailer item codes are not verified manufacturer part numbers. No stock has been received."};
+}
+function parseReceiptText(text){
+ const vendor=detectReceiptVendor(text);
+ if(vendor==="Amazon")return parseAmazonText(text);
+ if(vendor)return parseRetailText(text);
+ throw Error("Receipt layout not recognized. Review the text and enter item details manually.");
+}
+
 const OCR_BASE="/receipt-ocr-v6/";
 let ocrScript;
 async function loadOcr(){
@@ -80,7 +143,7 @@ async function extractPdfText(file,progress=()=>{}){
  const task=pdf.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false});
  let ocr,scans=0;
  try{const doc=await task.promise;if(doc.numPages>20)throw Error("Receipt exceeds 20 pages.");const pages=[];
- for(let n=1;n<=doc.numPages;n++){const page=await doc.getPage(n),content=await page.getTextContent(),embedded=content.items.map(item=>item.str||"").join(" ");
+ for(let n=1;n<=doc.numPages;n++){const page=await doc.getPage(n),content=await page.getTextContent(),embedded=content.items.map(item=>(item.str||"")+(item.hasEOL?"\n":" ")).join("");
  if(embedded.trim().length>=30){pages.push(embedded);continue;}
  if(++scans>5)throw Error("Scanned receipt limit is five pages. Split the file or paste text manually.");
  progress("Reading scanned page "+n+" of "+doc.numPages);
@@ -90,5 +153,5 @@ async function extractPdfText(file,progress=()=>{}){
  const text=pages.join("\n");if(!text.trim())throw Error("No readable receipt text.");return text;
  }finally{try{if(ocr)await ocr.close();}finally{await task.destroy();}}
 }
-const api={parseAmazonText,extractPdfText,extractImageText,barcode,matches,applyBarcode,receiptFile,duplicateReceipt,scanImage};root.MotorNoteCapture=api;if(typeof module!=="undefined")module.exports=api;
+const api={parseAmazonText,detectReceiptVendor,parseRetailText,parseReceiptText,extractPdfText,extractImageText,barcode,matches,applyBarcode,receiptFile,duplicateReceipt,scanImage};root.MotorNoteCapture=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

@@ -82,5 +82,30 @@ async function generate({vehicleId,scope,fetcher=root.fetch,engine=root.LifeOSRe
  const tasks=[{name:"Confirm diagnosis, repair scope and part fitment",source:"Preparation"},{name:"Review factory precautions and prepare tools",source:"Preparation"},...docs.filter(p=>/inspection|removal|installation|replacement|service and repair/i.test(p.title)).map(p=>({name:"Review / perform: "+p.title,source:p.sourceLabel,route:p.route})),{name:"Verify completed work and record results",source:"Verification"}];
  return {vehicleId,scope:text,title:sections.map(s=>s.component).join(" + ")+(replacement?" Replacement":" Repair"),sections:sections.map(s=>s.component),documents:docs.map(p=>({id:p.id,title:p.title,sourceLabel:p.sourceLabel,sourcePath:p.sourcePath,route:p.route,role:p.role,specs:specs.filter(s=>s.page===p.page).map(s=>s.text)})),parts,tools:[...tools.values()],warnings,specs,tasks,unavailable,limitations:["Candidate parts are not confirmed failures or verified part numbers.","Review factory diagrams, fastener assignments and procedure dependencies before work.","No prices or tool ownership verified."]};
 }
-const api={resolveSections,supportingLinks,generate};root.MotorNoteRepairPlanner=api;if(typeof module!=="undefined")module.exports=api;
+// Phase templates organize evidence; they do not replace factory instructions.
+function buildGuidedPhases(plan){
+ if(!plan||!Array.isArray(plan.documents)||!plan.documents.length)return [];
+ const docs=plan.documents,component=docs.filter(d=>d.role==="component"),support=docs.filter(d=>d.role==="support");
+ const match=(arr,re)=>arr.filter(d=>re.test(d.title));
+ const phase=(id,title,detail,refs,critical=false)=>({id,title,detail,critical,documents:[...new Map(refs.map(d=>[d.id,d])).values()]});
+ const phases=[phase("scope","Confirm repair scope","Confirm the diagnosis, selected components and VIN-specific fitment. Do not buy or replace parts based on search matches alone.",match(component,/inspection|testing/i),true),
+ phase("readiness","Prepare parts and equipment","Verify all required parts and tools are available. Read all applicable warnings and supporting procedures before starting.",docs,true)];
+ const oxygen=plan.vehicleId==="subaru-crosstrek"&&plan.sections?.length&&plan.sections.every(n=>/oxygen.*sensor/i.test(n));
+ const battery=match(support,/note: battery/i),access=match(support,/under cover.*removal/i),close=match(support,/under cover.*installation/i);
+ const remove=match(component,/: removal$/i),install=match(component,/: installation$/i),inspect=match(component,/: inspection$/i);
+ if(oxygen&&battery.length&&access.length&&close.length&&remove.length===plan.sections.length&&install.length===plan.sections.length&&inspect.length===plan.sections.length){
+  phases.push(phase("isolate","Isolate and support vehicle","Record diagnostic data before disconnecting power. Let the exhaust cool. Follow the factory battery precautions and safely support the vehicle.",[...battery,...remove],true),
+  phase("access","Gain access","Follow the Crosstrek front under cover removal procedure. Never work beneath a vehicle supported only by a jack.",access,true),
+  phase("remove","Remove selected sensors","Follow the selected sensor removal pages. Shared preparation has already been covered; verify each factory instruction and connector location.",remove,true),
+  phase("inspect","Inspect sensors and connections","Use the inspection procedures to check damage and applicable resistance values. A resistance test alone does not prove sensor function.",inspect),
+  phase("install","Install selected sensors","Follow each installation procedure. Verify thread compound instructions, torque and harness routing. Defer shared undercover and battery reconnection until both selected sensors are installed.",install,true),
+  phase("reassemble","Restore access and power","Follow undercover installation and applicable battery reconnection and initialization instructions. Confirm the vehicle is safely lowered.",[...close,...battery],true));
+ }else{
+  // Unverified job sequences must not be presented as a prescribed factory order.
+  phases.push(phase("manual-work","Perform verified factory procedure","Use these linked component and support documents to establish the correct procedure sequence for this repair. Confirm dependencies, variants and fastener assignments in the manual; this plan does not infer a safe disassembly or installation order.",docs,true));
+ }
+ phases.push(phase("verify","Verify repair and record outcome","Perform appropriate post-repair checks. Record results, installed parts, mileage and actual costs in the Garage project; marking this phase complete does not create a service record.",[...battery,...inspect],true));
+ return phases;
+}
+const api={resolveSections,supportingLinks,generate,buildGuidedPhases};root.MotorNoteRepairPlanner=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

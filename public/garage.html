@@ -2588,13 +2588,35 @@
 				x-transition.opacity
 			>
 				<div
-					class="w-full max-w-md bg-zinc-900 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-4"
+					class="w-full max-w-lg max-h-[92vh] overflow-y-auto bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 shadow-2xl space-y-4"
 					@click.away="modals.newProject = false"
 				>
 					<h3 class="text-base font-bold text-white">
-						Create Relational Project Notebook
+						New Repair Project
 					</h3>
 					<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs"><span class="text-zinc-400">Vehicle</span><div class="font-bold text-amber-300" x-text="activeVehicle?.name || 'Select a vehicle first'"></div></div>
+					<section x-show="!pendingRepairProjectDraft" class="space-y-3 rounded-xl border border-amber-500/30 bg-zinc-950 p-3">
+						<h4 class="font-bold text-amber-300">Repair Intelligence</h4>
+						<label class="block text-xs text-zinc-400">What do you want to repair?
+							<textarea x-model="repairIntent" @input="repairPlan=null;repairPlanError='';repairPlanRun++" rows="3" placeholder="I need to replace the oxygen sensors in my Subaru…" class="mt-1 w-full rounded-lg bg-zinc-900 border border-zinc-800 p-3 text-white text-sm"></textarea>
+						</label>
+						<button type="button" @click="generateRepairPlan()" :disabled="repairPlanBusy || !repairIntent.trim()" class="w-full rounded-xl bg-amber-500 py-3 font-black text-zinc-950 disabled:opacity-40" x-text="repairPlanBusy ? 'Resolving factory documents…' : 'Generate repair plan →'"></button>
+						<p x-show="repairPlanError" class="text-xs text-rose-300" x-text="repairPlanError"></p>
+						<template x-if="repairPlan">
+							<div class="space-y-3 text-xs">
+								<div class="font-bold text-white text-sm" x-text="repairPlan.title"></div>
+								<p class="text-amber-200">Proposed scope · confirm diagnosis and fitment before buying parts.</p>
+								<details open class="border border-zinc-800 rounded-lg p-2"><summary class="font-bold text-zinc-200" x-text="'Factory documents ('+repairPlan.documents.length+')'"></summary><template x-for="doc in repairPlan.documents" :key="doc.id"><a class="block text-amber-300 py-1 underline" :href="manualLink(doc.sourcePath)" target="_blank" rel="noopener" x-text="doc.title+' · '+doc.sourceLabel"></a></template></details>
+								<details open class="border border-zinc-800 rounded-lg p-2"><summary class="font-bold text-zinc-200">Parts & consumables</summary><template x-for="part in repairPlan.parts" :key="part.name"><div class="py-1"><span x-text="part.name"></span><small class="block text-zinc-400" x-text="part.relationship+' · '+part.source"></small></div></template></details>
+								<details class="border border-zinc-800 rounded-lg p-2"><summary class="font-bold text-zinc-200">Tools & equipment</summary><template x-for="tool in repairPlan.tools" :key="tool.name"><div class="py-1" x-text="tool.name+' · '+tool.source"></div></template><p x-show="!repairPlan.tools.length" class="text-zinc-400">No tools extracted. Review source procedures.</p></details>
+								<details open class="border border-zinc-800 rounded-lg p-2"><summary class="font-bold text-zinc-200">Torque specifications</summary><template x-for="(spec,i) in repairPlan.specs" :key="i"><div class="py-1"><span x-text="spec.text"></span><small class="block text-zinc-400" x-text="spec.source"></small></div></template></details>
+								<details class="border border-zinc-800 rounded-lg p-2"><summary class="font-bold text-zinc-200">Warnings and preparation tasks</summary><template x-for="(w,i) in repairPlan.warnings" :key="'w'+i"><p class="py-1 text-amber-200" x-text="w.text+' · '+w.source"></p></template><template x-for="(task,i) in repairPlan.tasks" :key="'t'+i"><p class="py-1" x-text="task.name"></p></template></details>
+								<p x-show="repairPlan.unavailable.length" class="text-rose-300" x-text="repairPlan.unavailable.length+' source documents could not be loaded. Review before proceeding.'"></p>
+								<template x-for="note in repairPlan.limitations" :key="note"><p class="text-zinc-400" x-text="note"></p></template>
+								<button type="button" @click="approveRepairPlan()" class="w-full py-3 rounded-xl bg-amber-500 text-zinc-950 font-black">Approve plan & create project →</button>
+							</div>
+						</template>
+					</section>
 					<div class="space-y-3 text-xs">
 						<div>
 							<label class="block text-zinc-400 mb-1"
@@ -3101,6 +3123,8 @@
 		</div>
 
 		<!-- ================= APPLICATION ENGINE SCRIPT ================= -->
+		<script src="/repair-workspace.js"></script>
+		<script src="/repair-planner.js"></script>
 		<script>
 			function garageApp() {
 				return {
@@ -3113,7 +3137,7 @@
 					analyticsVehicleId: 'all',
 					activeVehicleId: 'scion-xb',
 					repairCartLinks: [],
-					pendingRepairProjectDraft: null,
+					pendingRepairProjectDraft: null, repairIntent:"", repairPlan:null, repairPlanBusy:false, repairPlanError:"",repairPlanRun:0,
 					sortOrder: 'desc',
 					smartQuery: '',
 					timelineSearch: '',
@@ -4452,7 +4476,19 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					async completeProjectAndRecordService(project) { if(!project || !this.projectReadyToComplete(project))return; const f=this.projectCompletionForm,vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)),mileage=Number(f.mileage); if(!vehicle || !f.verified || !f.date || !Number.isFinite(mileage) || mileage<0){alert('Confirm the work, date, and a valid odometer reading.');return;} const existing=this.logs.find(log=>String(log.projectId||'')===String(project.id)); if(existing){project.maintenanceLogId=existing.id;project.status='Completed';project.completion=100;project.completedAt=project.completedAt||new Date().toISOString();await this.saveToStorage();this.modals.projectCompletion=false;this.modals.projectDetail=false;return;} const now=new Date().toISOString(),cost=this.projectActualCost(project),plan=this.maintenancePlans.find(item=>String(item.id)===String(project.maintenancePlanId)); const log={id:'project-service-'+project.id,projectId:project.id,maintenancePlanId:plan?.id||null,vehicleId:vehicle.id,vehicle:vehicle.name,mileage,date:f.date,serviceType:project.title||'Completed vehicle project',category:'Maintenance',cost,notes:String(f.notes||'').trim(),attachments:[],history:[],projectCategory:project.category||'General',procedureReferences:(project.procedures||[]).map(item=>({id:item.id,title:item.title,sourceLabel:item.sourceLabel,sourcePath:item.sourcePath})),projectAttachmentIds:(project.attachments||[]).map(item=>item.id),projectCostEntryIds:(project.costEntries||[]).map(item=>item.id)}; this.logs.unshift(log); project.status='Completed';project.completion=100;project.completedAt=now;project.maintenanceLogId=log.id;project.actualCost=cost;project.updatedAt=now; if(mileage>Number(vehicle.odometer||0))vehicle.odometer=mileage; if(plan && plan.status!=='Cancelled'){plan.status='Completed';plan.completedAt=now;plan.completion=100;plan.actualCost=cost;plan.tasks=(plan.tasks||[]).map(task=>({...task,done:true}));} const saved=await this.saveToStorage(); if(saved){this.modals.projectCompletion=false;this.modals.projectDetail=false;this.selectedProject=project;this.selectedMaintenancePlan=plan||null;}else{alert('The service record could not be saved. The project is still open; try confirming again.');} },
 					async saveProjectWorkspace(project) { if(!project)return; const canonical=this.projects.find(item=>String(item.id)===String(project.id)); const target=canonical||project; if(target!==project){ Object.assign(target,project); } if(!Array.isArray(target.partRequirements))target.partRequirements=[]; if(!Array.isArray(target.purchaseOrders))target.purchaseOrders=[]; if(!Array.isArray(target.costEntries))target.costEntries=[]; target.completion=this.projectCompletion(target); target.updatedAt=new Date().toISOString(); target.budget=Math.max(0,Number(target.budget)||0); target.actualCost=this.projectActualCost(target); this.syncProjectMaintenancePlan(target); const saved=await this.saveToStorage(); if(saved){this.selectedProject=target;this.modals.projectDetail=false;} else {alert('Project could not be saved. Your project remains open; try saving again.');} },
 
-						async saveNewProject() {
+						async generateRepairPlan() {
+							const run=++this.repairPlanRun,vehicleId=this.activeVehicleId,scope=this.repairIntent;
+							this.repairPlanBusy=true;this.repairPlanError="";this.repairPlan=null;
+							try{const plan=await window.MotorNoteRepairPlanner.generate({vehicleId,scope});if(run===this.repairPlanRun&&vehicleId===this.activeVehicleId)this.repairPlan=plan;}
+							catch(error){if(run===this.repairPlanRun)this.repairPlanError=error.message||"Could not generate plan.";}
+							finally{this.repairPlanBusy=false;}
+						},
+						async approveRepairPlan() {
+							const plan=this.repairPlan;if(!plan||plan.vehicleId!==this.activeVehicleId){this.repairPlanError="Regenerate for the selected vehicle.";return;}
+							this.newProjectForm={...this.newProjectForm,title:plan.title,category:"Repair",description:plan.scope};
+							await this.saveNewProject(plan);
+						},
+						async saveNewProject(plan=null) {
 							const draft=this.pendingRepairProjectDraft,cart=draft?.cart||null,now=new Date().toISOString(),projectId='project-'+Date.now();
 							const cartItems=Array.isArray(cart?.items)?cart.items:[],cartTools=Array.isArray(cart?.tools)?cart.tools:[],cartTorque=Array.isArray(cart?.torqueSpecs)?cart.torqueSpecs:[];
 							const procedureRecord=cart?{id:'repair-cart-'+(draft.id||Date.now()),title:cart.procedure||'Manual repair procedure',category:this.newProjectForm.category||'Repair',sourceLabel:cart.procedure||'Manual Explorer',sourcePath:cart.source||'',specs:[...cartTorque.map(group=>'Torque: '+(group.values||[]).map(value=>value.value+' '+value.unit).join(' / ')+(group.association?' · '+group.association.component+' · '+group.association.fastener:'')),...cartTools.map(tool=>'Tool: '+tool),...(Array.isArray(cart.warnings)?cart.warnings.map(warning=>'Warning: '+(warning.text||warning)):[])],route:cart.route||'',vehicle:cart.vehicle||this.activeVehicle?.name||'',vehicleId:this.activeVehicleId,cartKey:cart.cartKey||null,cartSnapshot:cart,items:cartItems,tools:cartTools,torqueSpecs:cartTorque,torque:Array.isArray(cart.torque)?cart.torque:[],warnings:Array.isArray(cart.warnings)?cart.warnings:[],attachedAt:now}:null;
@@ -4470,10 +4506,11 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 								priority: this.newProjectForm.priority || 'Medium',
 								dueDate: this.newProjectForm.dueDate || '',
 								completion: 0,
-								tasks: importedTasks,
+								tasks: plan?plan.tasks.map((task,index)=>({...task,id:projectId+"-plan-task-"+index,done:false})):importedTasks,
 								milestones: [],
-								procedures: procedureRecord?[procedureRecord]:[],
-								partRequirements: importedParts,
+								procedures: plan?plan.documents.map(doc=>({...doc,attachedAt:now})):procedureRecord?[procedureRecord]:[],
+								partRequirements: plan?plan.parts.map((part,index)=>({id:projectId+"-plan-part-"+index,partNumber:"",description:part.name,quantity:part.quantity,unitCost:0,status:"Needs review",relationship:part.relationship,source:part.source})):importedParts,
+								repairPlan:plan?JSON.parse(JSON.stringify(plan)):null,
 								purchaseOrders: [],costEntries: [],attachments: [],
 								createdAt: now,
 								updatedAt: now
@@ -4481,6 +4518,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 							this.projects.push(p);
 							const saved = await this.saveToStorage();
 							if(saved&&cart){try{const stored=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'),cartKey=cart.cartKey||`${cart.source||'manual'}::${cart.route||cart.procedure||projectId}`;stored[cartKey]={...cart,cartKey,projectId:p.id,projectTitle:p.title,vehicleId:p.vehicleId,vehicle:this.activeVehicle?.name||cart.vehicle||'',updatedAt:now};localStorage.setItem('lifeos.repair.carts.v1',JSON.stringify(stored));localStorage.removeItem('lifeos.repair.project-draft.v1');this.pendingRepairProjectDraft=null;this.refreshRepairCartLinks();}catch(error){console.warn('Project saved, but the Repair Cart link could not be written',error);alert('Project saved, but its Repair Cart link could not be stored. Reopen the cart and link it to this project.');}}
+							this.repairPlan=null;this.repairIntent='';this.repairPlanError='';this.repairPlanRun++;
 							this.newProjectForm = { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' };
 							this.modals.newProject = false;
 							if(saved)this.openProjectDetail(p);else alert('Project could not be saved. It remains in this session; try saving again.');

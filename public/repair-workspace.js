@@ -454,7 +454,7 @@ if(options.guided&&options.projectId&&(!requestedProject||(cart.projectId&&Strin
  alert("This procedure is not available for the requested Garage project, or its cart belongs to another project. Open the correct linked procedure.");
  return;
 }
-const returnToGarage=options.guided&&requestedProject?"/garage?"+new URLSearchParams({vehicleId:garageVehicleId,projectId:String(requestedProject.id)}).toString():"";
+const returnToGarage=options.guided&&(options.repairId||requestedProject)?"/garage?"+new URLSearchParams({...garageVehicleId&&{vehicleId:garageVehicleId},...options.repairId?{repairId:String(options.repairId)}:{projectId:String(requestedProject.id)}}).toString():"";
 shell.querySelector("#rw-sub").textContent=vehicle;
 const visibleParts=facts.parts.filter(p=>p.relationship!== "mention" || p.confidence>=0.6);
 const rows=visibleParts.map(p=>{
@@ -522,17 +522,17 @@ content.querySelector("#rw-save").onclick=()=>{all[key]=snapshot();save(all);ale
 content.querySelector("#rw-export").onclick=()=>{const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="repair-cart.json";a.click();URL.revokeObjectURL(url);};
 content.querySelector("#rw-clear").onclick=()=>{content.querySelectorAll("[data-part],[data-tool],[data-torque]").forEach(x=>x.checked=false);snapshot();};
 shell.classList.add("open");
-if(returnToGarage){const back=document.createElement("a");back.href=returnToGarage;back.textContent="← Return to Garage project";back.style.cssText="display:block;color:#ffb066;padding:10px 0;text-decoration:underline";content.prepend(back);}
+if(returnToGarage){const back=document.createElement("a");back.href=returnToGarage;back.textContent=options.repairId?"← Return to Garage repair record":"← Return to Garage project";back.style.cssText="display:block;color:#ffb066;padding:10px 0;text-decoration:underline";content.prepend(back);}
 if(options.guided)content.querySelector("#rw-start-mode").click();
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-repair-workspace]");if(b){e.preventDefault();openWorkspace();}});
 function launchGuidedRepair(){
  const url=new URL(location.href);
  if(url.searchParams.get("guided")!=="1"||!/^#\/v\/\d+\/\d+\/\d+$/.test(location.hash)||!document.getElementById("fr"))return;
- const projectId=url.searchParams.get("projectId");
- url.searchParams.delete("guided");url.searchParams.delete("projectId");
+ const projectId=url.searchParams.get("projectId"),repairId=url.searchParams.get("repairId");
+ url.searchParams.delete("guided");url.searchParams.delete("projectId");url.searchParams.delete("repairId");
  history.replaceState(history.state,"",url.pathname+url.search+url.hash);
- openWorkspace({guided:true,projectId}).catch(error=>alert("Could not start guided repair: "+error.message));
+ openWorkspace({guided:true,projectId,repairId}).catch(error=>alert("Could not start guided repair: "+error.message));
 }
 document.addEventListener("manual-viewer-ready",launchGuidedRepair);
 launchGuidedRepair();

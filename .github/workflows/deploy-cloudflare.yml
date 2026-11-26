@@ -63,7 +63,7 @@ jobs:
   deploy-preview:
     name: Deploy isolated preview Worker
     needs: validate
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125'
+    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125') || (github.event_name == 'pull_request' && github.event.pull_request.head.ref == 'preview/repair-cart-scion-dedupe-20261125')
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -74,7 +74,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Deploy preview Worker, static assets, and read-only manual corpus binding
+      - name: Deploy isolated preview Worker for preview-branch push, dispatch, or pull request
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

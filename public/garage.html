@@ -1101,38 +1101,41 @@
 					</div>
 				</div>
 
-				<!-- 7. PARTS INVENTORY MANAGEMENT TAB -->
-				<div
-					x-show="currentTab === 'inventory'"
-					x-transition.opacity
-					class="space-y-4"
-				>
-					<div class="flex justify-between items-center">
-						<div>
-							<h2 class="text-lg font-bold text-white">
-								Parts & Spare Inventory
-							</h2>
-							<p class="text-xs text-zinc-400">
-								Track shelf stock, low inventory warnings, and
-								automatic job deductions
-							</p>
-						</div>
-						<button
-							@click="openNewPartModal()"
-							class="px-3 py-1.5 rounded-xl bg-amber-500 text-zinc-950 text-xs font-bold shadow-md shadow-amber-500/20"
-						>
-							+ Add Part
-						</button>
+				<!-- 7. INVENTORY COMMAND CENTER -->
+				<div x-show="currentTab === 'inventory'" x-transition.opacity class="space-y-3">
+					<div class="flex items-center justify-between gap-2">
+						<div><h2 class="text-lg font-black text-white">Inventory Command Center</h2><p class="text-[10px] text-zinc-400">All vehicles · local stock and project demand</p></div>
+						<button type="button" @click="openNewPartModal()" class="shrink-0 px-3 py-2 rounded-lg bg-amber-500 text-zinc-950 text-xs font-black">+ Part</button>
 					</div>
-
-					<details x-show="lowInventoryCount > 0" class="px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300">
-						<summary class="cursor-pointer font-bold">Low inventory · <span x-text="lowInventoryCount"></span> needed soon</summary>
-						<p class="text-zinc-400 mt-2">Low available stock for maintenance due within 20 days or active work.</p>
-						<template x-for="item in inventoryDemandAlerts()" :key="item.id"><div class="mt-2 border-t border-zinc-800 pt-2"><div class="flex justify-between gap-2"><span class="font-semibold text-white" x-text="item.name"></span><span x-text="item.available+' available'"></span></div><p class="text-zinc-400" x-text="item.reasons.join(' · ')"></p></div></template>
-					</details>
-
-					<details class="glass-panel px-3 py-2" open>
-						<summary class="cursor-pointer text-sm font-bold text-amber-300">Tool inventory · <span x-text="toolInventory.length"></span> recorded</summary>
+					<div class="grid grid-cols-3 gap-1.5">
+						<template x-for="tile in inventoryCommandTiles" :key="tile.id">
+							<button type="button" @click="inventoryView=tile.view" :aria-pressed="inventoryView===tile.view" class="min-w-0 text-left rounded-xl border px-2 py-2 space-y-1" :class="[tile.tone,inventoryView===tile.view?'ring-1 ring-amber-400':'']">
+								<div class="flex items-center justify-between gap-1"><span class="text-[10px] font-bold" x-text="tile.label"></span><span class="text-[10px] text-zinc-400">↗</span></div>
+								<div class="text-xl sm:text-2xl font-black font-mono truncate" x-text="tile.value"></div>
+								<div class="text-[9px] text-zinc-400 truncate" x-text="tile.detail"></div>
+							</button>
+						</template>
+					</div>
+					<template x-if="inventoryCommandNext"><button type="button" @click="inventoryView=inventoryCommandNext.view" class="glass-panel w-full text-left px-3 py-2 flex justify-between items-center gap-2"><div class="min-w-0"><p class="text-[9px] font-bold uppercase text-amber-400">Next best action</p><p class="text-xs font-semibold text-white" x-text="inventoryCommandNext.title"></p><p class="text-[10px] text-zinc-400" x-text="inventoryCommandNext.detail"></p></div><span class="text-amber-300">→</span></button></template>
+					<div class="glass-panel p-3 space-y-3">
+						<div class="flex items-center justify-between gap-2"><h3 class="text-sm text-white font-bold" x-text="inventoryViewTitle"></h3><button type="button" x-show="inventoryView!=='stock'" @click="inventoryView='stock'" class="text-xs text-amber-300">Stock →</button><button type="button" x-show="inventoryView==='stock'" @click="inventoryView='history'" class="text-xs text-amber-300">History →</button></div>
+						<div x-show="inventoryView==='stock'||inventoryView==='value'" class="space-y-2">
+							<input x-model="inventorySearch" placeholder="Search parts, numbers, vendors…" class="w-full bg-zinc-950 rounded-lg border border-zinc-800 p-2 text-sm text-white">
+							<div class="grid grid-cols-2 gap-2">
+								<template x-for="item in inventoryVisibleStock" :key="item.id">
+									<button type="button" @click="openEditPartModal(item)" class="min-w-0 text-left rounded-lg border border-zinc-800 bg-zinc-950 p-2 space-y-1">
+										<div class="text-[10px] font-mono text-amber-300 truncate" x-text="item.partNumber||'No part number'"></div>
+										<div class="text-xs font-bold text-white break-words" x-text="item.description"></div>
+										<div class="flex justify-between items-center gap-1"><span class="font-bold text-xs" :class="projectAvailableInventory(item)>0?'text-emerald-300':'text-zinc-400'" x-text="projectAvailableInventory(item)+' available'"></span><span class="text-[10px] text-zinc-400" x-text="inventoryMoney(Number(item.quantity||0)*Number(item.unitCost||0))"></span></div>
+										<div class="text-[10px] text-zinc-500 truncate" x-text="(item.vehicleCompatibility||'Fitment unverified')+' · '+Number(item.reservedQuantity||0)+' reserved'"></div>
+										<div class="text-[10px] font-bold text-amber-300">Edit →</div>
+									</button>
+								</template>
+							</div>
+							<p x-show="!inventoryVisibleStock.length" class="text-xs text-zinc-400">No matching stock records.</p>
+						</div>
+						<div x-show="inventoryView==='tools'"><div class="space-y-2">
+						
 						<div class="space-y-3 mt-3 border-t border-zinc-800 pt-3">
 							<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
 								<template x-for="tool in toolInventory" :key="tool.id">
@@ -1149,9 +1152,9 @@
 							<button type="button" @click="saveOwnedTool()" :disabled="toolInventoryBusy||!toolDraftName.trim()" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2 disabled:opacity-40" x-text="toolEditId!==null?'Save tool changes':'Add owned tool'"></button><button type="button" x-show="toolEditId!==null" @click="cancelToolEdit()" :disabled="toolInventoryBusy" class="w-full text-xs text-zinc-400 py-2">Cancel edit</button>
 							<p x-show="toolInventoryError" x-text="toolInventoryError" class="text-xs text-rose-300"></p>
 						</div>
-					</details>
-					<details class="glass-panel px-3 py-2">
-						<summary class="cursor-pointer text-sm font-bold text-amber-300">Stock movement history · <span x-text="inventoryLedger.length"></span></summary>
+					</div></div>
+						<div x-show="inventoryView==='history'"><div>
+						
 						<p class="text-xs text-zinc-400 mt-2">Opening balances and saved quantity/reservation changes. Tools are not consumable stock.</p>
 						<div class="mt-2 max-h-80 overflow-y-auto space-y-1">
 							<template x-for="entry in inventoryLedger.slice().reverse()" :key="entry.id"><div class="border-t border-zinc-800 py-2 text-xs">
@@ -1160,93 +1163,21 @@
 								<div class="grid grid-cols-2 gap-1 mt-1"><div class="rounded bg-zinc-950 p-1.5" x-text="'On hand: '+entry.before.onHand+' → '+entry.after.onHand"></div><div class="rounded bg-zinc-950 p-1.5" x-text="'Reserved: '+entry.before.reserved+' → '+entry.after.reserved"></div></div>
 							</div></template>
 						</div>
-					</details>
-					<!-- Mobile: one card per part -->
-					<div class="sm:hidden space-y-2">
-						<template x-for="item in inventory" :key="'inv-card-'+item.id">
-							<div class="glass-panel p-3 space-y-2">
-								<div class="flex justify-between items-start gap-2">
-									<div class="min-w-0">
-										<div class="font-mono text-amber-400 font-bold text-xs" x-text="item.partNumber"></div>
-										<div class="text-white font-semibold text-sm" x-text="item.description"></div>
-									</div>
-									<span
-										class="shrink-0 px-2 py-0.5 rounded font-bold font-mono text-xs"
-										:class="item.quantity <= 2 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-400'"
-										x-text="'Qty ' + item.quantity"
-									></span>
-								</div>
-								<div class="grid grid-cols-2 gap-2 text-[11px] font-mono text-zinc-400">
-									<div>Vendor: <span class="text-zinc-300" x-text="item.vendor"></span></div>
-									<div>Unit Cost: <span class="text-emerald-400" x-text="String.fromCharCode(36) + item.unitCost.toFixed(2)"></span></div>
-								</div>
-								<div class="text-[11px] text-zinc-400">Fits: <span class="text-zinc-300" x-text="item.vehicleCompatibility"></span></div>
-								<div class="flex gap-3 justify-end"><button type="button" @click="openEditPartModal(item)" class="text-amber-300 font-bold text-xs py-2 px-2">Edit</button><button type="button" @click="deleteInventoryItem(item.id)" :disabled="inventorySaving" class="text-rose-400 font-bold text-xs py-2 px-2">Delete</button></div>
-							</div>
-						</template>
-						<div x-show="!inventory.length" class="glass-panel p-6 text-center text-xs text-zinc-500">
-							No parts in inventory yet.
+					</div></div>
+						<div x-show="inventoryView==='soon'" class="space-y-2">
+							<p class="text-xs text-zinc-400">Stock of two or fewer available units with maintenance due within 20 days or active project demand.</p>
+							<template x-for="item in inventoryDemandAlerts()" :key="item.id"><button type="button" @click="openEditPartModal(inventory.find(p=>String(p.id)===String(item.id)))" class="w-full text-left rounded-lg border border-amber-500/30 bg-amber-500/5 p-2"><div class="flex justify-between gap-2 text-xs"><span class="font-bold text-white" x-text="item.name"></span><span class="text-amber-300" x-text="item.available+' available'"></span></div><p class="text-[10px] text-zinc-400 mt-1" x-text="item.reasons.join(' · ')"></p></button></template>
+							<p x-show="!lowInventoryCount" class="text-xs text-zinc-400">No low-stock items with imminent demand.</p>
 						</div>
-					</div>
-
-					<!-- Tablet/Desktop: table -->
-					<div class="hidden sm:block glass-panel p-4 overflow-x-auto">
-						<table class="w-full text-left text-xs">
-							<thead>
-								<tr
-									class="border-b border-zinc-800 text-zinc-400 uppercase font-mono"
-								>
-									<th class="pb-2">Part #</th>
-									<th class="pb-2">Description</th>
-									<th class="pb-2">Vendor</th>
-									<th class="pb-2">Qty</th>
-									<th class="pb-2">Unit Cost</th>
-									<th class="pb-2">Compatibility</th>
-									<th class="pb-2 text-right">Actions</th>
-								</tr>
-							</thead>
-							<tbody
-								class="divide-y divide-zinc-800/60 font-mono"
-							>
-								<template
-									x-for="item in inventory"
-									:key="item.id"
-								>
-									<tr class="hover:bg-zinc-900/50">
-										<td
-											class="py-3 font-bold text-amber-400"
-											x-text="item.partNumber"
-										></td>
-										<td
-											class="py-3 text-white font-sans font-semibold"
-											x-text="item.description"
-										></td>
-										<td
-											class="py-3 text-zinc-400"
-											x-text="item.vendor"
-										></td>
-										<td class="py-3">
-											<span
-												class="px-2 py-0.5 rounded font-bold"
-												:class="item.quantity <= 2 ? 'bg-rose-500/20 text-rose-400 border border-rose-500/30' : 'bg-emerald-500/15 text-emerald-400'"
-												x-text="item.quantity"
-											></span>
-										</td>
-										<td
-											class="py-3 text-emerald-400"
-											x-text="String.fromCharCode(36) + item.unitCost.toFixed(2)"
-										></td>
-										<td
-											class="py-3 text-zinc-300 font-sans"
-											x-text="item.vehicleCompatibility"
-										></td>
-										<td class="py-3 text-right">
-											<div class="flex gap-3 justify-end"><button type="button" @click="openEditPartModal(item)" class="text-amber-300 font-bold text-xs py-2 px-2">Edit</button><button type="button" @click="deleteInventoryItem(item.id)" :disabled="inventorySaving" class="text-rose-400 font-bold text-xs py-2 px-2">Delete</button></div>
-										</td>
-									</tr>
-								</template>
-							</tbody>
-						</table>
+						<div x-show="inventoryView==='review'" class="space-y-2">
+							<p class="text-xs text-zinc-400">Outstanding project requirements without enough verified matching stock. Fitment and allocations still need review.</p>
+							<template x-for="item in inventoryProjectReview" :key="item.key"><button type="button" @click="currentTab='projects';openProjectDetail(item.project)" class="w-full text-left border border-zinc-800 rounded-lg p-2"><div class="flex justify-between gap-2 text-xs"><span class="font-bold text-white" x-text="item.name"></span><span class="text-amber-300" x-text="'Qty '+item.quantity"></span></div><p class="text-[10px] text-zinc-400" x-text="item.project.title+' · '+item.reason"></p></button></template>
+							<p x-show="!inventoryProjectReview.length" class="text-xs text-zinc-400">No unmatched project requirements recorded.</p>
+						</div>
+						<div x-show="inventoryView==='orders'" class="space-y-2">
+							<template x-for="entry in inventoryOpenOrders" :key="entry.key"><button type="button" @click="currentTab='projects';openProjectDetail(entry.project)" class="w-full text-left border border-zinc-800 rounded-lg p-2"><div class="flex justify-between text-xs gap-2"><span class="font-bold text-white" x-text="entry.order.vendor||'Supplier'"></span><span class="text-amber-300" x-text="entry.order.status"></span></div><p class="text-[10px] text-zinc-400" x-text="entry.project.title+' · '+(entry.order.lines||[]).length+' lines · '+inventoryMoney(projectPurchaseOrderTotal(entry.order))"></p><p class="text-[10px] text-zinc-400" x-text="entry.order.expectedDate?'Expected '+entry.order.expectedDate:'No expected date'"></p></button></template>
+							<p x-show="!inventoryOpenOrders.length" class="text-xs text-zinc-400">No open purchase orders.</p>
+						</div>
 					</div>
 				</div>
 
@@ -2620,7 +2551,7 @@
 						</div>
 						<label class="block text-zinc-400">Vehicle compatibility<select x-model="newPartForm.vehicleCompatibility" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-white"><option value="">Not verified</option><option value="Universal">Universal</option><template x-for="name in inventoryCompatibilityOptions()" :key="name"><option :value="name" x-text="name"></option></template></select></label>
 						<p x-show="editingInventoryId!==null" class="text-xs text-zinc-400" x-text="'Reserved: '+inventoryReservedCount(editingInventoryId)+' · Available after edit: '+Math.max(0,Number(newPartForm.quantity||0)-inventoryReservedCount(editingInventoryId))"></p>
-						<p x-show="inventoryError" x-text="inventoryError" class="text-xs text-rose-300"></p>
+						<p x-show="inventoryError" x-text="inventoryError" class="text-xs text-rose-300"></p><button type="button" x-show="editingInventoryId!==null" @click="deleteInventoryItem(editingInventoryId)" :disabled="inventorySaving" class="text-xs text-rose-400 font-bold py-1">Delete item</button>
 						<button type="button" :disabled="inventorySaving" @click="saveNewPart()"
 							class="w-full py-3 bg-amber-500 text-zinc-950 font-bold rounded-xl shadow-lg shadow-amber-500/20"
 						>
@@ -3054,7 +2985,7 @@
 					showLightbox: false,
 					lightboxImage: '',
 					isEditingRepair: false,
-					appSchemaVersion: 8, inventoryLedger:[], inventorySaveTail:null,
+					appSchemaVersion: 8, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",inventorySearch:"",
 					garageDB: null,
 					saveState: 'saved',
 					lastSavedAt: null,
@@ -3726,6 +3657,44 @@
 						return this.projects.filter(p => p.vehicleId === this.activeVehicleId);
 					},
 
+					inventoryMoney(value){return "$"+(Number(value)||0).toFixed(2);},
+					get inventoryVisibleStock(){
+						const q=String(this.inventorySearch||"").trim().toLowerCase(),rows=(this.inventory||[]).filter(p=>!q||[p.description,p.partNumber,p.vendor,p.vehicleCompatibility].some(v=>String(v||"").toLowerCase().includes(q)));
+						return this.inventoryView==="value"?rows.slice().sort((a,b)=>Number(b.quantity||0)*Number(b.unitCost||0)-Number(a.quantity||0)*Number(a.unitCost||0)):rows;
+					},
+					get inventoryOpenOrders(){
+						return (this.projects||[]).flatMap(p=>(p.purchaseOrders||[]).filter(o=>/^(ordered|backordered|on order)$/i.test(o.status||"")).map(order=>({key:String(p.id)+"-"+String(order.id),project:p,order})));
+					},
+					get inventoryProjectReview(){
+						const rows=[],norm=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
+						for(const project of this.projects||[]){
+							if(/^(completed|cancelled|canceled|archived)$/i.test(project.status||""))continue;
+							const v=(this.vehicles||[]).find(v=>String(v.id)===String(project.vehicleId));
+							for(const [i,req] of (project.partRequirements||[]).entries()){
+								if(req.used||req.reserved||/^(used|received|cancelled|canceled)(?:\b|$)/i.test(req.status||""))continue;
+								if((project.purchaseOrders||[]).some(o=>/^(ordered|backordered|on order)$/i.test(o.status||"")&&(o.lines||[]).some(l=>String(l.requirementId)===String(req.id))))continue;
+								const qty=Math.max(1,Number(req.quantity)||1),matches=(this.inventory||[]).filter(p=>{
+									if(req.inventoryId!=null&&String(req.inventoryId)!=="")return String(p.id)===String(req.inventoryId);
+									if(!v||!(p.vehicleCompatibility===v.name||p.vehicleCompatibility==="Universal"||String(p.vehicleId||"")===String(v.id)))return false;
+									const pn=norm(req.partNumber);return pn?pn===norm(p.partNumber):!!norm(req.description)&&norm(req.description)===norm(p.description);
+								});
+								if(!matches.some(p=>Math.max(0,Number(p.quantity||0)-Number(p.reservedQuantity||0))>=qty))rows.push({key:String(project.id)+"-"+String(req.id||i),name:req.description||req.partNumber||"Unnamed requirement",quantity:qty,project,reason:matches.length?"Insufficient matching stock":"No matching stock"});
+							}
+						}
+						return rows;
+					},
+					get inventoryCommandTiles(){
+						const stock=this.inventory||[],value=stock.reduce((sum,p)=>sum+Math.max(0,Number(p.quantity)||0)*Math.max(0,Number(p.unitCost)||0),0),soon=this.lowInventoryCount,review=this.inventoryProjectReview.length,orders=this.inventoryOpenOrders.length;
+						const neutral="border-zinc-700 bg-zinc-950 text-zinc-100",blue="border-sky-500/30 bg-sky-500/5 text-sky-300",amber="border-amber-500/40 bg-amber-500/10 text-amber-300",green="border-emerald-500/30 bg-emerald-500/5 text-emerald-300";
+						return [{id:"stock",view:"stock",label:"Stock items",value:stock.length,detail:"Part records",tone:blue},{id:"tools",view:"tools",label:"Owned tools",value:(this.toolInventory||[]).length,detail:"Equipment",tone:blue},{id:"value",view:"value",label:"Stock value",value:this.inventoryMoney(value),detail:"Recorded cost",tone:green},{id:"soon",view:"soon",label:"Needed soon",value:soon,detail:"20 days / projects",tone:soon?amber:neutral},{id:"review",view:"review",label:"Unmatched",value:review,detail:"Project requirements",tone:review?amber:neutral},{id:"orders",view:"orders",label:"On order",value:orders,detail:"Purchase orders",tone:orders?"border-violet-500/30 bg-violet-500/5 text-violet-300":neutral}];
+					},
+					get inventoryViewTitle(){return ({stock:"Parts inventory",tools:"Owned tools",value:"Stock by value",soon:"Needed soon",review:"Unmatched project requirements",orders:"Open purchase orders",history:"Stock movement history"})[this.inventoryView]||"Parts inventory";},
+					get inventoryCommandNext(){
+						if(this.inventoryProjectReview.length)return {view:"review",title:"Review outstanding project supplies",detail:this.inventoryProjectReview.length+" unmatched requirements"};
+						if(this.lowInventoryCount)return {view:"soon",title:"Review upcoming stock needs",detail:this.lowInventoryCount+" low-stock items with demand"};
+						if(this.inventoryOpenOrders.length)return {view:"orders",title:"Check incoming orders",detail:this.inventoryOpenOrders.length+" open orders"};
+						return null;
+					},
 					inventoryDemandAlerts() {
 						const inventory=this.inventory||[],vehicles=this.vehicles||[],projects=this.projects||[],plans=this.maintenancePlans||[];
 						const norm=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
@@ -4646,7 +4615,7 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						if(this.inventoryReservedCount(id)>0||this.inventoryHasActiveLinks(id)){alert("This part is reserved or linked to an active project. Release the requirement before deleting.");return;}
 						if(!confirm("Delete this inventory item?"))return;
 						const prior=this.inventory;this.inventorySaving=true;this.inventory=prior.filter(i=>String(i.id)!==String(id));
-						try{if(!await this.saveToStorage("Inventory item removed",{itemId:id}))throw Error("Inventory item could not be deleted.");}
+						try{if(!await this.saveToStorage("Inventory item removed",{itemId:id}))throw Error("Inventory item could not be deleted.");if(String(this.editingInventoryId)===String(id)){this.editingInventoryId=null;this.modals.newPart=false;}}
 						catch(e){this.inventory=prior;alert(e.message);}
 						finally{this.inventorySaving=false;}
 					},

@@ -89,9 +89,40 @@ function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],pred
    if(remaining<=0)break;
   }
   const {r:ignored,orders:ignoredOrders,...meta}=d;
-  rows.push({...meta,partNumber:r.partNumber||"",unit:r.unit||"recorded unit",reserved,onHand,incoming,received,shortage:Math.max(0,remaining),allocations,needsReview:!!d.estimated||r.relationship==="candidate"||!candidates.length,reason:remaining>0?"Uncovered requirement":incoming||received?"Awaiting delivery or stock entry":"Stock match — confirm fitment"});
+  rows.push({...meta,partNumber:r.partNumber||"",unit:r.unit||"recorded unit",requirementId:r.id??null,inventoryId:r.inventoryId??null,relationship:r.relationship||null,reserved,onHand,incoming,received,shortage:Math.max(0,remaining),allocations,needsReview:!!d.estimated||r.relationship==="candidate"||!candidates.length,reason:remaining>0?"Uncovered requirement":incoming||received?"Awaiting delivery or stock entry":"Stock match — confirm fitment"});
  }
  return {rows,reviews,shortages:rows.filter(r=>r.shortage>0),covered:rows.filter(r=>r.shortage===0),horizon};
 }
-const api={forecast};root.MotorNoteDemandEngine=api;if(typeof module!=="undefined")module.exports=api;
+function shoppingList(result={rows:[],reviews:[]},vehicles=[]){
+ const groups=new Map();
+ for(const row of result.rows||[]){
+  const qty=positive(row.shortage);if(!qty)continue;
+  const pn=String(row.partNumber||"").trim(),unit=String(row.unit||"recorded unit").trim();
+  // Only consolidate identified parts within the same vehicle and unit.
+  // Unknown part numbers and unknown vehicles stay separate unless linked to the same stock ID.
+  const identity=row.vehicleId!=null&&pn?["number",String(row.vehicleId),norm(pn),unit.toLowerCase()]:row.vehicleId!=null&&row.inventoryId!=null?["stock",String(row.vehicleId),String(row.inventoryId),unit.toLowerCase()]:["requirement",row.key];
+  const key=JSON.stringify(identity);
+  let group=groups.get(key);
+  if(!group){
+   group={key,name:row.name,partNumber:pn,unit,vehicleId:row.vehicleId,vehicleName:vehicles.find(v=>same(v.id,row.vehicleId))?.name||"Vehicle not recorded",quantity:0,required:0,stock:0,incoming:0,received:0,days:Infinity,needsReview:false,sources:[]};
+   groups.set(key,group);
+  }
+  group.quantity+=qty;group.required+=positive(row.quantity);group.stock+=positive(row.onHand)+positive(row.reserved);group.incoming+=positive(row.incoming);group.received+=positive(row.received);group.days=Math.min(group.days,Number.isFinite(row.days)?row.days:Infinity);
+  group.needsReview=group.needsReview||!!row.needsReview||!pn||unit==="recorded unit";
+  group.sources.push({key:row.key,name:row.name,source:row.source,kind:row.kind,projectId:row.projectId??null,planId:row.planId??null,requirementId:row.requirementId??null,quantity:qty,days:row.days});
+ }
+ const items=[...groups.values()].sort((a,b)=>a.days-b.days||a.vehicleName.localeCompare(b.vehicleName)||a.name.localeCompare(b.name));
+ return {items,reviews:(result.reviews||[]).slice(),horizon:result.horizon??20};
+}
+function shoppingText(list){
+ const lines=["MotorNote — shopping list ("+list.horizon+" days + active projects)"];
+ for(const item of list.items||[]){
+  lines.push("- "+item.quantity+" "+item.unit+" — "+item.name+(item.partNumber?" ["+item.partNumber+"]":"")+" — "+item.vehicleName+(item.needsReview?" (verify fitment/quantity)":""));
+  for(const src of item.sources)lines.push("  "+src.source+": "+src.quantity);
+ }
+ if(!list.items?.length)lines.push("No uncovered quantified requirements.");
+ if(list.reviews?.length){lines.push("","Confirm before buying:");for(const r of list.reviews)lines.push("- "+r.name+" — "+r.source+": "+r.reason);}
+ return lines.join("\n");
+}
+const api={forecast,shoppingList,shoppingText};root.MotorNoteDemandEngine=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

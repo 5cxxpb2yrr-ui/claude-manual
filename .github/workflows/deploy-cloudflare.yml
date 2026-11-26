@@ -7,13 +7,14 @@ on:
   push:
     branches:
       - main
+      - preview/repair-cart-scion-dedupe-20261125
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: claude-manual-production
+  group: claude-manual-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -58,3 +59,26 @@ jobs:
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
           npx --yes wrangler@4 deploy --config wrangler.jsonc
+
+  deploy-preview:
+    name: Deploy isolated preview Worker
+    needs: validate
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Deploy preview Worker, static assets, and read-only manual corpus binding
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
+          npx --yes wrangler@4 deploy --config wrangler.jsonc --name claude-manual-preview

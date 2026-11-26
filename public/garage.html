@@ -1144,14 +1144,14 @@
 									<div class="min-w-0 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
 										<div class="text-xs font-bold text-emerald-300 break-words" x-text="tool.name"></div>
 										<p class="text-[10px] text-zinc-400 break-words" x-text="tool.notes"></p>
-										<button type="button" @click="removeOwnedTool(tool.id)" :disabled="toolInventoryBusy" class="text-[10px] text-zinc-400 mt-1 underline">Remove</button>
+										<button type="button" @click="editOwnedTool(tool)" :disabled="toolInventoryBusy" class="text-xs text-amber-300 mt-2 mr-3 underline">Edit</button><button type="button" @click="removeOwnedTool(tool.id)" :disabled="toolInventoryBusy" class="text-[10px] text-zinc-400 mt-1 underline">Remove</button>
 									</div>
 								</template>
 							</div>
 							<p x-show="!toolInventory.length" class="text-xs text-zinc-400">Record the tools you own so repair plans can suggest matching equipment.</p>
 							<input x-model="toolDraftName" placeholder="Tool name (e.g. torque wrench)" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-sm text-white">
 							<input x-model="toolDraftNotes" placeholder="Size, range, condition (optional)" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white">
-							<button type="button" @click="addOwnedTool(toolDraftName,toolDraftNotes)" :disabled="toolInventoryBusy||!toolDraftName.trim()" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2 disabled:opacity-40">Add owned tool</button>
+							<button type="button" @click="saveOwnedTool()" :disabled="toolInventoryBusy||!toolDraftName.trim()" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2 disabled:opacity-40" x-text="toolEditId!==null?'Save tool changes':'Add owned tool'"></button><button type="button" x-show="toolEditId!==null" @click="cancelToolEdit()" :disabled="toolInventoryBusy" class="w-full text-xs text-zinc-400 py-2">Cancel edit</button>
 							<p x-show="toolInventoryError" x-text="toolInventoryError" class="text-xs text-rose-300"></p>
 						</div>
 					</details>
@@ -1175,12 +1175,7 @@
 									<div>Unit Cost: <span class="text-emerald-400" x-text="String.fromCharCode(36) + item.unitCost.toFixed(2)"></span></div>
 								</div>
 								<div class="text-[11px] text-zinc-400">Fits: <span class="text-zinc-300" x-text="item.vehicleCompatibility"></span></div>
-								<button
-									@click="deleteInventoryItem(item.id)"
-									class="w-full text-center text-rose-400 active:text-rose-300 font-bold text-xs py-2 border-t border-zinc-800 mt-1"
-								>
-									Delete
-								</button>
+								<div class="flex gap-3 justify-end"><button type="button" @click="openEditPartModal(item)" class="text-amber-300 font-bold text-xs py-2 px-2">Edit</button><button type="button" @click="deleteInventoryItem(item.id)" :disabled="inventorySaving" class="text-rose-400 font-bold text-xs py-2 px-2">Delete</button></div>
 							</div>
 						</template>
 						<div x-show="!inventory.length" class="glass-panel p-6 text-center text-xs text-zinc-500">
@@ -1240,12 +1235,7 @@
 											x-text="item.vehicleCompatibility"
 										></td>
 										<td class="py-3 text-right">
-											<button
-												@click="deleteInventoryItem(item.id)"
-												class="text-rose-400 hover:text-rose-300 font-bold px-2 py-1"
-											>
-												Delete
-											</button>
+											<div class="flex gap-3 justify-end"><button type="button" @click="openEditPartModal(item)" class="text-amber-300 font-bold text-xs py-2 px-2">Edit</button><button type="button" @click="deleteInventoryItem(item.id)" :disabled="inventorySaving" class="text-rose-400 font-bold text-xs py-2 px-2">Delete</button></div>
 										</td>
 									</tr>
 								</template>
@@ -2562,12 +2552,10 @@
 				x-transition.opacity
 			>
 				<div
-					class="w-full max-w-md bg-zinc-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl space-y-4"
-					@click.away="modals.newPart = false"
+					class="w-full max-w-md max-h-[90vh] overflow-y-auto bg-zinc-900 border border-amber-500/30 rounded-2xl p-6 shadow-2xl space-y-4"
+					@click.away="if(!inventorySaving)modals.newPart = false"
 				>
-					<h3 class="text-base font-bold text-white">
-						Add Parts Inventory Item
-					</h3>
+					<div class="flex justify-between items-center"><h3 class="text-base font-bold text-white" x-text="editingInventoryId!==null?'Edit inventory part':'Add inventory part'"></h3><button type="button" @click="modals.newPart=false" :disabled="inventorySaving" class="text-zinc-400 p-2">✕</button></div>
 					<div class="space-y-3 text-xs">
 						<div class="grid grid-cols-2 gap-2">
 							<div>
@@ -2608,7 +2596,7 @@
 								>
 								<input
 									type="number"
-									x-model.number="newPartForm.quantity"
+									min="0" step="1" inputmode="numeric" x-model.number="newPartForm.quantity"
 									class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-white font-mono"
 								/>
 							</div>
@@ -2619,16 +2607,18 @@
 								<input
 									type="number"
 									step="0.01"
-									x-model.number="newPartForm.unitCost"
+									min="0" inputmode="decimal" x-model.number="newPartForm.unitCost"
 									class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-white font-mono"
 								/>
 							</div>
 						</div>
-						<button
-							@click="saveNewPart()"
+						<label class="block text-zinc-400">Vehicle compatibility<select x-model="newPartForm.vehicleCompatibility" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-xl p-2 text-white"><option value="">Not verified</option><option value="Universal">Universal</option><template x-for="name in inventoryCompatibilityOptions()" :key="name"><option :value="name" x-text="name"></option></template></select></label>
+						<p x-show="editingInventoryId!==null" class="text-xs text-zinc-400" x-text="'Reserved: '+inventoryReservedCount(editingInventoryId)+' · Available after edit: '+Math.max(0,Number(newPartForm.quantity||0)-inventoryReservedCount(editingInventoryId))"></p>
+						<p x-show="inventoryError" x-text="inventoryError" class="text-xs text-rose-300"></p>
+						<button type="button" :disabled="inventorySaving" @click="saveNewPart()"
 							class="w-full py-3 bg-amber-500 text-zinc-950 font-bold rounded-xl shadow-lg shadow-amber-500/20"
 						>
-							Save Inventory Part
+							Save inventory part
 						</button>
 					</div>
 				</div>
@@ -3163,7 +3153,7 @@
 					archivedMaintenance: [],
 					maintenanceSetupVersion: 0,
 
-					toolInventory: [], toolDraftName:"",toolDraftNotes:"",toolInventoryBusy:false,toolInventoryError:"",
+					toolInventory: [], toolDraftName:"",toolDraftNotes:"",toolEditId:null,toolInventoryBusy:false,toolInventoryError:"",
 					inventory: [
 						{ id: 301, partNumber: '90915-YZZF2', description: 'Toyota OEM Oil Filter', vendor: 'Toyota Direct', quantity: 4, unitCost: 6.50, purchaseDate: '2026-01-10', vehicleCompatibility: '2006 Scion xB' },
 						{ id: 302, partNumber: '15208AA15A', description: 'Subaru OEM Oil Filter', vendor: 'Subaru Parts Direct', quantity: 1, unitCost: 8.20, purchaseDate: '2026-02-05', vehicleCompatibility: '2019 Subaru Crosstrek' }
@@ -3390,7 +3380,7 @@
 					editRepairForm: { id: null, vehicle: '', mileage: 0, date: '', serviceType: '', cost: 0, notes: '', attachments: [] },
 					newRepairForm: { vehicle: '2006 Scion xB', mileage: 212000, date: new Date().toISOString().split('T')[0], serviceTitle: '', category: 'Scheduled Maintenance', cost: 0, notes: '', procedureReference: null },
 					newProjectForm: { title: '', budget: 200, priority: 'Medium', dueDate: '', description: '', category: 'General' },
-					newPartForm: { partNumber: '', vendor: '', description: '', quantity: 1, unitCost: 10.00 },
+					editingInventoryId:null,inventorySaving:false,inventoryError:"",newPartForm: { partNumber: '', vendor: '', description: '', quantity: 1, unitCost: 10.00 },
 					maintenancePlanForm: { scheduleId: '', vehicleId: '', title: '', priority: 'Medium', targetMileage: 0, targetDate: '', estimatedMin: 0, estimatedMax: 0, notes: '', parts: [] },
 					selectedMaintenancePlan: null,
 					completeMaintenanceForm: { mileage: 0, date: '', partsCost: 0, labor: 0, other: 0, notes: '' },
@@ -3614,6 +3604,21 @@
 							// No upstream/downstream guesses or automatic compatibility claims.
 							return (pn&&num===pn)||(key&&desc===key)||(req?.inventoryId!=null&&String(req.inventoryId)===String(p.id));
 						}).map(p=>({id:p.id,name:p.description,partNumber:p.partNumber,available:Math.max(0,Number(p.quantity||0)-Number(p.reservedQuantity||0))+(req?.reserved&&String(req.inventoryId)===String(p.id)?Number(req.quantity||0):0)}));
+					},
+					editOwnedTool(tool) {this.toolEditId=tool.id;this.toolDraftName=tool.name;this.toolDraftNotes=tool.notes||"";this.toolInventoryError="";},
+					cancelToolEdit() {this.toolEditId=null;this.toolDraftName="";this.toolDraftNotes="";this.toolInventoryError="";},
+					async saveOwnedTool() {
+						if(this.toolEditId===null)return this.addOwnedTool(this.toolDraftName,this.toolDraftNotes);
+						if(this.toolInventoryBusy)return false;
+						const id=this.toolEditId,name=String(this.toolDraftName||"").trim(),notes=String(this.toolDraftNotes||"").trim();
+						if(!name){this.toolInventoryError="Enter a tool name.";return false;}
+						if(!(this.toolInventory||[]).some(t=>String(t.id)===String(id))){this.toolInventoryError="Tool no longer exists.";return false;}
+						if(this.toolInventory.some(t=>String(t.id)!==String(id)&&this.inventoryMatchKey(t.name)===this.inventoryMatchKey(name))){this.toolInventoryError="Tool already recorded.";return false;}
+						const prior=this.toolInventory;this.toolInventoryBusy=true;this.toolInventoryError="";
+						this.toolInventory=prior.map(t=>String(t.id)===String(id)?{...t,name,notes}:t);
+						try{if(!await this.saveToStorage())throw Error("Tool changes could not be saved.");this.cancelToolEdit();return true;}
+						catch(e){this.toolInventory=prior;this.toolInventoryError=e.message;return false;}
+						finally{this.toolInventoryBusy=false;}
 					},
 					async addOwnedTool(name,notes="") {
 						name=String(name||"").trim();if(!name||this.toolInventoryBusy)return false;
@@ -4555,28 +4560,42 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 						this.modals.projectDetail = false;
 					},
 
+					inventoryCompatibilityOptions() {return [...new Set([...(this.vehicles||[]).map(v=>v.name),this.newPartForm.vehicleCompatibility].filter(n=>n&&n!=="Universal"))];},
+					inventoryReservedCount(id) {const item=(this.inventory||[]).find(p=>String(p.id)===String(id));return Math.max(0,Number(item?.reservedQuantity)||0);},
+					inventoryHasActiveLinks(id) {return (this.projects||[]).some(p=>!["Completed","Cancelled"].includes(p.status)&&(p.partRequirements||[]).some(req=>String(req.inventoryId)===String(id)&&req.status!=="Used"));},
 					openNewPartModal() {
-						this.modals.newPart = true;
+						this.editingInventoryId=null;this.inventoryError="";
+						this.newPartForm={partNumber:"",vendor:"",description:"",quantity:1,unitCost:0,vehicleCompatibility:this.activeVehicle?.name||""};this.modals.newPart=true;
 					},
-
-					saveNewPart() {
-						const part = {
-							id: Date.now(),
-							partNumber: this.newPartForm.partNumber || 'PART-001',
-							vendor: this.newPartForm.vendor || 'Generic',
-							description: this.newPartForm.description || 'Replacement Part',
-							quantity: Number(this.newPartForm.quantity) || 1,
-							unitCost: Number(this.newPartForm.unitCost) || 0,
-							vehicleCompatibility: this.activeVehicle.name
-						};
-						this.inventory.push(part);
-						this.saveToStorage();
-						this.modals.newPart = false;
+					openEditPartModal(item) {
+						if(this.inventorySaving)return;
+						this.editingInventoryId=item.id;this.inventoryError="";
+						this.newPartForm={partNumber:item.partNumber||"",vendor:item.vendor||"",description:item.description||"",quantity:Number(item.quantity||0),unitCost:Number(item.unitCost||0),vehicleCompatibility:item.vehicleCompatibility||""};this.modals.newPart=true;
 					},
-
-					deleteInventoryItem(id) {
-						this.inventory = this.inventory.filter(i => i.id !== id);
-						this.saveToStorage();
+					async saveNewPart() {
+						if(this.inventorySaving)return false;
+						const f=this.newPartForm,id=this.editingInventoryId,existing=id!==null?this.inventory.find(p=>String(p.id)===String(id)):null;
+						const description=String(f.description||"").trim(),quantity=Number(f.quantity),unitCost=Number(f.unitCost),partNumber=String(f.partNumber||"").trim(),vehicleCompatibility=String(f.vehicleCompatibility||"");
+						this.inventoryError="";
+						if(id!==null&&!existing){this.inventoryError="Part no longer exists.";return false;}
+						if(!description||f.quantity===""||f.unitCost===""||!Number.isInteger(quantity)||quantity<0||!Number.isFinite(unitCost)||unitCost<0){this.inventoryError="Enter a description, whole nonnegative quantity and valid cost.";return false;}
+						if(existing&&quantity<this.inventoryReservedCount(id)){this.inventoryError="Quantity cannot be lower than reserved stock.";return false;}
+						if(existing&&(this.inventoryReservedCount(id)>0||this.inventoryHasActiveLinks(id))&&(partNumber!==(existing.partNumber||"")||vehicleCompatibility!==(existing.vehicleCompatibility||"")||description!==(existing.description||""))){this.inventoryError="Part identity and fitment are linked to a project. Release the active requirement before changing them.";return false;}
+						const record={...(existing||{id:"part-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),reservedQuantity:0}),description,partNumber,vendor:String(f.vendor||"").trim(),quantity,unitCost,vehicleCompatibility};
+						const prior=this.inventory;this.inventorySaving=true;
+						this.inventory=existing?prior.map(p=>String(p.id)===String(id)?record:p):[...prior,record];
+						try{if(!await this.saveToStorage())throw Error("Inventory changes could not be saved.");this.modals.newPart=false;this.editingInventoryId=null;return true;}
+						catch(e){this.inventory=prior;this.inventoryError=e.message;return false;}
+						finally{this.inventorySaving=false;}
+					},
+					async deleteInventoryItem(id) {
+						if(this.inventorySaving)return;
+						if(this.inventoryReservedCount(id)>0||this.inventoryHasActiveLinks(id)){alert("This part is reserved or linked to an active project. Release the requirement before deleting.");return;}
+						if(!confirm("Delete this inventory item?"))return;
+						const prior=this.inventory;this.inventorySaving=true;this.inventory=prior.filter(i=>String(i.id)!==String(id));
+						try{if(!await this.saveToStorage())throw Error("Inventory item could not be deleted.");}
+						catch(e){this.inventory=prior;alert(e.message);}
+						finally{this.inventorySaving=false;}
 					},
 
 					handleFileUpload(event) {

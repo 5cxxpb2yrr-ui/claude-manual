@@ -2846,7 +2846,19 @@
 						</div>
 						<div x-show="selectedProject.maintenancePlanId" class="text-amber-400"><strong>Maintenance:</strong> Linked</div>
 						<button x-show="!selectedProject.maintenancePlanId" @click="linkProjectToMaintenance(selectedProject)" class="w-full py-2 bg-amber-500/10 text-amber-400 font-bold rounded-xl border border-amber-500/30">🔧 Link to Maintenance Workflow</button>
-						<div class="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2"><div class="flex items-center justify-between gap-2"><strong class="text-zinc-300">Manual & repair cart</strong><a :href="manualProjectLink(selectedProject)" class="text-amber-400 font-bold">Open in Manual Explorer ↗</a></div><template x-for="cart in repairCartsForProject(selectedProject)" :key="cart.cartKey"><a :href="repairCartManualLink(cart)" class="block rounded-lg border border-zinc-800 p-2 hover:border-amber-500/50"><span class="block text-white font-semibold" x-text="cart.procedure || 'Saved procedure'"></span><span class="block text-[10px] text-zinc-400" x-text="(cart.items || []).length + ' parts · ' + (cart.tools || []).length + ' tools · ' + (cart.torqueSpecs || []).length + ' torque groups'"></span></a></template><div x-show="!repairCartsForProject(selectedProject).length" class="text-[11px] text-zinc-500">No manual procedure carts linked yet. Open a procedure in Manual Explorer, choose this project, and save the cart.</div></div>
+						<div class="rounded-xl border border-amber-500/30 bg-zinc-950 p-3 space-y-3">
+							<div class="flex items-center justify-between gap-2"><strong class="text-amber-300">Guided Repair</strong><a :href="manualProjectLink(selectedProject)" class="text-amber-400 text-xs font-bold">Browse manual ↗</a></div>
+							<template x-for="entry in guidedRepairEntries(selectedProject)" :key="entry.route">
+								<div class="rounded-lg border border-zinc-800 p-3 space-y-2">
+									<div class="font-semibold text-white" x-text="entry.title"></div>
+									<div class="text-[11px] text-zinc-400" x-show="entry.execution" x-text="guidedRepairProgress(entry)"></div>
+									<a :href="guidedRepairLink(entry,selectedProject)" class="block w-full text-center rounded-xl bg-amber-500 py-3 font-black text-zinc-950" x-text="entry.execution?.status === 'in-progress' ? 'Resume guided repair →' : entry.execution?.status === 'completed' ? 'Review guided repair →' : 'Start guided repair →'"></a>
+									<a :href="repairCartManualLink(entry)" class="block text-xs text-amber-300 underline">Open manual / repair cart</a>
+								</div>
+							</template>
+							<div x-show="!guidedRepairEntries(selectedProject).length" class="text-xs text-zinc-400">Attach a supported factory procedure or link a repair cart to this project to start guided repair.</div>
+							<template x-for="cart in repairCartsForProject(selectedProject).filter(c=>!guidedRepairRoute(c))" :key="cart.cartKey"><a :href="repairCartManualLink(cart)" class="block text-xs text-amber-300 underline" x-text="cart.procedure || 'Saved procedure'"></a></template>
+						</div>
 						<div x-show="selectedProject.partRequirements && selectedProject.partRequirements.length" class="pt-2">
 							<strong class="text-zinc-400">Parts:</strong>
 							<template x-for="part in (selectedProject.partRequirements || [])" :key="part.id">
@@ -3613,6 +3625,17 @@
 					manualProjectLink(project) { const v=this.vehicles.find(item=>String(item.id)===String(project?.vehicleId)); const info=v&&this.manualLibrary.vehicles[v.id]; return info?this.manualLink('/veh/'+info.idx+'/rep'):this.manualLink('/'); },
 					repairCartManualLink(cart) { return this.manualLibrary.base+'/manuals.html'+this.manualBackParam()+(String(cart?.route||'').startsWith('#')?cart.route:'#'+String(cart?.route||'/')); },
 					repairCartsForProject(project) { return this.repairCartLinks.filter(cart=>String(cart.projectId)===String(project?.id)); },
+					guidedRepairRoute(entry) { const route=String(entry?.route||entry?.sourcePath||'').replace(/^#/,''); return /^\/v\/\d+\/\d+\/\d+$/.test(route)?'#'+route:''; },
+					guidedRepairEntries(project) {
+						const entries=new Map(),info=this.manualLibrary.vehicles[project?.vehicleId];
+						if(!info)return [];
+						const add=entry=>{const route=this.guidedRepairRoute(entry);if(!route||Number(route.split('/')[2])!==info.idx||entries.has(route))return;entries.set(route,{...entry,route,title:entry.procedure||entry.title||'Factory repair procedure'});};
+						this.repairCartsForProject(project).forEach(add);
+						(project?.procedures||[]).forEach(add);
+						return [...entries.values()];
+					},
+					guidedRepairLink(entry,project) { const route=this.guidedRepairRoute(entry);if(!route||!project?.id)return this.manualProjectLink(project);const params=new URLSearchParams({guided:'1',projectId:String(project.id)});if(/^https?:$/.test(location.protocol))params.set('back',location.origin+location.pathname);return this.manualLibrary.base+'/manuals.html?'+params.toString()+route; },
+					guidedRepairProgress(entry) { const steps=entry.execution?.steps||[];return steps.filter(s=>s.status==='done').length+' of '+steps.length+' steps complete'; },
 					refreshRepairCartLinks() { try { const saved=JSON.parse(localStorage.getItem('lifeos.repair.carts.v1')||'{}'); this.repairCartLinks=Object.entries(saved).map(([cartKey,cart])=>({...cart,cartKey})).filter(cart=>cart&&cart.projectId); } catch { this.repairCartLinks=[]; } },
 					publishRepairProjectIndex() { try { localStorage.setItem('lifeos.repair.projects.v1',JSON.stringify((this.projects||[]).map(project=>({id:project.id,vehicleId:project.vehicleId,title:project.title,status:project.status,category:project.category,createdAt:project.createdAt,updatedAt:project.updatedAt})))); } catch(error) { console.warn('Repair project index could not be published',error); } },
 

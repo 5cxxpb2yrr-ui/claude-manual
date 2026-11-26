@@ -231,16 +231,11 @@ function findScionSiblingSpecificationPages(tree,pageId){
  if(!targetPath)return [];
  let component="";
  for(let i=targetPath.length-1;i>=0;i--){
-  const name=String(targetPath[i].n||"");
-  const match=/^(.+?):\s*(?:testing and inspection|service and repair|removal and installation|disassembly and reassembly|specifications)$/i.exec(name);
-  if(match){component=match[1].trim();break;}
- }
- if(!component){
-  for(let i=targetPath.length-1;i>=0;i--){
-   const name=String(targetPath[i].n||"").trim();
-   if(name&&!/^(additional pages|part \d+)/i.test(name)&&!/(testing and inspection|service and repair|removal and installation|disassembly and reassembly)$/i.test(name)){
-    component=name;break;
-   }
+  const name=String(targetPath[i].n||"").trim();
+  const head=name.split(":")[0].trim();
+  const candidate=head.replace(/\b(?:assembly|unit|subassembly|remove|replace|install|overhaul|testing|inspection|service|repair|specifications)\b/gi," ").replace(/\s+/g," ").trim();
+  if(candidate&&!/^(additional pages|part \d+|other variant|electrical|charging system)$/i.test(candidate)){
+   component=candidate;break;
   }
  }
  if(!component)return [];
@@ -274,10 +269,18 @@ async function findScionSiblingSpecificationLinks(pageUrl){
  const match=/\/pages\/(\d+)\.html$/i.exec(pageUrl.pathname);
  if(!match)return [];
  try{
-  const response=await fetch("/api/navigation/scion-repair.json",{credentials:"same-origin",cache:"no-store"});
-  if(!response.ok)return [];
-  const tree=await response.json();
-  return findScionSiblingSpecificationPages(tree,match[1]).map(page=>{
+  const routeMatch=/^#\/v\/\d+\/(\d+)\//.exec(location.hash||"");
+  const preferred=routeMatch&&Number(routeMatch[1])===1
+   ?["scion-parts.json","scion-repair.json"]
+   :["scion-repair.json","scion-parts.json"];
+  const trees=await Promise.all(preferred.map(async filename=>{
+   try{
+    const response=await fetch("/api/navigation/"+filename,{credentials:"same-origin",cache:"no-store"});
+    return response.ok?await response.json():null;
+   }catch(_){return null;}
+  }));
+  const combined={c:trees.filter(Boolean)};
+  return findScionSiblingSpecificationPages(combined,match[1]).map(page=>{
    const url=new URL(pageUrl.href);url.pathname=url.pathname.replace(/\/pages\/\d+\.html$/i,"/pages/"+page.page+".html");
    return {...page,url:url.href};
   });

@@ -12,9 +12,10 @@ function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],pred
  const liveProjects=projects.filter(active),livePlans=maintenancePlans.filter(active);
  const byVehicle=id=>vehicles.find(v=>same(v.id,id));
  const linked=p=>liveProjects.find(x=>same(x.id,p.projectId)||same(x.maintenancePlanId,p.id));
+ const canonicalProject=p=>!!(linked(p)?.partRequirements||[]).length;
  // Old standalone maintenance reservations do not update reservedQuantity. Protect them before allocating.
  for(const plan of livePlans){
-  if(linked(plan))continue;
+  if(canonicalProject(plan))continue;
   for(const r of plan.parts||[])if(r.reserved&&!terminal(r)){
    const s=stock.find(s=>same(s.p.id,r.inventoryId));if(s){const n=Math.min(s.free,positive(r.quantity));s.free-=n;s.legacy+=n;}
   }
@@ -28,7 +29,7 @@ function forecast({inventory=[],vehicles=[],projects=[],maintenancePlans=[],pred
  }
  for(const p of liveProjects)for(const [i,r] of (p.partRequirements||[]).entries())add(r,{key:"project:"+p.id+":"+(r.id??i),kind:"project",source:p.title||"Project",projectId:p.id,vehicleId:p.vehicleId,days:0,orders:p.purchaseOrders||[]});
  for(const plan of livePlans){
-  if(linked(plan))continue; // project is the canonical source for linked work
+  if(canonicalProject(plan))continue; // project is the canonical source for linked work
   const pred=predictions.find(x=>same(x.vehicleId,plan.vehicleId)&&same(x.id,plan.scheduleId));
   const days=plan.status==="In Progress"?0:Math.min(day(plan.targetDate,now)??Infinity,pred?.status==="Red"?0:pred?.remainingDays??Infinity);
   if(days>horizon)continue;

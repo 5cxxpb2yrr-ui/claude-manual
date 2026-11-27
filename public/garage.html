@@ -324,7 +324,15 @@
 					x-transition.opacity
 					class="space-y-6"
 				>
-					<!-- Active Vehicle Snapshot: compact summary, expanded health tiles -->
+					<template x-if="currentTab==='dashboard'"><div class="space-y-3"><template x-for="mission in [garageMission]" :key="'garage-mission'"><section class="space-y-3">
+ <div class="text-[10px] uppercase tracking-wider font-extrabold text-amber-400">Garage Mission Control · All vehicles</div>
+ <template x-if="mission.next"><button type="button" @click="openGarageMission(mission.next)" class="glass-panel w-full text-left px-4 py-3 border-amber-500/60 flex items-center justify-between gap-3"><span class="min-w-0"><span class="block text-[10px] font-black uppercase tracking-wide text-amber-300">Next best action</span><span class="block font-bold text-white mt-1" x-text="mission.next.title"></span><span class="block text-xs text-zinc-400 mt-1" x-text="mission.next.detail"></span></span><span class="text-amber-300 shrink-0">→</span></button></template>
+ <template x-if="!mission.next"><div class="glass-panel p-3"><p class="text-[10px] font-bold uppercase text-amber-300">Next best action</p><p class="text-sm" x-text="mission.incomplete?'Some data unavailable':'No actionable items in the current records'"></p><p class="text-xs text-zinc-400">This is a record-based review, not a mechanical safety assessment.</p></div></template>
+ <p x-show="mission.incomplete" class="text-xs text-amber-300">Some source data could not be evaluated. Review the listed data issues.</p>
+ <template x-for="group in mission.groups" :key="group.name"><details class="glass-panel px-3 py-2"><summary class="flex items-center justify-between gap-2 cursor-pointer min-h-9 text-xs font-bold"><span x-text="group.name"></span><span class="rounded bg-zinc-950 border border-zinc-800 px-2 py-1 text-amber-300" x-text="group.rows.length"></span></summary><div class="border-t border-zinc-800 pt-1"><template x-for="item in group.rows" :key="item.id"><button type="button" @click="openGarageMission(item)" class="w-full text-left flex items-center justify-between gap-2 border-b border-zinc-800 py-2 last:border-0"><span class="min-w-0"><span class="block text-xs font-bold text-white" x-text="item.title"></span><span class="block text-[11px] text-zinc-400" x-text="item.detail"></span></span><span class="text-amber-300 shrink-0">→</span></button></template><p x-show="!group.rows.length" class="text-xs text-zinc-400 py-2">No recorded items.</p></div></details></template>
+ </section></template></div></template>
+ <details class="space-y-3"><summary class="text-xs font-bold text-zinc-400 cursor-pointer py-2">Active vehicle snapshot & recent activity</summary>
+ <!-- Active Vehicle Snapshot: compact summary, expanded health tiles -->
 					<details class="glass-panel px-3 py-2 group">
 						<summary class="cursor-pointer list-none [&::-webkit-details-marker]:hidden flex items-center justify-between gap-2 min-h-11">
 							<div class="min-w-0 flex-1">
@@ -538,6 +546,7 @@
 							</div>
 						</div>
 					</div>
+ </details>
 				</div>
 
 				<!-- 2. ADVANCED ANALYTICS DASHBOARD TAB -->
@@ -3082,6 +3091,7 @@
 		<script src="/repair-planner.js"></script>
 		<script src="/inventory-engine.js"></script>
 <script src="/repair-history.js"></script>
+<script src="/garage-mission.js"></script>
 		<script src="/inventory-demand.js"></script>
 		<script src="/inventory-purchasing.js"></script>
 <script src="/inventory-capture.js"></script>
@@ -3980,7 +3990,29 @@
 						window.open(this.manualLibrary.base + '/manuals.html' + back + vehicleParam + '#/search' + (t ? '/' + encodeURIComponent(t) : ''), '_blank', 'noopener');
 					},
 
-					get vehicleLogs() {
+					get garageMission(){
+ const errors=[],safe=(section,fn,fallback)=>{try{return fn();}catch(err){errors.push({section});return fallback;}},vehicles=this.vehicles||[],name=id=>vehicles.find(v=>String(v.id)===String(id))?.name||"Vehicle not recorded";
+ const predictions=safe("maintenance schedules",()=>vehicles.flatMap(v=>this.predictiveForVehicle(v).map(p=>({...p,vehicleId:v.id,vehicleName:v.name}))),[]);
+ const projects=safe("repair readiness",()=>(this.projects||[]).filter(p=>!/^(completed|cancelled|canceled|archived)$/i.test(p.status||"")).map(p=>{
+  const readiness=p.repairPlan?this.projectReadiness(p):null;
+  return {id:p.id,title:p.title||"Untitled project",vehicleName:name(p.vehicleId),status:p.status,dueDate:p.dueDate,readiness,readinessCompleted:this.projectGuidedPhaseDone(p,"readiness"),findings:this.guidedOpenFindings(p).length,timerRunning:!!p.guidedExecution?.timerStartedAt,unavailableTools:(readiness?.items||[]).filter(i=>i.kind==="tool"&&!i.inventoryMatch&&!i.done).length,next:this.projectNextAction(p)};
+ }),[]);
+ const orders=safe("purchase orders",()=>[
+  ...this.inventoryOpenOrders.map(({key,order,project})=>({...order,key:"project:"+key,vehicleName:name(project.vehicleId),target:{tab:"projects",projectId:project.id}})),
+  ...(this.vendorOrders||[]).filter(o=>["Ordered","Partially received"].includes(o.status)).map(o=>({...o,key:"vendor:"+o.id,target:{tab:"inventory",view:"orders"}}))
+ ],[]);
+ const forecast=safe("inventory demand",()=>this.inventoryForecast(20),null),storage=safe("storage and reorder",()=>this.inventoryStorage,null),integrity=safe("inventory integrity",()=>this.inventoryIntegrity,null);
+ const history=safe("repair history",()=>vehicles.map(v=>({vehicleId:v.id,vehicleName:v.name,repeatCount:window.MotorNoteHistory.history({logs:this.logs||[],vehicle:v,vehicles}).repeat.length})),[]);
+ return window.MotorNoteMission.build({today:this.toolToday(),predictions,projects,orders,forecast,storage,integrity,history,tools:this.toolInventory||[],saveError:this.saveState==="error",errors});
+ },
+ openGarageMission(item){
+ const target=item?.target;if(!target)return;
+ if(target.vehicleId!=null&&this.vehicles.some(v=>String(v.id)===String(target.vehicleId)))this.activeVehicleId=this.vehicles.find(v=>String(v.id)===String(target.vehicleId)).id;
+ if(target.tab==="inventory"&&target.view){this.inventoryView=target.view;if(target.view==="shopping")this.inventoryForecastHorizon=20;}
+ this.currentTab=target.tab;
+ if(target.projectId!=null){const project=(this.projects||[]).find(p=>String(p.id)===String(target.projectId));if(project)this.openProjectDetail(project);}
+ },
+ get vehicleLogs() {
 						return (this.logs || []).filter(l => this.isLogForVehicle(l, this.activeVehicle));
 					},
 

@@ -16,7 +16,7 @@ test("preview Access credential gate supports transition and fails closed when r
 });
 test("preview credentials stay scoped and all asset checks retain exact verification",()=>{
  assert.ok(step.includes("CF-Access-Client-Id"));assert.ok(step.includes("CF-Access-Client-Secret"));
- assert.equal((step.match(/curl "\$\{ACCESS_HEADERS\[@\]\}"/g)||[]).length,3);
+ assert.equal((step.match(/curl "\$\{ACCESS_HEADERS\[@\]\}"/g)||[]).length,4);
  assert.doesNotMatch(step,/curl[^\n]*(?:--location(?:\s|$)| -L(?:\s|$))/);
  assert.match(step,/cmp -s \/tmp\/pdf-asset/);assert.match(step,/cmp "\/tmp\/ocr-asset"/);assert.match(step,/cmp \/tmp\/ui-asset/);
  assert.match(step,/anonymous-check=\$GITHUB_SHA/);

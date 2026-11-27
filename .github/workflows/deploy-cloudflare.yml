@@ -188,6 +188,26 @@ jobs:
             cmp /tmp/ui-asset "public/garage-ui-v1/$asset"
           done
 
+          # Confirm live private R2 retrieval via the protected preview Worker.
+          # Fixed paths and no redirects keep service credentials on the intended host.
+          for path in '/api/navigation/scion-repair.json' '/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html' '/m/subaru-service-manual/2019%20Subaru%20Crosstrek%20Limited/pages/614.html'; do
+            status=$(curl "${ACCESS_HEADERS[@]}" --silent --show-error --max-time 60 -D /tmp/manual-headers -o /tmp/manual-object -w '%{http_code}' "$BASE$path?verify=$GITHUB_SHA")
+            test "$status" = 200 || { echo "::error::Manual retrieval failed ($status): $path"; exit 1; }
+            case "$path" in
+              *.json) node -e 'const n=JSON.parse(require("fs").readFileSync("/tmp/manual-object","utf8"));if(!Array.isArray(n.c)||!n.c.length)process.exit(1)' ;;
+              *.html) grep -Eiq '^content-type: *text/html' /tmp/manual-headers
+                      grep -Eiq 'FLUID CAPACITIES' /tmp/manual-object ;;
+            esac
+            echo "Verified manual retrieval: $path"
+            if [[ "$MOTORNOTE_PREVIEW_ACCESS_REQUIRED" == "true" ]]; then
+              status=$(curl --silent --show-error --max-time 30 -o /dev/null -w '%{http_code}' "$BASE$path?anonymous-check=$GITHUB_SHA")
+              case "$status" in
+                302|303|307|308|401|403) echo "Anonymous manual retrieval denied ($status)" ;;
+                *) echo "::error::Anonymous manual retrieval not blocked ($status): $path"; exit 1 ;;
+              esac
+            fi
+          done
+
           # A successful authenticated response alone does not prove protection.
           if [[ "$MOTORNOTE_PREVIEW_ACCESS_REQUIRED" == "true" ]]; then
             status=$(curl --silent --show-error --max-time 30 -o /dev/null -w '%{http_code}' "$BASE/garage?anonymous-check=$GITHUB_SHA")

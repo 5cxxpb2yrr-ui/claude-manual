@@ -43,6 +43,9 @@ jobs:
           npm install --prefix .browser-tests --no-save --package-lock=false playwright@1.51.1
           .browser-tests/node_modules/.bin/playwright install --with-deps chromium webkit
 
+      - name: Fetch pinned V9 recovery baseline for compatibility test
+        run: git fetch --no-tags --depth=1 origin 4a2d43c5cdc8e6e98c72e03a57871a0ace4a5334
+
       - name: Run isolated mobile browser lifecycle
         run: node scripts/garage-browser-smoke.mjs
 

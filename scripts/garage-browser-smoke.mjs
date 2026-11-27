@@ -3,16 +3,24 @@ import {createServer} from "node:http";
 import {readFile,mkdir,writeFile} from "node:fs/promises";
 import {resolve,extname,sep} from "node:path";
 import {createRequire} from "node:module";
+import {execFileSync} from "node:child_process";
 import {MANUAL_DOCUMENT_CSP} from "../worker.js";
 const require=createRequire(import.meta.url);
 const {chromium,webkit}=require("../.browser-tests/node_modules/playwright");
 const root=resolve("public"),types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json",".svg":"image/svg+xml"};
-let networkBlocked=false,blockedRequests=0;
+let networkBlocked=false,blockedRequests=0,rollbackMode=false;
+const rollbackCommit="4a2d43c5cdc8e6e98c72e03a57871a0ace4a5334";
+const rollbackHtml=execFileSync("git",["show",rollbackCommit+":public/garage.html"],{encoding:"utf8",maxBuffer:8*1024*1024});
+assert.match(rollbackHtml,/appSchemaVersion: 9/);
+assert.doesNotMatch(rollbackHtml,/data-common-specs/);
 const manualSandbox=(await readFile(resolve(root,"manuals.html"),"utf8")).match(/<iframe class="pg"[^>]*sandbox="([^"]+)"/)?.[1];
 assert.equal(manualSandbox,"allow-same-origin");
 const isolationPath="/m/isolation-fixture/pages/";
 const server=createServer(async(req,res)=>{
  if(networkBlocked){blockedRequests++;req.socket.destroy();return;}
+ if(rollbackMode&&new URL(req.url,"http://localhost").pathname==="/garage"){
+  res.writeHead(200,{"Content-Type":types[".html"],"Cache-Control":"no-store","X-Test-Recovery-Commit":rollbackCommit}).end(rollbackHtml);return;
+ }
  if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html"){
   res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Quick Lookups: Fluids</h1><p>FLUID CAPACITIES</p><table><tr><td>Engine Oil</td><td>Fixture</td></tr><tr><td>Engine Coolant</td><td>Fixture</td></tr></table>');return;
  }
@@ -231,6 +239,44 @@ async function run(name,launcher){
  await quick.waitFor({state:"visible"});await quick.getByText("DOT 3",{exact:true}).waitFor();
  await quick.getByRole("button",{name:"Close ✕"}).click();await quick.waitFor({state:"hidden"});await tab(page,"profile");
  console.log(name,"verified Specs modal opens in place and rejects mismatched documents; quick reference shares safe defaults");
+
+ phase="schema-compatible rollback";
+ // Exercise the actual older V9 Garage HTML with the current unchanged runtime
+ // modules on the same test origin and IndexedDB, not a new browser or import.
+ // This checks storage compatibility, not an actual Cloudflare traffic rollback.
+ const newAttachment=await app(page,async(a,id)=>{
+  const p=a.projects.find(x=>x.id===id);
+  if(!await a.addProjectAttachments(p,{target:{files:[new File(["rollback bytes"],"rollback.pdf",{type:"application/pdf"})],value:""}}))throw Error("Rollback fixture attachment failed");
+  a.toolInventory.push({id:"rollback-tool",name:"Fixture torque wrench",notes:"Recovery test"});
+  if(!await a.saveToStorage("Rollback fixture"))throw Error("Rollback fixture save failed");
+  return p.attachments.at(-1).storageKey;
+ },ids.p);
+ await saved(page);
+ const snapshot=async()=>app(page,async(a,key)=>{
+  const stored=await a.loadGarageState();
+  delete stored.savedAt;
+  const attachment=await a.readGarageAttachment(key);
+  return {stored,bytes:attachment?Array.from(new Uint8Array(await attachment.arrayBuffer())):null};
+ },newAttachment);
+ const beforeRollback=await snapshot();
+ assert.equal(beforeRollback.stored.schemaVersion,9);
+ assert.ok(beforeRollback.stored.inventoryLedger.length>0);
+ assert.equal(beforeRollback.stored.vendorOrders.length,1);
+ assert.ok(beforeRollback.stored.toolInventory.some(t=>t.id==="rollback-tool"));
+ assert.ok(beforeRollback.bytes?.length);
+ try{
+  rollbackMode=true;
+  const response=await page.goto(origin+"/garage#specs");
+  assert.equal(response.headers()["x-test-recovery-commit"],rollbackCommit,"Must actually load pinned V9 recovery HTML");
+  await saved(page);
+  assert.equal(await page.locator("[data-common-specs]").count(),0);
+  assert.deepEqual(await snapshot(),beforeRollback,"Recovery build startup save must preserve every collection and attachment byte");
+  assert.equal(await app(page,a=>window.MotorNoteInventoryEngine.audit(a.inventoryLedger,a.inventory).length),0);
+ }finally{rollbackMode=false;}
+ await page.reload();await saved(page);await tab(page,"profile");
+ assert.equal(await page.locator("[data-common-specs]").count(),1);
+ assert.deepEqual(await snapshot(),beforeRollback,"Returning to current release must preserve the V9 data");
+ console.log(name,"same-origin V9 rollback and return preserved all persisted collections and attachment bytes");
 
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");assert.deepEqual(runtimeDetails,[],"Browser runtime diagnostics");
  await verifyManualIsolation(browser,name);

@@ -9,24 +9,15 @@
 		<title>
 			MotorNote Pro Ultimate - Commercial Fleet & Personal Garage
 		</title>	
-		<!-- Tailwind CSS v4 CDN -->
-		<script src="https://unpkg.com/@tailwindcss/browser@4"></script>
-		<!-- Alpine.js CDN -->
-		<script
-			defer
-			src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
-		></script>
-		<!-- Google Fonts Inter -->
-		<link
-			href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap"
-			rel="stylesheet"
-		/>
-		<style>
+		<!-- Build-time CSS and pinned same-origin Alpine runtime. -->
+ <link rel="stylesheet" href="/garage-ui-v1/garage.css">
+ <script defer src="/garage-ui-v1/alpine.min.js"></script>
+ <style>
 			body {
-				font-family: 'Inter', sans-serif;
+				font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 			}
 			.font-mono {
-				font-family: 'JetBrains Mono', monospace;
+				font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 			}
 			.no-scrollbar::-webkit-scrollbar {
 				display: none;
@@ -319,18 +310,14 @@
 			<!-- ================= MAIN CONTENT AREA ================= -->
 			<main class="flex-1 px-4 sm:px-6 pt-5 pb-24 z-10">
 				<!-- 1. DASHBOARD TAB -->
-				<div
-					x-show="currentTab === 'dashboard'"
-					x-transition.opacity
-					class="space-y-6"
-				>
-					<template x-if="currentTab==='dashboard'"><div class="space-y-3"><template x-for="mission in [garageMission]" :key="'garage-mission'"><section class="space-y-3">
+				<template x-if="currentTab === 'dashboard'"><div class="space-y-6" data-garage-tab="dashboard">
+					<div class="space-y-3"><template x-for="mission in [garageMission]" :key="'garage-mission'"><section class="space-y-3">
  <div class="text-[10px] uppercase tracking-wider font-extrabold text-amber-400">Garage Mission Control · All vehicles</div>
  <template x-if="mission.next"><button type="button" @click="openGarageMission(mission.next)" class="glass-panel w-full text-left px-4 py-3 border-amber-500/60 flex items-center justify-between gap-3"><span class="min-w-0"><span class="block text-[10px] font-black uppercase tracking-wide text-amber-300">Next best action</span><span class="block font-bold text-white mt-1" x-text="mission.next.title"></span><span class="block text-xs text-zinc-400 mt-1" x-text="mission.next.detail"></span></span><span class="text-amber-300 shrink-0">→</span></button></template>
  <template x-if="!mission.next"><div class="glass-panel p-3"><p class="text-[10px] font-bold uppercase text-amber-300">Next best action</p><p class="text-sm" x-text="mission.incomplete?'Some data unavailable':'No actionable items in the current records'"></p><p class="text-xs text-zinc-400">This is a record-based review, not a mechanical safety assessment.</p></div></template>
  <p x-show="mission.incomplete" class="text-xs text-amber-300">Some source data could not be evaluated. Review the listed data issues.</p>
  <template x-for="group in mission.groups" :key="group.name"><details class="glass-panel px-3 py-2"><summary class="flex items-center justify-between gap-2 cursor-pointer min-h-9 text-xs font-bold"><span x-text="group.name"></span><span class="rounded bg-zinc-950 border border-zinc-800 px-2 py-1 text-amber-300" x-text="group.rows.length"></span></summary><div class="border-t border-zinc-800 pt-1"><template x-for="item in group.rows" :key="item.id"><button type="button" @click="openGarageMission(item)" class="w-full text-left flex items-center justify-between gap-2 border-b border-zinc-800 py-2 last:border-0"><span class="min-w-0"><span class="block text-xs font-bold text-white" x-text="item.title"></span><span class="block text-[11px] text-zinc-400" x-text="item.detail"></span></span><span class="text-amber-300 shrink-0">→</span></button></template><p x-show="!group.rows.length" class="text-xs text-zinc-400 py-2">No recorded items.</p></div></details></template>
- </section></template></div></template>
+ </section></template></div>
  <details class="space-y-3"><summary class="text-xs font-bold text-zinc-400 cursor-pointer py-2">Active vehicle snapshot & recent activity</summary>
  <!-- Active Vehicle Snapshot: compact summary, expanded health tiles -->
 					<details class="glass-panel px-3 py-2 group">
@@ -547,10 +534,10 @@
 						</div>
 					</div>
  </details>
-				</div>
+				</div></template>
 
 				<!-- 2. ADVANCED ANALYTICS DASHBOARD TAB -->
-				<div x-show="currentTab === 'analytics'" x-transition.opacity class="space-y-6">
+				<template x-if="currentTab === 'analytics'"><div class="space-y-6" data-garage-tab="analytics">
 					<div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 						<div><h2 class="text-xl font-bold text-white">Advanced Analytics & Cost Forecasting 2.0</h2><p class="text-xs text-zinc-400">Ownership cost, spending trends, cost-per-mile, fleet efficiency and projected maintenance liability.</p></div>
 						<div class="flex gap-2"><select x-model="analyticsPeriod" class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"><option value="3m">Last 3 Months</option><option value="6m">Last 6 Months</option><option value="12m">Last 12 Months</option><option value="all">All Time</option></select><select x-model="analyticsVehicleId" class="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-xs text-white"><option value="all">All Vehicles</option><template x-for="v in vehicles" :key="'analytics-v-'+v.id"><option :value="v.id" x-text="v.name"></option></template></select></div>
@@ -575,14 +562,10 @@
 					</div>
 
 					<div class="glass-panel p-5"><div class="flex justify-between items-center mb-4"><div><h3 class="text-sm font-bold text-white">Fleet Ownership Comparison</h3><p class="text-[11px] text-zinc-500">Current-period spend normalized by miles driven.</p></div><span class="text-xs text-zinc-500" x-text="analyticsMetrics.miles.toLocaleString()+' miles analyzed'"></span></div><div class="overflow-x-auto"><table class="w-full text-left text-xs"><thead><tr class="border-b border-zinc-800 text-zinc-500 uppercase"><th class="pb-3">Vehicle</th><th class="pb-3">Health</th><th class="pb-3">Spend</th><th class="pb-3">Miles</th><th class="pb-3">$/Mile</th><th class="pb-3">Events</th></tr></thead><tbody class="divide-y divide-zinc-800/60"><template x-for="v in vehicleComparisonData" :key="v.id"><tr><td class="py-3 font-bold text-white" x-text="v.name"></td><td class="py-3" x-text="v.health+'/100'"></td><td class="py-3 text-amber-400" x-text="String.fromCharCode(36)+v.cost.toFixed(2)"></td><td class="py-3 text-zinc-400" x-text="v.milesDriven.toLocaleString()"></td><td class="py-3 text-emerald-400 font-bold" x-text="v.costPerMile?String.fromCharCode(36)+v.costPerMile.toFixed(3):'—'"></td><td class="py-3 text-zinc-400" x-text="v.repairsCount"></td></tr></template></tbody></table></div></div>
-				</div>
+				</div></template>
 
 				<!-- 3. PREDICTIVE MAINTENANCE ENGINE TAB -->
-				<div
-					x-show="currentTab === 'predictive'"
-					x-transition.opacity
-					class="space-y-6"
-				>
+				<template x-if="currentTab === 'predictive'"><div class="space-y-6" data-garage-tab="predictive">
 					<div class="flex justify-between items-center">
 						<div>
 							<h2 class="text-xl font-bold text-white">
@@ -698,10 +681,10 @@
 							</div>
 						</template>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- MAINTENANCE WORKFLOW 2.0 -->
-				<div x-show="currentTab === 'maintenance'" x-transition.opacity class="space-y-6">
+				<template x-if="currentTab === 'maintenance'"><div class="space-y-6" data-garage-tab="maintenance">
 					<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
 						<div><h2 class="text-xl font-bold text-white">Maintenance Planner 2.0</h2><p class="text-xs text-zinc-400">Turn predictive maintenance into planned, trackable work.</p></div>
 						<button @click="openMaintenancePlanner()" class="px-4 py-2 rounded-xl bg-amber-500 text-zinc-950 text-xs font-black">＋ Plan Maintenance</button>
@@ -736,7 +719,7 @@
 						<h3 class="font-bold text-white">Active Maintenance Plans</h3>
 						<template x-for="plan in activeMaintenancePlans" :key="plan.id"><div class="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><div class="flex justify-between"><div><b class="text-white text-sm" x-text="plan.title"></b><div class="text-[11px] text-zinc-500" x-text="plan.status + ' • ' + plan.priority"></div></div><span class="text-xs text-purple-400 font-bold" x-text="plan.completion + '%' "></span></div><div class="flex gap-2 mt-2"><template x-for="(task,idx) in plan.tasks" :key="idx"><button @click="toggleMaintenanceTask(plan,idx)" class="text-[10px] px-2 py-1 rounded border" :class="task.done ? 'border-emerald-500/30 text-emerald-400' : 'border-zinc-700 text-zinc-400'" x-text="(task.done ? '✓ ' : '○ ') + task.name"></button></template></div></div></template>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- MAINTENANCE PLAN MODAL -->
 				<div x-show="modals.maintenancePlan" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4" x-transition.opacity>
@@ -760,11 +743,7 @@
 				</div>
 
 				<!-- 4. ENHANCED TIMELINE TAB -->
-				<div
-					x-show="currentTab === 'timeline'"
-					x-transition.opacity
-					class="space-y-4"
-				>
+				<template x-if="currentTab === 'timeline'"><div class="space-y-4" data-garage-tab="timeline">
 					<div
 						class="flex flex-col md:flex-row justify-between items-start md:items-center gap-3"
 					>
@@ -885,14 +864,10 @@
 							</div>
 						</template>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 5. REPAIRS & DIAGNOSTICS TAB -->
-				<div
-					x-show="currentTab === 'repairs'"
-					x-transition.opacity
-					class="space-y-4"
-				>
+				<template x-if="currentTab === 'repairs'"><div class="space-y-4" data-garage-tab="repairs">
 					<div class="flex justify-between items-center">
 						<div>
 							<h2 class="text-lg font-bold text-white">
@@ -966,14 +941,10 @@
 							</div>
 						</template>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 6. KANBAN PROJECTS TAB -->
-				<div
-					x-show="currentTab === 'projects'"
-					x-transition.opacity
-					class="space-y-4"
-				>
+				<template x-if="currentTab === 'projects'"><div class="space-y-4" data-garage-tab="projects">
 					<div class="flex justify-between items-center">
 						<div>
 							<h2 class="text-lg font-bold text-white">
@@ -1125,10 +1096,10 @@
 							</div>
 						</template>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 7. INVENTORY COMMAND CENTER -->
-				<div x-show="currentTab === 'inventory'" x-transition.opacity class="space-y-3">
+				<template x-if="currentTab === 'inventory'"><div class="space-y-3" data-garage-tab="inventory">
 					<div class="flex items-center justify-between gap-2">
 						<div><h2 class="text-lg font-black text-white">Inventory Command Center</h2><p class="text-[10px] text-zinc-400">All vehicles · local stock and project demand</p></div>
 						<div class="flex gap-1.5"><button type="button" @click="inventoryView='shopping';inventoryForecastHorizon=20;inventoryShoppingMessage=''" class="shrink-0 px-2 py-2 rounded-lg border border-amber-500/40 text-amber-300 text-xs font-bold">Shopping</button><button type="button" @click="openNewPartModal()" class="shrink-0 px-3 py-2 rounded-lg bg-amber-500 text-zinc-950 text-xs font-black">+ Part</button></div>
@@ -1307,14 +1278,10 @@
 							<p x-show="!inventoryOpenOrders.length" class="text-xs text-zinc-400">No open purchase orders.</p>
 						</div>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 8. RECEIPT & ATTACHMENT CENTER TAB -->
-				<div
-					x-show="currentTab === 'attachments'"
-					x-transition.opacity
-					class="space-y-4"
-				>
+				<template x-if="currentTab === 'attachments'"><div class="space-y-4" data-garage-tab="attachments">
 					<div
 						class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2"
 					>
@@ -1408,14 +1375,10 @@
 							</div>
 						</template>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 9. AI GARAGE ADVISOR TAB -->
-				<div
-					x-show="currentTab === 'advisor'"
-					x-transition.opacity
-					class="space-y-4"
-				>
+				<template x-if="currentTab === 'advisor'"><div class="space-y-4" data-garage-tab="advisor">
 					<div class="flex justify-between items-center">
 						<div>
 							<h2
@@ -1507,14 +1470,10 @@
 							</button>
 						</div>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 10. SERVICE EXPENSE REPORTING TAB -->
-				<div
-					x-show="currentTab === 'reports'"
-					x-transition.opacity
-					class="space-y-6"
-				>
+				<template x-if="currentTab === 'reports'"><div class="space-y-6" data-garage-tab="reports">
 					<div class="flex justify-between items-center">
 						<div>
 							<h2 class="text-lg font-bold text-white">
@@ -1672,14 +1631,10 @@
 							</div>
 						</div>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 11. MAINTENANCE KNOWLEDGE BASE TAB -->
-				<div
-					x-show="currentTab === 'kb'"
-					x-transition.opacity
-					class="space-y-4"
-				>
+				<template x-if="currentTab === 'kb'"><div class="space-y-4" data-garage-tab="kb">
 					<div class="mb-2">
 						<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 							<div>
@@ -1760,14 +1715,10 @@
 							</article>
 						</template>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 12. VEHICLE SPECS & GARAGE TAB -->
-				<div
-					x-show="currentTab === 'profile'"
-					x-transition.opacity
-					class="space-y-4"
-				>
+				<template x-if="currentTab === 'profile'"><div class="space-y-4" data-garage-tab="profile">
 					<div class="flex justify-between items-center">
 						<div>
 							<h2 class="text-lg font-bold text-white">
@@ -1962,10 +1913,10 @@
 							Reset State & Reload Seed Data
 						</button>
 					</div>
-				</div>
+				</div></template>
 
 				<!-- 13. DATABASE HEALTH & DATA INTEGRITY TAB -->
-				<div x-show="currentTab === 'database'" x-transition.opacity class="space-y-4">
+				<template x-if="currentTab === 'database'"><div class="space-y-4" data-garage-tab="database">
 					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 						<div>
 							<h2 class="text-lg font-bold text-white">Database Health & Data Integrity</h2>
@@ -2008,7 +1959,7 @@
 							<span class="px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-400" x-text="saveState === 'saving' ? 'Saving…' : (lastSavedAt ? 'Saved ' + new Date(lastSavedAt).toLocaleTimeString() : 'No save recorded')"></span>
 						</div>
 					</div>
-				</div>
+				</div></template>
 			</main>
 
 			<!-- ================= MODALS & OVERLAYS ================= -->

@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const dependency = new URL("../node_modules/pdfjs-dist/", import.meta.url);
 const version = "4.10.38";
-const pins = {"pdfjs-dist":"4.10.38","tesseract.js":"6.0.1","tesseract.js-core":"6.0.0","@tesseract.js-data/eng":"1.0.0"};
+const pins = {"pdfjs-dist":"4.10.38","tesseract.js":"6.0.1","tesseract.js-core":"6.0.0","@tesseract.js-data/eng":"1.0.0","tailwindcss":"4.1.17","@tailwindcss/cli":"4.1.17","alpinejs":"3.14.9"};
 const pkg = name => new URL("../node_modules/" + name + "/", import.meta.url);
 const installed = name => { try { return JSON.parse(readFileSync(new URL("package.json", pkg(name)), "utf8")).version; } catch { return ""; } };
 if (Object.entries(pins).some(([name,v]) => installed(name) !== v)) {
@@ -31,3 +31,14 @@ const assets=[
 ["@tesseract.js-data/eng","4.0.0_best_int/eng.traineddata.gz","eng.traineddata.gz"]];
 for(const [name,source,target] of assets){const output=new URL(target,dest);copyFileSync(new URL(source,pkg(name)),output);console.log("Prepared OCR",target,readFileSync(output).length,"bytes");}
 for(const name of ["tesseract.js","tesseract.js-core","@tesseract.js-data/eng"]){const license=readdirSync(pkg(name)).find(x=>/^licen[cs]e(?:\.|$)/i.test(x));if(license)copyFileSync(new URL(license,pkg(name)),new URL(name.replace(/[^a-z0-9-]/gi,"-")+"-LICENSE.txt",dest));}
+
+// Compile Garage utilities before deployment; no browser-side Tailwind compiler.
+const ui=new URL("../public/garage-ui-v1/",import.meta.url);
+mkdirSync(ui,{recursive:true});
+const cssPath=fileURLToPath(new URL("garage.css",ui));
+const cli=JSON.parse(readFileSync(new URL("package.json",pkg("@tailwindcss/cli")),"utf8")).bin;
+const cssBuild=spawnSync(process.execPath,[fileURLToPath(new URL(typeof cli==="string"?cli:cli.tailwindcss,pkg("@tailwindcss/cli"))),"-i",fileURLToPath(new URL("../styles/garage.css",import.meta.url)),"-o",cssPath,"--minify"],{cwd:root,stdio:"inherit"});
+if(cssBuild.status!==0)throw Error("Garage CSS compilation failed");
+copyFileSync(new URL("dist/cdn.min.js",pkg("alpinejs")),new URL("alpine.min.js",ui));
+for(const name of ["tailwindcss","alpinejs"]){const license=readdirSync(pkg(name)).find(x=>/^licen[cs]e(?:\.|$)/i.test(x));if(license)copyFileSync(new URL(license,pkg(name)),new URL(name+"-LICENSE.txt",ui));}
+console.log("Garage UI bytes",readFileSync(cssPath).length,readFileSync(new URL("alpine.min.js",ui)).length);

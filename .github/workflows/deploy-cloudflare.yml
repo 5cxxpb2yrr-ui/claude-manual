@@ -132,3 +132,12 @@ jobs:
             esac
             cmp "/tmp/ocr-asset" "public/receipt-ocr-v6/$asset"
           done
+
+          for asset in garage.css alpine.min.js; do
+            curl --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ui-headers -o /tmp/ui-asset "$BASE/garage-ui-v1/$asset?verify=$GITHUB_SHA"
+            case "$asset" in
+              *.css) grep -Eiq '^content-type: *text/css' /tmp/ui-headers ;;
+              *.js) grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/ui-headers ;;
+            esac
+            cmp /tmp/ui-asset "public/garage-ui-v1/$asset"
+          done

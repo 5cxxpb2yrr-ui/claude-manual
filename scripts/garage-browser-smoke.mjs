@@ -126,6 +126,9 @@ async function run(name,launcher){
   assert.equal(await page.evaluate(()=>!!navigator.serviceWorker.controller),true,"Cold navigation must be service-worker controlled");
   if(name==="chromium")assert.equal(response.fromServiceWorker(),true,"Chromium cold response must come from the service worker");
   await saved(page);
+  const pinned=await page.evaluate(()=>[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline")));
+  assert.equal(pinned.length,12,"All essential Garage resources must be version pinned");
+  assert.ok(pinned.every(version=>/^[a-f0-9]{64}$/.test(version||"")&&version===pinned[0]),"Offline document must load a single coherent version");
   assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="OFFLINE-1")?.quantity),1);
   assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
   assert.equal(await app(page,async a=>{a.openNewPartModal();Object.assign(a.newPartForm,{description:"Cold offline fixture",partNumber:"COLD-OFFLINE-1",quantity:1,unitCost:4,vehicleCompatibility:"Universal"});return await a.saveNewPart();}),true);

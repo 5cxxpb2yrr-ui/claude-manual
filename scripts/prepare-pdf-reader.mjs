@@ -47,5 +47,9 @@ console.log("Garage UI bytes",readFileSync(cssPath).length,readFileSync(new URL(
 const offlineTemplate=readFileSync(new URL("garage-sw.template.js",import.meta.url),"utf8");
 const {createHash}=await import("node:crypto");
 const shellHash=createHash("sha256").update(offlineTemplate);
-for(const path of ["/garage","/garage-ui-v1/garage.css","/garage-ui-v1/alpine.min.js","/repair-workspace.js","/repair-planner.js","/inventory-engine.js","/repair-history.js","/garage-mission.js","/garage-backup.js","/inventory-demand.js","/inventory-purchasing.js","/inventory-capture.js","/inventory-prices.js"])shellHash.update(path).update(readFileSync(new URL("../public"+(path==="/garage"?"/garage.html":path),import.meta.url)));
-writeFileSync(new URL("../public/garage-sw.js",import.meta.url),offlineTemplate.replace("__GARAGE_BUILD_HASH__",shellHash.digest("hex")));
+const shellAssets=JSON.parse(offlineTemplate.match(/const ASSETS = (\[[\s\S]*?\]);/)[1]),digests={};
+for(const path of shellAssets){
+ const bytes=readFileSync(new URL("../public"+(path==="/garage"?"/garage.html":path),import.meta.url));
+ shellHash.update(path).update(bytes);digests[path]=createHash("sha256").update(bytes).digest("hex");
+}
+writeFileSync(new URL("../public/garage-sw.js",import.meta.url),offlineTemplate.replace("__GARAGE_BUILD_HASH__",shellHash.digest("hex")).replace("__GARAGE_ASSET_DIGESTS__",JSON.stringify(digests)));

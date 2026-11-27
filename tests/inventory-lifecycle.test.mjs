@@ -9,7 +9,7 @@ const slice=(a,b)=>{const i=garage.indexOf(a),j=garage.indexOf(b,i);assert.ok(i>
 test("purchase demand to partial receiving, repair consumption and supplier history",async()=>{
  const project={id:"p",vehicleId:"v",status:"Planned",partRequirements:[{id:"r",description:"Filter",partNumber:"F-1",unit:"each",quantity:3,status:"Required"}]};
  const vehicle={id:"v",name:"Car"},state={projects:[project],vehicles:[vehicle],inventory:[],vendorOrders:[],inventoryLedger:[]};
- const methods=new Function("window","alert","return ({"+slice("projectReceiptCandidates(project,req){","async addProjectAttachments(project,event)")+"})")({},()=>{});
+ const methods=new Function("window","alert","return ({"+slice("legacyMaintenanceHeld(id,","async addProjectAttachments(project,event)")+"})")({},()=>{});
  Object.assign(state,methods,{async saveToStorage(reason,reference){if(this.fail)return false;this.inventoryLedger=ledger.reconcile(this.inventoryLedger,this.inventory,{reason,reference});return true;}});
  const forecast=()=>demand.forecast({inventory:state.inventory,vehicles:state.vehicles,vendorOrders:state.vendorOrders,projects:state.projects.map(p=>({...p,partRequirements:p.partRequirements.map(r=>({...r,quantity:state.projectRemainingPart(r)}))}))});
  assert.equal(forecast().shortages[0].shortage,3);

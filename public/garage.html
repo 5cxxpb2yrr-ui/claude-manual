@@ -3092,6 +3092,7 @@
 		<script src="/inventory-engine.js"></script>
 <script src="/repair-history.js"></script>
 <script src="/garage-mission.js"></script>
+<script src="/garage-backup.js"></script>
 		<script src="/inventory-demand.js"></script>
 		<script src="/inventory-purchasing.js"></script>
 <script src="/inventory-capture.js"></script>
@@ -3126,7 +3127,7 @@
 					isEditingRepair: false,
 					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",captureBusy:false,vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",reconcileDraft:null,reconcileError:"",storageDraft:null,storageError:"",storageFilter:"",priceSearch:"",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
 					garageDB: null,
-					saveState: 'saved', lastSaveError:'',
+					saveState: 'saved', lastSaveError:'', backupBusy:false, startupReadFailed:false,
 					lastSavedAt: null,
 					databaseHealth: { status: 'checking', issues: [], warnings: [], counts: {}, indexedDB: false, schemaVersion: 0, lastCheckedAt: null },
 
@@ -4620,14 +4621,15 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 				window.addEventListener('offline',()=>console.log('Offline mode active'));
 						try {
 							await this.openGarageDB();
+ if(this.startupReadFailed)throw Error('IndexedDB could not be opened safely. Close other Garage tabs and reload.');
 							let saved = await this.loadGarageState();
 							let source = 'indexeddb';
 							if (!saved) {
 								const legacy = localStorage.getItem('motornote_pro_app_state');
-								if (legacy) { try { saved = JSON.parse(legacy); source = 'legacy-localstorage'; } catch(e) { console.warn('Legacy state parse failed', e); } }
+								if (legacy) { try { saved = JSON.parse(legacy); source = 'legacy-localstorage'; } catch(e) { throw Error('Existing local state could not be parsed. Preserve it before recovery.'); } }
 							}
 							if (saved) {
-								if (Number(saved.schemaVersion || 1) < this.appSchemaVersion) await this.createSafetySnapshot(saved, 'pre-migration');
+								if (Number(saved.schemaVersion || 1) < this.appSchemaVersion) {if(!await this.createSafetySnapshot(saved, 'pre-migration'))throw Error('Pre-migration snapshot failed; original data preserved.');}
 								this.applyState(saved);
 								this.normalizeData();
 								await this.migrateAttachmentData();
@@ -4646,7 +4648,8 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 							this.runDatabaseHealthCheck().catch(error => console.warn('Background database health check failed', error));
 							if (source === 'legacy-localstorage' && this.garageDB) localStorage.setItem('motornote_pro_migration_complete', new Date().toISOString());
 						} catch (error) {
-							console.error('Garage initialization failed', error?.name || 'Error', error?.message || error, error?.stack || '');
+							this.startupReadFailed=true;this.saveState='error';this.lastSaveError=error.message||'State initialization failed.';
+ console.error('Garage initialization failed', error?.name || 'Error', error?.message || error, error?.stack || '');
 							this.databaseHealth = { ...this.databaseHealth, status: 'error', issues: ['Application state could not be initialized safely.'], warnings: [error.message || 'Unknown initialization error'], lastCheckedAt: new Date().toISOString() };
 						}
 					},
@@ -4666,7 +4669,8 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 								}
 							};
 						req.onsuccess = e => { this.garageDB = e.target.result; this.garageDB.onversionchange = () => this.garageDB.close(); resolve(this.garageDB); };
-						req.onerror = () => resolve(null);
+						req.onerror = () => {this.startupReadFailed=true;resolve(null);};
+ req.onblocked=()=>{this.startupReadFailed=true;resolve(null);};
 					});
 				},
 
@@ -4702,16 +4706,17 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 				},
 
 				getPersistableState() {
-					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? undefined : val));
+					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? (typeof val==='string'&&val.startsWith('data:')?val:undefined) : val));
 					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), inventoryLedger:strip(this.inventoryLedger||[]), vendorOrders:strip(this.vendorOrders||[]), toolInventory:strip(this.toolInventory||[]), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
 				},
 
 				loadGarageState() {
 					if (!this.garageDB) return Promise.resolve(null);
-					return new Promise(resolve => { const req = this.garageDB.transaction('state', 'readonly').objectStore('state').get('current'); req.onsuccess = () => resolve(req.result?.value || null); req.onerror = () => resolve(null); });
+					return new Promise((resolve,reject) => { const req = this.garageDB.transaction('state', 'readonly').objectStore('state').get('current'); req.onsuccess = () => resolve(req.result?.value || null); req.onerror = () => reject(req.error||Error('Cannot read saved Garage state.')); });
 				},
 
 				async saveToStorage(reason="Saved inventory change",reference=null) {
+ if(this.startupReadFailed||this.backupBusy&&reason!=="Backup recovery"){this.lastSaveError="Storage recovery active or saved state unreadable.";this.saveState="error";return false;}
 					let state;
                     try{state=this.getPersistableState();}catch(e){this.lastSaveError=e.message||String(e);this.saveState="error";return false;}
 					const persist=async()=>{
@@ -4733,9 +4738,9 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 				},
 
 				async createSafetySnapshot(state = this.getPersistableState(), reason = 'manual') {
-					const snapshot = { ...JSON.parse(JSON.stringify(state)), snapshotReason: reason, createdAt: new Date().toISOString() };
 					try {
-						if (this.garageDB) await new Promise((resolve, reject) => { const tx=this.garageDB.transaction('backups','readwrite'); tx.objectStore('backups').put({ id:`backup-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, createdAt:snapshot.createdAt, reason, state:snapshot }); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error); });
+ const snapshot = {...await this.portableGarageState(state),snapshotReason:reason,createdAt:new Date().toISOString()};
+						if (this.garageDB) await new Promise((resolve, reject) => { const tx=this.garageDB.transaction('backups','readwrite'); tx.objectStore('backups').put({ id:`backup-${Date.now()}-${Math.random().toString(36).slice(2,7)}`, createdAt:snapshot.createdAt, reason, state:snapshot }); tx.oncomplete=resolve; tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error||Error('Snapshot aborted')); });
 						else localStorage.setItem('motornote_pro_last_backup', JSON.stringify(snapshot));
 						return snapshot;
 					} catch (e) { console.warn('Safety snapshot failed', e); return null; }
@@ -4753,7 +4758,7 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 					if(this.inventoryLedger?.length)warnings.push(...window.MotorNoteInventoryEngine.audit(this.inventoryLedger,this.inventory));
 					this.inventory.forEach(p => { if (Number(p.quantity) < 0) warnings.push(`Inventory ${p.id} has a negative quantity.`); if (Number(p.reservedQuantity || 0) > Number(p.quantity || 0)) warnings.push(`Inventory ${p.id} has more reserved than on-hand stock.`); });
 					let attachmentCount=0, attachmentKeys=[];
-					this.logs.forEach(l => (l.attachments || []).forEach(a => { attachmentCount++; if (a.storageKey) attachmentKeys.push(a.storageKey); }));
+					[...this.logs,...this.projects].forEach(l => (l.attachments || []).forEach(a => { attachmentCount++; if (!a.dataUrl&&!window.MotorNoteBackup.validData(a.data)&&a.storageKey) attachmentKeys.push(a.storageKey); }));
 					let indexedDBAttachments = 0, missingAttachments = 0;
 					if (this.garageDB) {
 						await new Promise(resolve => {
@@ -4783,14 +4788,16 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 					alert('Safe data repair completed. A pre-repair snapshot was saved.');
 				},
 
-				async restoreLatestSnapshot() {
-					if (!this.garageDB) { const raw=localStorage.getItem('motornote_pro_last_backup'); if(!raw)return alert('No local safety snapshot found.'); try { this.applyState(JSON.parse(raw)); this.normalizeData(); await this.saveToStorage(); await this.runDatabaseHealthCheck(); alert('Latest local snapshot restored.'); } catch(e){alert('Snapshot could not be restored.');} return; }
-					const snapshot = await new Promise(resolve => { const tx=this.garageDB.transaction('backups','readonly'); const req=tx.objectStore('backups').index('createdAt').openCursor(null,'prev'); req.onsuccess=()=>resolve(req.result?.value?.state||null); req.onerror=()=>resolve(null); });
-					if (!snapshot) return alert('No safety snapshot found.');
-					if (!confirm('Restore the latest snapshot? Current data will be saved as a new pre-restore snapshot first.')) return;
-					await this.createSafetySnapshot(this.getPersistableState(),'pre-restore'); this.applyState(snapshot); this.normalizeData(); await this.saveToStorage(); await this.runDatabaseHealthCheck(); alert('Latest safety snapshot restored.');
-				},
-					switchVehicle(id) {
+				async restoreLatestSnapshot(){
+ if(this.backupBusy||this.startupReadFailed)return false;
+ try{
+ const snapshot=this.garageDB?await new Promise((resolve,reject)=>{const req=this.garageDB.transaction('backups','readonly').objectStore('backups').index('createdAt').openCursor(null,'prev');req.onsuccess=()=>resolve(req.result?.value?.state||null);req.onerror=()=>reject(req.error);}):JSON.parse(localStorage.getItem('motornote_pro_last_backup')||'null');
+ if(!snapshot){alert("No safety snapshot found.");return false;}
+ if(!confirm("Restore latest snapshot? Current data will be backed up first."))return false;
+ return await this.recoverGarageState(snapshot,"pre-restore");
+ }catch(e){alert("Restore failed: "+e.message);return false;}
+ },
+ switchVehicle(id) {
 						this.activeVehicleId = id;
 						this.tempMileage = this.activeVehicle.odometer;
 						try { localStorage.setItem('lifeos.garage.activeVehicle.v1', JSON.stringify({ vehicleId: id, vehicleName: this.activeVehicle?.name || '', updatedAt: new Date().toISOString() })); } catch (error) { console.warn('Active vehicle could not be shared with Manual Explorer', error); }
@@ -5228,7 +5235,7 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 						const files=event.target.files; if(!files?.length)return;
 						Array.from(files).forEach(file=>{const storageKey=`att-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;const att={id:storageKey,storageKey,name:file.name,type:file.type,category:'Receipt',vendor:'AutoParts Store',receiptDate:new Date().toISOString().split('T')[0]};
 							if(this.garageDB){const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').put({id:storageKey,blob:file,name:file.name,type:file.type,createdAt:new Date().toISOString()});tx.oncomplete=()=>{att.data=URL.createObjectURL(file);this.attachToCurrentRepair(att);this.saveToStorage();};}
-							else{const reader=new FileReader();reader.onload=e=>{att.data=e.target.result;this.attachToCurrentRepair(att);this.saveToStorage();};reader.readAsDataURL(file);}}); event.target.value='';
+							else{const reader=new FileReader();reader.onload=e=>{att.data=e.target.result;att.dataUrl=e.target.result;delete att.storageKey;this.attachToCurrentRepair(att);this.saveToStorage();};reader.readAsDataURL(file);}}); event.target.value='';
 					},
 
 					attachToCurrentRepair(att) {
@@ -5462,115 +5469,55 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 
 					maintenancePlanCost(plan) { return (plan?.parts||[]).reduce((a,p)=>a+Number(p.unitCost||0)*Number(p.quantity||0),0); },
 
-				exportJSON() {
-						const state = this.getPersistableState();
-						const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-						const url = URL.createObjectURL(blob);
-						const a = document.createElement('a');
-						a.href = url;
-						a.download = `motornote-backup-${new Date().toISOString().split('T')[0]}.json`;
-						a.click();
-					},
-
-	importJSON(event) {
-					const file = event.target.files[0];
-					if (!file) return;
-
-					const reader = new FileReader();
-					reader.onload = async (e) => {
-						try {
-							const parsed = JSON.parse(e.target.result);
-							const candidate = Array.isArray(parsed) ? { logs: parsed } : parsed;
-
-							if (!candidate || typeof candidate !== 'object') {
-								throw new Error('Unsupported schema format');
-							}
-
-							const validArray = key =>
-								candidate[key] === undefined || Array.isArray(candidate[key]);
-
-							if (!['vehicles', 'logs', 'serviceLogs', 'projects', 'inventory', 'partsInventory', 'toolInventory', 'inventoryLedger', 'vendorOrders', 'maintenancePlans']
-								.every(validArray)) {
-								throw new Error('One or more imported collections are invalid.');
-							}
-
-							if(Array.isArray(candidate.inventoryLedger)&&candidate.inventoryLedger.length){const stock=candidate.partsInventory||candidate.inventory;if(!Array.isArray(stock))throw Error('Inventory ledger import requires stock records.');const issues=window.MotorNoteInventoryEngine.audit(candidate.inventoryLedger,stock);if(issues.length)throw Error(issues.join('; '));}
-							await this.createSafetySnapshot(this.getPersistableState(), 'pre-import');
-
-							if (Array.isArray(candidate.vehicles)) this.vehicles = candidate.vehicles;
-							if (Array.isArray(candidate.logs)) this.logs = candidate.logs;
-							if (Array.isArray(candidate.serviceLogs)) this.logs = candidate.serviceLogs;
-							if (Array.isArray(candidate.projects)) this.projects = candidate.projects;
-							if (Array.isArray(candidate.inventory)) this.inventory = candidate.inventory;
-							if (Array.isArray(candidate.partsInventory)) this.inventory = candidate.partsInventory;
-							if(Array.isArray(candidate.toolInventory))this.toolInventory=candidate.toolInventory;
-							if(Array.isArray(candidate.vendorOrders))this.vendorOrders=candidate.vendorOrders;
-							if(Array.isArray(candidate.inventoryLedger)&&candidate.inventoryLedger.length)this.inventoryLedger=candidate.inventoryLedger;
-							if (Array.isArray(candidate.maintenancePlans)) this.maintenancePlans = candidate.maintenancePlans;
-
-							this.normalizeData();
-
-							if (this.activeVehicle) {
-								this.timelineVehicleFilter = this.activeVehicle.name;
-							}
-
-							await this.migrateAttachmentData();
-
-							// Force Alpine to observe the imported collections immediately.
-							this.logs = [...this.logs];
-							this.vehicles = [...this.vehicles];
-							this.projects = [...this.projects];
-							this.inventory = [...this.inventory];
-
-							console.log('Imported vehicles:', this.vehicles.length);
-							console.log('Imported logs:', this.logs.length);
-							console.log('Timeline records:', this.filteredTimelineLogs.length);
-							console.log('Resolved vehicle mappings:', this.logs.reduce((a,l)=>{const id=this.resolveLogVehicleId(l)||'UNRESOLVED';a[id]=(a[id]||0)+1;return a;},{}));
-
-							if(!await this.saveToStorage('Imported stock balances'))throw Error('Imported state could not be saved. Restore the pre-import snapshot if needed.');
-							await this.runDatabaseHealthCheck();
-
-							if (this.databaseHealth.status === 'error') {
-								throw new Error(
-									'Import was rejected because integrity checks found errors. Use Restore Latest Snapshot to undo it.'
-								);
-							}
-
-							alert('Garage data imported and validated successfully. A pre-import snapshot was saved.');
-							this.modals.importExport = false;
-						} catch (err) {
-							console.error(
-								'Import error:',
-								err?.name || 'Error',
-								err?.message || err,
-								err?.stack || ''
-							);
-							alert('Import rejected: ' + (err?.message || 'Invalid or incompatible JSON file.'));
-						} finally {
-							event.target.value = '';
-						}
-					};
-
-					reader.readAsText(file);
-				},
-
-				async migrateAttachmentData() {
+				async portableGarageState(state=this.getPersistableState()){
+ return window.MotorNoteBackup.portable(state,async key=>{
+ if(!key||!this.garageDB)return null;
+ const row=await new Promise((resolve,reject)=>{const req=this.garageDB.transaction('attachments','readonly').objectStore('attachments').get(key);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
+ if(!row?.blob)return null;
+ return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(row.blob);});
+ });
+ },
+ async exportJSON(){
+ if(this.backupBusy||this.startupReadFailed)return false;this.backupBusy=true;
+ try{await this.inventorySaveTail;const state=await this.portableGarageState(),blob=new Blob([JSON.stringify(state,null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="motornote-backup-"+this.toolToday()+".json";a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);return true;}
+ catch(e){alert("Export failed: "+e.message);return false;}finally{this.backupBusy=false;}
+ },
+ async recoverGarageState(input,reason="pre-import"){
+ if(this.backupBusy||this.startupReadFailed||this.inventorySaving||this.vendorBusy||this.guidedSaving||this.guidedServiceBusy||this.maintenanceMutationBusy)return false;
+ this.backupBusy=true;let prior=null,applied=false;
+ try{
+ await this.inventorySaveTail;prior=this.getPersistableState();
+ const next=await this.portableGarageState(window.MotorNoteBackup.candidate(prior,input,window.MotorNoteInventoryEngine.audit));
+ if(!await this.createSafetySnapshot(prior,reason))throw Error("Current data could not be backed up; no changes made.");
+ this.applyState(next);applied=true;
+ if(!await this.saveToStorage("Backup recovery"))throw Error(this.lastSaveError||"Restore write failed.");
+ this.hydrateAttachments();this.modals.importExport=false;
+ alert("Garage data restored. Previous data was backed up.");return true;
+ }catch(e){if(applied){this.applyState(prior);this.hydrateAttachments();}alert("Recovery rejected: "+e.message);return false;}
+ finally{this.backupBusy=false;}
+ },
+ async importJSON(event){
+ const file=event.target.files?.[0];event.target.value="";if(!file)return false;
+ try{const data=JSON.parse(await file.text());if(!confirm("Replace the collections in this file? Existing data will be backed up first."))return false;return await this.recoverGarageState(data);}
+ catch(e){alert("Import rejected: "+e.message);return false;}
+ },
+ async migrateAttachmentData() {
 					if (!this.logs) return true;
 					for (const log of this.logs) {
 						if (!Array.isArray(log.attachments)) log.attachments = [];
 						for (const att of log.attachments) {
 							if (!att.id && att.storageKey) att.id = att.storageKey;
-							if (!att.storageKey && att.id) att.storageKey = att.id;
+							if (!att.storageKey && att.id&&!att.dataUrl&&!window.MotorNoteBackup.validData(att.data)) att.storageKey = att.id;
 						}
 					}
 					return true;
 				},
 
 				hydrateAttachments() {
-					if (!this.garageDB) return;
 					this.logs.forEach(log => {
 						(log.attachments || []).forEach(att => {
-							if (!att.data && att.storageKey) {
+							if(att.dataUrl){att.data=att.dataUrl;return;}
+ if (!att.data && att.storageKey&&this.garageDB) {
 								try {
 									const tx=this.garageDB.transaction('attachments','readonly');
 									const req=tx.objectStore('attachments').get(att.storageKey);

@@ -52,6 +52,11 @@ const server=createServer(async(req,res)=>{
  if(/\/pages\/99900[12]\.html$/.test(req.url)){
   const wide=req.url.endsWith("999001.html");res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP}).end('<div class="main"><h1>'+ (wide?'Wide fixture':'Narrow fixture')+'</h1><div style="width:'+(wide?'960px':'150px')+'">Fixture content</div></div>');return;
  }
+ // Same-origin inert document for observing activation without starting Garage
+ // or registering/updating its worker while the replacement is activating.
+ if(req.url?.startsWith("/__garage-activation?")){
+  res.writeHead(200,{"Content-Type":types[".html"],"Cache-Control":"no-store"}).end('<!doctype html><title>Garage activation probe</title>');return;
+ }
  if(req.url==="/__manual-isolation"){
   res.writeHead(200,{"Content-Type":types[".html"]}).end('<iframe id="manual" sandbox="'+manualSandbox+'" src="'+isolationPath+'1.html"></iframe>');return;
  }
@@ -372,16 +377,24 @@ async function run(name,launcher){
   },{prefix,version});
  };
  const activate=async(version,url)=>{
-  // Release the previous controlled document so its waiting replacement can activate normally.
+  // Release the previous Garage document before observing the replacement.
+  // Do not run Garage startup (including another registration/update) until
+  // activation has finished. The inert probe shares the origin and scope.
   await page.goto("about:blank");
-  await page.goto(url);await saved(page);
-  await waitForLifecycle("activated "+version,async({prefix,version})=>{
+  const probe=await page.goto(origin+"/__garage-activation?version="+version);
+  assert.equal(probe?.status(),200,"Activation probe must be served by the fixture");
+  const fullyActivated=async({prefix,version})=>{
    const keys=(await caches.keys()).filter(k=>k.startsWith(prefix));
    const registration=await navigator.serviceWorker.getRegistration(),controller=navigator.serviceWorker.controller;
    // Cache cleanup happens during activate, before the lifecycle is complete.
    // Require the document to be controlled by the fully activated registration.
    return !!controller&&controller===registration?.active&&controller.state==="activated"&&!registration.waiting&&!registration.installing&&keys.length===1&&keys[0]===prefix+version;
-  },{prefix,version});
+  };
+  await waitForLifecycle("activated on inert probe "+version,fullyActivated,{prefix,version});
+  const response=await page.goto(url);
+  assert.equal(response?.status(),200,"Garage must load after activation");
+  await saved(page);
+  await waitForLifecycle("activated Garage controller "+version,fullyActivated,{prefix,version});
  };
  const checkOfflineShell=async(version,url)=>{
   // Use a previously unvisited URL to rule out WebKit's reuse of the online navigation.

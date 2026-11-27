@@ -93,7 +93,18 @@ async function verifyManualIsolation(browser,name){
   assert.equal(await p.evaluate(()=>localStorage.getItem("manual-script-ran")),null);
   console.log(name,"manual content isolation and same-origin navigation passed");
   await p.setViewportSize({width:390,height:844});
-  await p.goto(origin+"/manuals.html#/v/1/0/999001");
+  await p.goto(origin+"/manuals.html#/");
+ await p.locator('#tabs a').first().waitFor({state:"visible"});
+ assert.deepEqual(await p.locator('#tabs a span').allTextContents(),["Home","Projects","Capture","Inventory","Manuals"]);
+ await p.locator('#tabs').getByRole("link",{name:"Capture",exact:true}).click();
+ await p.getByRole("dialog",{name:"Capture menu"}).waitFor({state:"visible"});
+ await p.getByRole("button",{name:"Close capture"}).click();
+ await p.getByRole("button",{name:/^Execute:/}).click();
+ await p.getByRole("dialog",{name:"Mission Control items"}).waitFor({state:"visible"});
+ await p.getByRole("button",{name:"Close mission items"}).click();
+ await p.getByRole("dialog",{name:"Mission Control items"}).waitFor({state:"hidden"});
+ console.log(name,"shared navigation, cross-workspace capture and mission tiles passed");
+ await p.goto(origin+"/manuals.html#/v/1/0/999001");
   const zoom=p.locator("#zoomlevel");
   await p.waitForFunction(()=>document.querySelector("#fr")?.style.visibility==="visible"&&document.querySelector("#zoomlevel")?.textContent.startsWith("Fit "));
   const fit=Number((await zoom.textContent()).match(/(\d+)%/)[1]);assert.ok(fit>20&&fit<60,"Wide page must fit mobile width");
@@ -138,6 +149,7 @@ async function run(name,launcher){
  try{
  await context.addInitScript(({state,cart,origin})=>{if(location.origin!==origin)return;if(!sessionStorage.getItem("fixture-seeded")){localStorage.setItem("motornote_pro_app_state",JSON.stringify(state));localStorage.setItem("lifeos.repair.project-draft.v1",JSON.stringify({id:"fixture-draft",cart}));sessionStorage.setItem("fixture-seeded","1");}},{state:fixture,cart,origin});
  await page.goto(origin+"/garage?newProject=1&repairDraft=fixture-draft");await saved(page);await tab(page,"projects");
+ assert.deepEqual(await page.locator('nav[aria-label="MotorNote navigation"] span').allTextContents(),["Home","Projects","Capture","Inventory","Manuals"]);
  await page.locator('[x-model="newProjectForm.title"]').fill("Fixture cart import");
  await page.locator('button[\\@click="saveNewProject()"]').click();
  await page.waitForFunction(sel=>window.Alpine.$data(document.querySelector(sel)).projects.some(p=>p.title==="Fixture cart import"),selector);await saved(page);
@@ -150,6 +162,18 @@ async function run(name,launcher){
  // Synthetic plan avoids R2 calls; actual app methods, UI and IndexedDB remain in use.
  const ids=await app(page,async(a,plan)=>{a.newProjectForm={title:plan.title,category:"Repair",description:plan.scope,budget:100,priority:"Medium",dueDate:""};await a.saveNewProject(plan);const p=a.projects.find(p=>p.title===plan.title);p.partRequirements[0].partNumber="FIX-1";p.partRequirements[0].unit="each";if(!await a.saveToStorage())throw Error("Fixture plan save failed");return {p:p.id,r:p.partRequirements[0].id};},plan);
  await detail.getByRole("heading",{name:plan.title,exact:true}).waitFor({state:"visible"});
+ assert.equal(await detail.getByRole("button",{name:"Overview",exact:true}).getAttribute("aria-pressed"),"true");
+ for(const [label,key,heading] of [["Work","work","Project workspace"],["Parts","parts","Parts & procurement"],["Manual","manual","Browse vehicle manuals"],["Records","records","Receipts & project evidence"]]){
+  await detail.getByRole("button",{name:label,exact:true}).click();
+  await detail.locator('[data-project-view="'+key+'"]').waitFor({state:"visible"});
+  assert.equal(await detail.locator('[data-project-view]:visible').count(),1);
+  assert.equal(await detail.locator('[data-project-view="'+key+'"]').getByText(heading,{exact:false}).first().isVisible(),true);
+  assert.equal(await detail.getByRole("button",{name:"Save Project Workspace"}).isVisible(),true);
+ }
+ await detail.getByRole("button",{name:"Overview",exact:true}).click();
+ await detail.locator('[data-project-view="overview"]').waitFor({state:"visible"});
+ assert.equal(await detail.getByRole("button",{name:/Open guided preparation/}).isVisible(),true);
+ console.log(name,"project workspace views preserve guided repair and save controls");
  await detail.getByRole("button",{name:"Close project",exact:true}).click();await detail.waitFor({state:"hidden"});
  await page.locator("nav").getByRole("button",{name:/Inventory/}).click();await tab(page,"inventory");assert.equal(await page.locator("[data-garage-tab]").count(),1);
  await app(page,a=>a.openVendorDraft());

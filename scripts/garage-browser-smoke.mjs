@@ -10,17 +10,25 @@ const {chromium,webkit}=require("../.browser-tests/node_modules/playwright");
 const root=resolve("public"),types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json",".svg":"image/svg+xml"};
 let networkBlocked=false,blockedRequests=0,rollbackMode=false;
 const rollbackCommit="4a2d43c5cdc8e6e98c72e03a57871a0ace4a5334";
-const rollbackHtml=execFileSync("git",["show",rollbackCommit+":public/garage.html"],{encoding:"utf8",maxBuffer:8*1024*1024});
+assert.ok(process.env.MOTORNOTE_RECOVERY_ROOT,"Build the pinned recovery fixture and set MOTORNOTE_RECOVERY_ROOT before running browser smoke");
+const rollbackRoot=resolve(process.env.MOTORNOTE_RECOVERY_ROOT,"public");
+const rollbackHtml=await readFile(resolve(rollbackRoot,"garage.html"),"utf8");
+assert.equal(rollbackHtml,execFileSync("git",["show",rollbackCommit+":public/garage.html"],{encoding:"utf8",maxBuffer:8*1024*1024}));
 assert.match(rollbackHtml,/appSchemaVersion: 9/);
 assert.doesNotMatch(rollbackHtml,/data-common-specs/);
+const shellVersion=async dir=>{
+ const source=await readFile(resolve(dir,"garage-sw.js"),"utf8");
+ const hash=source.match(/const VERSION = "([a-f0-9]{64})";/)?.[1];
+ assert.ok(hash,"Expected generated Garage service worker");
+ return hash;
+};
+const currentShell=await shellVersion(root),recoveryShell=await shellVersion(rollbackRoot);
+assert.notEqual(currentShell,recoveryShell,"Recovery must use its own built assets");
 const manualSandbox=(await readFile(resolve(root,"manuals.html"),"utf8")).match(/<iframe class="pg"[^>]*sandbox="([^"]+)"/)?.[1];
 assert.equal(manualSandbox,"allow-same-origin");
 const isolationPath="/m/isolation-fixture/pages/";
 const server=createServer(async(req,res)=>{
  if(networkBlocked){blockedRequests++;req.socket.destroy();return;}
- if(rollbackMode&&new URL(req.url,"http://localhost").pathname==="/garage"){
-  res.writeHead(200,{"Content-Type":types[".html"],"Cache-Control":"no-store","X-Test-Recovery-Commit":rollbackCommit}).end(rollbackHtml);return;
- }
  if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html"){
   res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Quick Lookups: Fluids</h1><p>FLUID CAPACITIES</p><table><tr><td>Engine Oil</td><td>Fixture</td></tr><tr><td>Engine Coolant</td><td>Fixture</td></tr></table>');return;
  }
@@ -40,7 +48,7 @@ const server=createServer(async(req,res)=>{
  if(req.url===isolationPath+"1.html"||req.url===isolationPath+"2.html"){
   res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Fixture manual</h1><script>window.manualScriptExecuted=true;localStorage.setItem("manual-script-ran","yes")</script><a href="2.html">Next diagram</a>');return;
  }
- try{const url=new URL(req.url,"http://localhost"),p=resolve(root,"."+decodeURIComponent(url.pathname==="/garage"?"/garage.html":url.pathname));if(!p.startsWith(root+sep)){res.writeHead(404).end();return;}res.writeHead(200,{"Content-Type":types[extname(p)]||"application/octet-stream","Cache-Control":"no-store"}).end(await readFile(p));}
+ try{const url=new URL(req.url,"http://localhost"),assetRoot=rollbackMode?rollbackRoot:root,p=resolve(assetRoot,"."+decodeURIComponent(url.pathname==="/garage"?"/garage.html":url.pathname));if(!p.startsWith(assetRoot+sep)){res.writeHead(404).end();return;}const bytes=await readFile(p);res.writeHead(200,{"Content-Type":types[extname(p)]||"application/octet-stream","Cache-Control":"no-store",...(rollbackMode?{"X-Test-Recovery-Commit":rollbackCommit}:{})}).end(bytes);}
  catch{if(!res.headersSent)res.writeHead(404);res.end();}
 });
 await new Promise(r=>server.listen(0,"127.0.0.1",r));
@@ -241,9 +249,9 @@ async function run(name,launcher){
  console.log(name,"verified Specs modal opens in place and rejects mismatched documents; quick reference shares safe defaults");
 
  phase="schema-compatible rollback";
- // Exercise the actual older V9 Garage HTML with the current unchanged runtime
- // modules on the same test origin and IndexedDB, not a new browser or import.
- // This checks storage compatibility, not an actual Cloudflare traffic rollback.
+ // Switch the complete independently built static shell on the same origin,
+ // including the service worker, CSS and runtime modules, without touching production.
+ // This simulates a deployment switch; it is not a Cloudflare traffic rollback.
  const newAttachment=await app(page,async(a,id)=>{
   const p=a.projects.find(x=>x.id===id);
   if(!await a.addProjectAttachments(p,{target:{files:[new File(["rollback bytes"],"rollback.pdf",{type:"application/pdf"})],value:""}}))throw Error("Rollback fixture attachment failed");
@@ -268,19 +276,54 @@ async function run(name,launcher){
  assert.equal(beforeRollback.stored.vendorOrders.length,1);
  assert.ok(beforeRollback.stored.toolInventory.some(t=>t.id==="rollback-tool"));
  assert.deepEqual(beforeRollback.bytes,Array.from(Buffer.from("rollback bytes")),"Newly uploaded rollback fixture must have exact committed bytes");
+ const prefix="motornote-garage-shell-";
+ const awaitInstalled=async version=>{
+  await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();if(!r)throw Error("No Garage registration");await r.update();});
+  await page.waitForFunction(async({prefix,version})=>{
+   const r=await navigator.serviceWorker.getRegistration(),keys=(await caches.keys()).filter(k=>k.startsWith(prefix)),key=prefix+version;
+   if(!keys.includes(key))return false;
+   const cache=await caches.open(key),html=await cache.match(location.origin+"/garage");
+   return !!html&&(r?.waiting?.state==="installed"||(keys.length===1&&r?.active?.state==="activated"));
+  },{prefix,version},{timeout:45000});
+ };
+ const activate=async(version,url)=>{
+  // Release the previous controlled document so its waiting replacement can activate normally.
+  await page.goto("about:blank");
+  await page.goto(url);await saved(page);
+  await page.waitForFunction(async({prefix,version})=>{
+   const keys=(await caches.keys()).filter(k=>k.startsWith(prefix));
+   return !!navigator.serviceWorker.controller&&keys.length===1&&keys[0]===prefix+version;
+  },{prefix,version},{timeout:45000});
+ };
+ const checkOfflineShell=async(version,url)=>{
+  await page.goto("about:blank");networkBlocked=true;
+  try{
+   await assert.rejects(fetch(origin+"/garage",{cache:"no-store"}));
+   const response=await page.goto(url);assert.equal(response?.status(),200);await saved(page);
+   const pinned=await page.evaluate(()=>[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline")));
+   assert.equal(pinned.length,12);assert.ok(pinned.every(v=>v===version),"Offline resources must all use the selected build");
+   assert.deepEqual(await snapshot(),beforeRollback,"Offline startup must preserve the full V9 state");
+  }finally{networkBlocked=false;}
+ };
  try{
   rollbackMode=true;
-  const response=await page.goto(origin+"/garage?recovery-fixture=1#specs");
+  const url=origin+"/garage?recovery-fixture=1#specs";
+  const response=await page.goto(url);
   assert.equal(response?.headers()["x-test-recovery-commit"],rollbackCommit,"Must actually load pinned V9 recovery HTML");
   await saved(page);
   assert.equal(await page.locator("[data-common-specs]").count(),0);
   assert.deepEqual(await snapshot(),beforeRollback,"Recovery build startup save must preserve every collection and attachment byte");
   assert.equal(await app(page,a=>window.MotorNoteInventoryEngine.audit(a.inventoryLedger,a.inventory).length),0);
+  await awaitInstalled(recoveryShell);await activate(recoveryShell,url);
+  await checkOfflineShell(recoveryShell,url);
  }finally{rollbackMode=false;}
- await page.reload();await saved(page);await tab(page,"profile");
+ const currentUrl=origin+"/garage?recovery-fixture=return#specs";
+ await page.goto(currentUrl);await saved(page);await tab(page,"profile");
+ await awaitInstalled(currentShell);await activate(currentShell,currentUrl);
  assert.equal(await page.locator("[data-common-specs]").count(),1);
  assert.deepEqual(await snapshot(),beforeRollback,"Returning to current release must preserve the V9 data");
- console.log(name,"same-origin V9 rollback and return preserved all persisted collections and attachment bytes");
+ await checkOfflineShell(currentShell,currentUrl);
+ console.log(name,"same-origin V9 full asset and offline shell rollback and return preserved all persisted collections and attachment bytes");
 
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");assert.deepEqual(runtimeDetails,[],"Browser runtime diagnostics");
  await verifyManualIsolation(browser,name);

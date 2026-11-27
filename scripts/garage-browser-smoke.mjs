@@ -29,7 +29,16 @@ const manualSandbox=(await readFile(resolve(root,"manuals.html"),"utf8")).match(
 assert.equal(manualSandbox,"allow-same-origin");
 const isolationPath="/m/isolation-fixture/pages/";
 const server=createServer(async(req,res)=>{
- if(networkBlocked){blockedRequests++;blockedPaths.push(req.url);req.socket.destroy();return;}
+ // Avoid reusing connections across simulated connectivity transitions.
+ // A graceful TCP FIN before any HTTP response is still a transport
+ // failure (not an HTTP 503, which the production worker must not mask).
+ if(networkBlocked){
+  blockedRequests++;blockedPaths.push(req.url);
+  req.socket.end();
+  return;
+ }
+ res.shouldKeepAlive=false;
+ res.setHeader("Connection","close");
  if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html"){
   res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Quick Lookups: Fluids</h1><p>FLUID CAPACITIES</p><table><tr><td>Engine Oil</td><td>Fixture</td></tr><tr><td>Engine Coolant</td><td>Fixture</td></tr></table>');return;
  }
@@ -242,7 +251,8 @@ async function run(name,launcher){
  networkBlocked=true;
  try {
   await assert.rejects(fetch(origin+"/garage",{cache:"no-store"}),"Origin must be unreachable");
-  const response=await page.goto(origin+"/garage");
+  const coldPath="/garage?offline-cold=1";
+  const response=await page.goto(origin+coldPath);
   assert.equal(response?.status(),200,"Cold navigation must return a successful cached document");
   assert.equal(await page.evaluate(()=>!!navigator.serviceWorker.controller),true,"Cold navigation must be service-worker controlled");
   if(name==="chromium")assert.equal(response.fromServiceWorker(),true,"Chromium cold response must come from the service worker");
@@ -255,9 +265,12 @@ async function run(name,launcher){
   assert.equal(await app(page,async a=>{a.openNewPartModal();Object.assign(a.newPartForm,{description:"Cold offline fixture",partNumber:"COLD-OFFLINE-1",quantity:1,unitCost:4,vehicleCompatibility:"Universal"});return await a.saveNewPart();}),true);
   await saved(page);
   const beforeReload=await page.evaluate(()=>performance.timeOrigin);
+  const reloadBlockedStart=blockedPaths.length;
   const reloadResponse=await navigate("offline durable save reload",()=>page.reload());
   assert.equal(reloadResponse?.status(),200,"Offline reload must return cached HTML");
   assert.equal(await page.evaluate(()=>!!navigator.serviceWorker.controller),true,"Offline reload must remain controlled");
+  assert.ok(blockedPaths.slice(reloadBlockedStart).includes(coldPath),"Offline reload must attempt the unavailable origin");
+  if(name==="chromium")assert.equal(reloadResponse.fromServiceWorker(),true,"Offline reload must come from the service worker");
   assert.notEqual(await page.evaluate(()=>performance.timeOrigin),beforeReload,"Offline reload must replace the document");
   await saved(page);
   assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline"))),pinned,"Reload must preserve the coherent cached shell");

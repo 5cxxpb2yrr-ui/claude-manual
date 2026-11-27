@@ -293,7 +293,10 @@ async function run(name,launcher){
   await page.goto(url);await saved(page);
   await page.waitForFunction(async({prefix,version})=>{
    const keys=(await caches.keys()).filter(k=>k.startsWith(prefix));
-   return !!navigator.serviceWorker.controller&&keys.length===1&&keys[0]===prefix+version;
+   const registration=await navigator.serviceWorker.getRegistration(),controller=navigator.serviceWorker.controller;
+   // Cache cleanup happens during activate, before the lifecycle is complete.
+   // Require the document to be controlled by the fully activated registration.
+   return !!controller&&controller===registration?.active&&controller.state==="activated"&&!registration.waiting&&!registration.installing&&keys.length===1&&keys[0]===prefix+version;
   },{prefix,version},{timeout:45000});
  };
  const checkOfflineShell=async(version,url)=>{
@@ -301,7 +304,10 @@ async function run(name,launcher){
   const cold=new URL(url);
   cold.searchParams.set("offline-probe",version);
   const blockedStart=blockedPaths.length;
-  await page.goto("about:blank");networkBlocked=true;
+  // Activation already released the previous document. Navigate from the
+  // verified controller to a never-visited URL without another blank round-trip.
+  // Earlier cold-start checks still exercise blank-to-offline navigation.
+  networkBlocked=true;
   try{
    await assert.rejects(fetch(origin+"/garage",{cache:"no-store"}));
    const response=await page.goto(cold.href);assert.equal(response?.status(),200);await saved(page);
@@ -309,12 +315,14 @@ async function run(name,launcher){
     pinned:[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline")),
     caches:(await caches.keys()).filter(k=>k.startsWith("motornote-garage-shell-")),
     controlled:!!navigator.serviceWorker.controller,
+    activeController:await (async()=>{const r=await navigator.serviceWorker.getRegistration(),c=navigator.serviceWorker.controller;return !!c&&c===r?.active&&c.state==="activated"&&!r.waiting&&!r.installing})(),
     url:location.href
    }));
    const attempted=blockedPaths.slice(blockedStart);
    console.log(name,"offline recovery probe",JSON.stringify({expected:version,...diagnostic,attempted}));
    assert.ok(attempted.includes(cold.pathname+cold.search),"Fresh offline navigation must attempt the blocked origin");
    assert.equal(diagnostic.controlled,true);
+   assert.equal(diagnostic.activeController,true,"Offline probe must use the fully activated controller");
    assert.deepEqual(diagnostic.caches,[prefix+version]);
    assert.equal(diagnostic.pinned.length,12);
    assert.deepEqual(diagnostic.pinned,Array(12).fill(version),"Offline resources must all use the selected build");

@@ -23,7 +23,15 @@ const balance=async(page,q,r)=>assert.deepEqual(await app(page,a=>{const p=a.inv
 async function run(name,launcher){
  const browser=await launcher.launch({headless:true}),context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:name==="webkit",hasTouch:true,acceptDownloads:true}),page=await context.newPage(),errors=[],dialogs=[],external=[];
  page.setDefaultTimeout(15000);
- page.on("pageerror",e=>errors.push(e.message));page.on("dialog",async d=>{dialogs.push(d.message());await d.accept();});
+ const runtimeDetails=[],consoleDetails=[];
+ let phase="startup";
+ page.on("pageerror",e=>{errors.push(e.message);const detail={phase,url:page.url(),name:e.name,message:e.message,stack:e.stack};runtimeDetails.push(detail);console.error(name,"pageerror",JSON.stringify(detail));});
+ page.on("console",msg=>{if(["error","warning"].includes(msg.type())){const detail={phase,type:msg.type(),text:msg.text(),location:msg.location()};consoleDetails.push(detail);console.error(name,"browser console",JSON.stringify(detail));}});
+ await page.exposeBinding("__garageRuntimeDiagnostic",(_source,detail)=>{runtimeDetails.push({phase,...detail});console.error(name,"browser diagnostic",JSON.stringify({phase,...detail}));});
+ await context.addInitScript(()=>{const describe=value=>{try{return {name:value?.name,message:value?.message,stack:value?.stack,text:String(value),properties:JSON.stringify(value,Object.getOwnPropertyNames(value??{}))};}catch{return {text:String(value)};}};
+ window.addEventListener("error",event=>{void window.__garageRuntimeDiagnostic({kind:"error",message:event.message,filename:event.filename,line:event.lineno,column:event.colno,error:describe(event.error)}).catch(()=>{});});
+ window.addEventListener("unhandledrejection",event=>{void window.__garageRuntimeDiagnostic({kind:"unhandledrejection",reason:describe(event.reason)}).catch(()=>{});});
+ });page.on("dialog",async d=>{dialogs.push(d.message());await d.accept();});
  await page.route("**/*",route=>{const url=route.request().url();if(url.startsWith(origin+"/")||url.startsWith("data:")||url.startsWith("blob:"))return route.continue();external.push(url);return route.abort();});
  try{
  await context.addInitScript(({state,cart})=>{if(!sessionStorage.getItem("fixture-seeded")){localStorage.setItem("motornote_pro_app_state",JSON.stringify(state));localStorage.setItem("lifeos.repair.project-draft.v1",JSON.stringify({id:"fixture-draft",cart}));sessionStorage.setItem("fixture-seeded","1");}},{state:fixture,cart});
@@ -33,6 +41,7 @@ async function run(name,launcher){
  await page.waitForFunction(sel=>window.Alpine.$data(document.querySelector(sel)).projects.some(p=>p.title==="Fixture cart import"),selector);await saved(page);
  assert.deepEqual(await app(page,a=>{const p=a.projects.find(p=>p.title==="Fixture cart import");return {part:p.partRequirements[0]?.partNumber,source:p.procedures[0]?.sourcePath,linked:Object.values(JSON.parse(localStorage.getItem("lifeos.repair.carts.v1")||"{}")).some(c=>c.projectId===p.id)};}),{part:"FIX-1",source:cart.source,linked:true});
  console.log(name,"manual-cart handoff passed");
+ phase="order and receiving";
  // Synthetic plan avoids R2 calls; actual app methods, UI and IndexedDB remain in use.
  const ids=await app(page,async(a,plan)=>{a.modals.projectDetail=false;a.newProjectForm={title:plan.title,category:"Repair",description:plan.scope,budget:100,priority:"Medium",dueDate:""};await a.saveNewProject(plan);const p=a.projects.find(p=>p.title===plan.title);p.partRequirements[0].partNumber="FIX-1";p.partRequirements[0].unit="each";if(!await a.saveToStorage())throw Error("Fixture plan save failed");a.modals.projectDetail=false;return {p:p.id,r:p.partRequirements[0].id};},plan);
  await page.locator("nav").getByRole("button",{name:/Inventory/}).click();await tab(page,"inventory");assert.equal(await page.locator("[data-garage-tab]").count(),1);
@@ -48,6 +57,7 @@ async function run(name,launcher){
  await page.waitForFunction(({sel,status})=>window.Alpine.$data(document.querySelector(sel)).vendorOrders[0].status===status,{sel:selector,status});await saved(page);await balance(page,status==="Received"?2:1,0);
  }
  console.log(name,"order and partial receiving passed");
+ phase="guided execution";
  await app(page,async(a,ids)=>{const p=a.projects.find(x=>x.id===ids.p),stock=a.inventory.find(x=>x.partNumber==="FIX-1");if(!await a.linkProjectReceipt(p,ids.r,stock.id))throw Error("link failed");if(!await a.reserveProjectPart(p,ids.r))throw Error("reserve failed");a.openProjectDetail(p);a.openProjectGuided(p);},ids);await balance(page,2,2);
  const complete=()=>page.getByRole("button",{name:"Confirm phase complete →"}).click();
  await complete();await page.getByText("Unified preparation checklist",{exact:true}).waitFor();
@@ -61,6 +71,7 @@ async function run(name,launcher){
  await page.waitForFunction(({sel,id})=>window.Alpine.$data(document.querySelector(sel)).logs.some(l=>l.projectId===id),{sel:selector,id:ids.p});await saved(page);
  const log=await app(page,(a,id)=>JSON.parse(JSON.stringify(a.logs.find(l=>l.projectId===id))),ids.p);assert.equal(log.materialConsumedValue,16);assert.equal(log.installedParts[0].quantity,2);assert.equal(log.guidedExecution.status,"completed");
  console.log(name,"guided execution and history passed");
+ phase="attachment upload";
  const uploaded=await app(page,async(a,id)=>{
  const p=a.projects.find(x=>x.id===id);
  const ok=await a.addProjectAttachments(p,{target:{files:[new File(["fixture pdf bytes"],"fixture.pdf",{type:"application/pdf"})],value:""}});
@@ -70,8 +81,10 @@ async function run(name,launcher){
  assert.equal(uploaded.ok,true,"Attachment metadata save");assert.equal(uploaded.count,1,"Attachment reference created");assert.equal(uploaded.storedBytes,17,"Committed attachment bytes readable");await saved(page);
  console.log(name,"attachment committed and read back",uploaded.storedBytes);
  await page.reload();await saved(page);await balance(page,0,0);
+ phase="attachment reload";
  const hydrated=await app(page,async(a,id)=>{const att=a.projects.find(p=>p.id===id)?.attachments?.[0];const blob=att?.storageKey?await a.readGarageAttachment(att.storageKey):null;return {present:!!att,hydrated:!!att?.data,bytes:blob?.size||0};},ids.p);
  assert.deepEqual(hydrated,{present:true,hydrated:true,bytes:17},"Attachment reload and hydration");
+ phase="backup restore";
  const backup=await app(page,a=>a.portableGarageState());const payload="data:application/pdf;base64,Zml4dHVyZSBwZGYgYnl0ZXM=";
  assert.equal(backup.projects.find(p=>p.id===ids.p).attachments[0].dataUrl,payload);
  assert.equal(await app(page,(a,b)=>a.recoverGarageState(b),backup),true);await saved(page);
@@ -81,14 +94,16 @@ async function run(name,launcher){
  assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
  console.log(name,"reload, attachment backup and restore passed");
  // Already-open Garage must be able to save a local transaction without network.
+ phase="offline transaction";
  await context.setOffline(true);
  const offlineSaved=await app(page,async a=>{a.openNewPartModal();Object.assign(a.newPartForm,{description:"Offline fixture",partNumber:"OFFLINE-1",quantity:1,unitCost:3,vehicleCompatibility:"Universal"});return await a.saveNewPart();});
  assert.equal(offlineSaved,true);await saved(page);
+ phase="reconnection and reload";
  await context.setOffline(false);await page.reload();await saved(page);
  assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="OFFLINE-1")?.quantity),1);
  console.log(name,"offline local save and subsequent reload passed");
- assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");
- }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,dialogs,external,url:page.url(),state:await app(page,a=>({saveState:a.saveState,lastSaveError:a.lastSaveError,projects:a.projects.map(p=>({id:p.id,title:p.title,attachments:(p.attachments||[]).map(x=>({id:x.id,storageKey:x.storageKey,name:x.name,hydrated:!!x.data}))}))})).catch(()=>null)},null,2));throw e;}
+ assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");assert.deepEqual(runtimeDetails,[],"Browser runtime diagnostics");
+ }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,runtimeDetails,consoleDetails,dialogs,external,url:page.url(),state:await app(page,a=>({saveState:a.saveState,lastSaveError:a.lastSaveError,projects:a.projects.map(p=>({id:p.id,title:p.title,attachments:(p.attachments||[]).map(x=>({id:x.id,storageKey:x.storageKey,name:x.name,hydrated:!!x.data}))}))})).catch(()=>null)},null,2));throw e;}
  finally{await context.close();await browser.close();}
 }
 try{const failures=[];for(const [name,launcher] of [["chromium",chromium],["webkit",webkit]]){try{await run(name,launcher)}catch(e){console.error(name,e);failures.push(name);}}if(failures.length)throw Error("Failed browsers: "+failures.join(", "));}finally{server.close();}

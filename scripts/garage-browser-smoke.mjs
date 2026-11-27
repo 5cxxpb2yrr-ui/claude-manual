@@ -278,30 +278,48 @@ async function run(name,launcher){
  assert.ok(beforeRollback.stored.toolInventory.some(t=>t.id==="rollback-tool"));
  assert.deepEqual(beforeRollback.bytes,Array.from(Buffer.from("rollback bytes")),"Newly uploaded rollback fixture must have exact committed bytes");
  const prefix="motornote-garage-shell-";
+ // The browser predicate is asynchronous (CacheStorage and registration APIs).
+ // Resolve it explicitly before deciding whether to continue polling. A
+ // Promise itself is truthy, even when its eventual value is false.
+ const waitForLifecycle=async(label,predicate,arg)=>{
+  const deadline=Date.now()+45000;
+  do{
+   if(await page.evaluate(predicate,arg)===true)return;
+   await new Promise(resolve=>setTimeout(resolve,100));
+  }while(Date.now()<deadline);
+  const detail=await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration(),c=navigator.serviceWorker.controller;return {controller:c?.state??null,active:r?.active?.state??null,waiting:r?.waiting?.state??null,installing:r?.installing?.state??null,caches:await caches.keys()};});
+  throw Error("Timed out waiting for "+label+": "+JSON.stringify(detail));
+ };
  const awaitInstalled=async version=>{
   await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();if(!r)throw Error("No Garage registration");await r.update();});
-  await page.waitForFunction(async({prefix,version})=>{
+  await waitForLifecycle("installed "+version,async({prefix,version})=>{
    const r=await navigator.serviceWorker.getRegistration(),keys=(await caches.keys()).filter(k=>k.startsWith(prefix)),key=prefix+version;
    if(!keys.includes(key))return false;
    const cache=await caches.open(key),html=await cache.match(location.origin+"/garage");
    return !!html&&(r?.waiting?.state==="installed"||(keys.length===1&&r?.active?.state==="activated"));
-  },{prefix,version},{timeout:45000});
+  },{prefix,version});
  };
  const activate=async(version,url)=>{
   // Release the previous controlled document so its waiting replacement can activate normally.
   await page.goto("about:blank");
   await page.goto(url);await saved(page);
-  await page.waitForFunction(async({prefix,version})=>{
+  await waitForLifecycle("activated "+version,async({prefix,version})=>{
    const keys=(await caches.keys()).filter(k=>k.startsWith(prefix));
-   return !!navigator.serviceWorker.controller&&keys.length===1&&keys[0]===prefix+version;
-  },{prefix,version},{timeout:45000});
+   const registration=await navigator.serviceWorker.getRegistration(),controller=navigator.serviceWorker.controller;
+   // Cache cleanup happens during activate, before the lifecycle is complete.
+   // Require the document to be controlled by the fully activated registration.
+   return !!controller&&controller===registration?.active&&controller.state==="activated"&&!registration.waiting&&!registration.installing&&keys.length===1&&keys[0]===prefix+version;
+  },{prefix,version});
  };
  const checkOfflineShell=async(version,url)=>{
   // Use a previously unvisited URL to rule out WebKit's reuse of the online navigation.
   const cold=new URL(url);
   cold.searchParams.set("offline-probe",version);
   const blockedStart=blockedPaths.length;
-  await page.goto("about:blank");networkBlocked=true;
+  // Activation already released the previous document. Navigate from the
+  // verified controller to a never-visited URL without another blank round-trip.
+  // Earlier cold-start checks still exercise blank-to-offline navigation.
+  networkBlocked=true;
   try{
    await assert.rejects(fetch(origin+"/garage",{cache:"no-store"}));
    const response=await page.goto(cold.href);assert.equal(response?.status(),200);await saved(page);
@@ -309,12 +327,14 @@ async function run(name,launcher){
     pinned:[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline")),
     caches:(await caches.keys()).filter(k=>k.startsWith("motornote-garage-shell-")),
     controlled:!!navigator.serviceWorker.controller,
+    activeController:await (async()=>{const r=await navigator.serviceWorker.getRegistration(),c=navigator.serviceWorker.controller;return !!c&&c===r?.active&&c.state==="activated"&&!r.waiting&&!r.installing})(),
     url:location.href
    }));
    const attempted=blockedPaths.slice(blockedStart);
    console.log(name,"offline recovery probe",JSON.stringify({expected:version,...diagnostic,attempted}));
    assert.ok(attempted.includes(cold.pathname+cold.search),"Fresh offline navigation must attempt the blocked origin");
    assert.equal(diagnostic.controlled,true);
+   assert.equal(diagnostic.activeController,true,"Offline probe must use the fully activated controller");
    assert.deepEqual(diagnostic.caches,[prefix+version]);
    assert.equal(diagnostic.pinned.length,12);
    assert.deepEqual(diagnostic.pinned,Array(12).fill(version),"Offline resources must all use the selected build");

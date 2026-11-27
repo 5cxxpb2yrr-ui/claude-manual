@@ -10,7 +10,7 @@
 
 Application schema V7 and V9 share IndexedDB version 4, but V7 cannot safely save V9 records. Its startup serialization drops inventoryLedger, vendorOrders and toolInventory, strips inline data fields, and cannot hydrate V9 ArrayBuffer attachment rows. Never direct a browser containing V9 data to V7 as routine rollback.
 
-The initial V9 recovery test passed using the pinned older Garage HTML with unchanged shared runtime modules on the same origin and database. The expanded test independently builds the recovery source and switches the entire static asset directory and service worker on that same test origin. It checks coherent version-pinned offline startup and all persisted collections and attachment bytes on recovery and return. The expanded test requires green CI before it can be considered verified. It does not perform an actual Cloudflare traffic rollback.
+The initial V9 recovery test passed using the pinned older Garage HTML with unchanged shared runtime modules on the same origin and database. The expanded test independently builds the recovery source and switches the entire static asset directory and service worker on that same test origin. It checks coherent version-pinned offline startup and all persisted collections and attachment bytes on recovery and return. The expanded test passed in both Chromium and WebKit in [run 46026802862](https://github.com/5cxxpb2yrr-ui/claude-manual/actions/runs/46026802862), commit `d459688c89b3a72620597284ade32caa9e8e5031`, Worker version `284d3938-2c7f-4ec7-96ea-79694d0bc98a`. It does not perform an actual Cloudflare traffic rollback.
 
 ## Before release
 
@@ -24,3 +24,10 @@ The initial V9 recovery test passed using the pinned older Garage HTML with unch
 Stop writes and export the latest readable V9 data before recovery. Recheck deployment history and select the known compatible V9 recovery version (not V7). A Worker rollback requires explicit authorization. Use the same production origin and do not clear browser storage. Check startup, service-worker version and asset coherence, data counts, ledger audit, purchase orders, tools, attachment access and a controlled save/reload. If the issue affects shared V9 persistence or migration itself, do not blindly switch versions: preserve current state and backups and use a reviewed forward recovery fix.
 
 No production traffic changes or access changes are authorized by this document. A code rollback does not restore IndexedDB or R2 content.
+
+## Preview Access transition
+
+- Keep Access changes separate from production code deployment. Use a preview-scoped service token, not an account API token, with a Service Auth policy on the preview application. Human login remains a separate Allow policy for authorized account members.
+- Save the service-token client ID and secret in the GitHub `preview` environment as `MOTORNOTE_ACCESS_CLIENT_ID` and `MOTORNOTE_ACCESS_CLIENT_SECRET`. Never put credentials in a commit, chat, URL, or log. Both must be supplied together.
+- The workflow supports transitional mode while protection is not enabled. Once the preview Access application is configured, set the preview environment variable `MOTORNOTE_PREVIEW_ACCESS_REQUIRED=true` so missing credentials fail before upload and anonymous access must be denied. Asset requests use headers only on the fixed preview host, never follow redirects, and retain existing byte comparisons. The anonymous status check is a basic smoke test; separately verify Access login redirects and protection of all direct routes.
+- Verify authenticated asset delivery, anonymous denial, human login and manual navigation before changing production Access. Do not disable public R2 until all independent library and legacy paths are accounted for. No production token is needed for preview CI.

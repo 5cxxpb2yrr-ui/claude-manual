@@ -116,9 +116,28 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MOTORNOTE_ACCESS_CLIENT_ID: ${{ secrets.MOTORNOTE_ACCESS_CLIENT_ID }}
+          MOTORNOTE_ACCESS_CLIENT_SECRET: ${{ secrets.MOTORNOTE_ACCESS_CLIENT_SECRET }}
+          MOTORNOTE_PREVIEW_ACCESS_REQUIRED: ${{ vars.MOTORNOTE_PREVIEW_ACCESS_REQUIRED }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
+          # Credentials are scoped to this preview verification step only.
+          # Never follow redirects or send these headers to an arbitrary URL.
+          ACCESS_HEADERS=()
+          case "${MOTORNOTE_PREVIEW_ACCESS_REQUIRED:-false}" in
+            true|false) ;;
+            *) echo "::error::MOTORNOTE_PREVIEW_ACCESS_REQUIRED must be true or false"; exit 1 ;;
+          esac
+          if [[ -n "$MOTORNOTE_ACCESS_CLIENT_ID" && -n "$MOTORNOTE_ACCESS_CLIENT_SECRET" ]]; then
+            ACCESS_HEADERS=(-H "CF-Access-Client-Id: $MOTORNOTE_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $MOTORNOTE_ACCESS_CLIENT_SECRET")
+            echo "Preview verification: Access service authentication enabled"
+          elif [[ -n "$MOTORNOTE_ACCESS_CLIENT_ID" || -n "$MOTORNOTE_ACCESS_CLIENT_SECRET" || "$MOTORNOTE_PREVIEW_ACCESS_REQUIRED" == "true" ]]; then
+            echo "::error::Both MotorNote preview Access secrets are required"
+            exit 1
+          else
+            echo "Preview verification: transitional unauthenticated mode"
+          fi
           BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
           case "$BRANCH" in
             preview/scion-torque-sibling-fix-20261125) ALIAS=preview-scion-torque-sibling-fix-20261125 ;;
@@ -134,7 +153,7 @@ jobs:
             for attempt in 1 2 3 4 5 6; do
               echo "Checking $asset (attempt $attempt)"
               rm -f /tmp/pdf-headers /tmp/pdf-asset
-              if curl --silent --show-error --max-time 30 -H 'Cache-Control: no-cache' -D /tmp/pdf-headers -o /tmp/pdf-asset "$BASE/api/receipt-pdf/4.10.38/$asset?verify=$GITHUB_SHA-$attempt"; then
+              if curl "${ACCESS_HEADERS[@]}" --silent --show-error --max-time 30 -H 'Cache-Control: no-cache' -D /tmp/pdf-headers -o /tmp/pdf-asset "$BASE/api/receipt-pdf/4.10.38/$asset?verify=$GITHUB_SHA-$attempt"; then
                 grep -Ei '^(HTTP/|content-type:|content-length:|cf-cache-status:)' /tmp/pdf-headers || true
                 echo "Expected / received bytes:"
                 wc -c "node_modules/pdfjs-dist/legacy/build/$asset" /tmp/pdf-asset
@@ -150,7 +169,7 @@ jobs:
           done
           for asset in tesseract.min.js worker.min.js tesseract-core-lstm.wasm.js tesseract-core-lstm.wasm eng.traineddata.gz; do
             echo "Checking OCR asset $asset"
-            curl --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ocr-headers -o /tmp/ocr-asset "$BASE/receipt-ocr-v6/$asset?verify=$GITHUB_SHA"
+            curl "${ACCESS_HEADERS[@]}" --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ocr-headers -o /tmp/ocr-asset "$BASE/receipt-ocr-v6/$asset?verify=$GITHUB_SHA"
             grep -Ei '^(HTTP/|content-type:)' /tmp/ocr-headers
             case "$asset" in
               *.js) grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/ocr-headers ;;
@@ -161,10 +180,19 @@ jobs:
           done
 
           for asset in garage.css alpine.min.js; do
-            curl --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ui-headers -o /tmp/ui-asset "$BASE/garage-ui-v1/$asset?verify=$GITHUB_SHA"
+            curl "${ACCESS_HEADERS[@]}" --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ui-headers -o /tmp/ui-asset "$BASE/garage-ui-v1/$asset?verify=$GITHUB_SHA"
             case "$asset" in
               *.css) grep -Eiq '^content-type: *text/css' /tmp/ui-headers ;;
               *.js) grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/ui-headers ;;
             esac
             cmp /tmp/ui-asset "public/garage-ui-v1/$asset"
           done
+
+          # A successful authenticated response alone does not prove protection.
+          if [[ "$MOTORNOTE_PREVIEW_ACCESS_REQUIRED" == "true" ]]; then
+            status=$(curl --silent --show-error --max-time 30 -o /dev/null -w '%{http_code}' "$BASE/garage?anonymous-check=$GITHUB_SHA")
+            case "$status" in
+              302|303|307|308|401|403) echo "Anonymous preview access denied ($status)" ;;
+              *) echo "::error::Anonymous preview request was not blocked (HTTP $status)"; exit 1 ;;
+            esac
+          fi

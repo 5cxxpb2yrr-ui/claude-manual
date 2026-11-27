@@ -249,7 +249,11 @@ async function run(name,launcher){
   if(!await a.addProjectAttachments(p,{target:{files:[new File(["rollback bytes"],"rollback.pdf",{type:"application/pdf"})],value:""}}))throw Error("Rollback fixture attachment failed");
   a.toolInventory.push({id:"rollback-tool",name:"Fixture torque wrench",notes:"Recovery test"});
   if(!await a.saveToStorage("Rollback fixture"))throw Error("Rollback fixture save failed");
-  return p.attachments.at(-1).storageKey;
+  const attachment=p.attachments.find(att=>att.name==="rollback.pdf");
+  if(!attachment?.storageKey)throw Error("New rollback attachment reference missing");
+  const stored=await a.readGarageAttachment(attachment.storageKey);
+  if(!stored||await stored.text()!=="rollback bytes")throw Error("New rollback attachment bytes do not match");
+  return attachment.storageKey;
  },ids.p);
  await saved(page);
  const snapshot=async()=>app(page,async(a,key)=>{
@@ -263,11 +267,11 @@ async function run(name,launcher){
  assert.ok(beforeRollback.stored.inventoryLedger.length>0);
  assert.equal(beforeRollback.stored.vendorOrders.length,1);
  assert.ok(beforeRollback.stored.toolInventory.some(t=>t.id==="rollback-tool"));
- assert.ok(beforeRollback.bytes?.length);
+ assert.deepEqual(beforeRollback.bytes,Array.from(Buffer.from("rollback bytes")),"Newly uploaded rollback fixture must have exact committed bytes");
  try{
   rollbackMode=true;
-  const response=await page.goto(origin+"/garage#specs");
-  assert.equal(response.headers()["x-test-recovery-commit"],rollbackCommit,"Must actually load pinned V9 recovery HTML");
+  const response=await page.goto(origin+"/garage?recovery-fixture=1#specs");
+  assert.equal(response?.headers()["x-test-recovery-commit"],rollbackCommit,"Must actually load pinned V9 recovery HTML");
   await saved(page);
   assert.equal(await page.locator("[data-common-specs]").count(),0);
   assert.deepEqual(await snapshot(),beforeRollback,"Recovery build startup save must preserve every collection and attachment byte");

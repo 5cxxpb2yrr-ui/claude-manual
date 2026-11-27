@@ -58,6 +58,7 @@ function receive(order,inventory,amounts,now=new Date().toISOString()){
   if(!part&&line.barcode){const matches=stock.filter(p=>p.barcode===line.barcode);if(matches.length>1)throw Error("Ambiguous stock barcode.");if(matches.length===1){part=matches[0];if((part.vehicleCompatibility||"Not verified")!==line.vehicleCompatibility||norm(part.unit||"each")!==norm(line.unit)||(pn(line.partNumber)&&pn(part.partNumber)!==pn(line.partNumber)))throw Error("Barcode match differs in fitment, unit or part number.");}}
   if(!part){
    const matches=stock.filter(p=>pn(line.partNumber)&&pn(p.partNumber)===pn(line.partNumber)&&p.vehicleCompatibility===line.vehicleCompatibility&&norm(p.unit||"each")===norm(line.unit));
+   if(matches.length>1)throw Error("Multiple exact stock matches. Select the correct inventory record before receiving.");
    if(matches.length===1)part=matches[0];
   }
   if(!part){part={id:"receipt-"+order.id+"-"+line.id,description:line.description,partNumber:line.partNumber,vendor:order.vendor,quantity:0,reservedQuantity:0,unitCost:line.unitCost,unit:line.unit,vehicleCompatibility:line.vehicleCompatibility};if(stock.some(p=>same(p.id,part.id)))throw Error("Duplicate receipt stock identity.");stock.push(part);}

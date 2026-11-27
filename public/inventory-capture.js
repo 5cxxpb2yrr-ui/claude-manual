@@ -153,5 +153,48 @@ async function extractPdfText(file,progress=()=>{}){
  const text=pages.join("\n");if(!text.trim())throw Error("No readable receipt text.");return text;
  }finally{try{if(ocr)await ocr.close();}finally{await task.destroy();}}
 }
-const api={parseAmazonText,detectReceiptVendor,parseRetailText,parseReceiptText,extractPdfText,extractImageText,barcode,matches,applyBarcode,receiptFile,duplicateReceipt,scanImage};root.MotorNoteCapture=api;if(typeof module!=="undefined")module.exports=api;
+
+const matchKey=v=>String(v??"").trim().toLowerCase();
+const partKey=v=>matchKey(v).replace(/[^a-z0-9]/g,"");
+const descriptionKey=v=>matchKey(v).replace(/[^a-z0-9]+/g," ").trim();
+const fitment=v=>String(v||"Not verified");
+const verified=v=>fitment(v)!=="Not verified"&&!!v;
+function suggestMatches(line,{inventory=[],demand=[],vehicles=[],orders=[],vendor=""}={}){
+ const code=String(line.barcode||"").trim(),mpn=partKey(line.partNumber),desc=descriptionKey(line.description),sku=matchKey(line.retailerItemCode),unit=matchKey(line.unit||"each"),quantity=Number(line.quantity);
+ const history=sku&&matchKey(vendor)?orders.filter(o=>matchKey(o.vendor)===matchKey(vendor)&&["Received","Partially received"].includes(o.status)).flatMap(o=>(o.lines||[]).filter(l=>matchKey(l.retailerItemCode)===sku&&Number(l.receivedQuantity)>0&&l.inventoryId!=null)):[];
+ const historyIds=new Set(history.map(l=>String(l.inventoryId)));
+ const stock=[];
+ for(const item of inventory){
+  const itemCode=String(item.barcode||"").trim(),aliases=(item.barcodes||[]).map(x=>String(x).trim()),number=partKey(item.partNumber);
+  const barcodeMatch=!!code&&(itemCode===code||aliases.includes(code)),partMatch=!!mpn&&mpn===number,historyMatch=historyIds.has(String(item.id)),descriptionMatch=!!desc&&desc===descriptionKey(item.description);
+  if(!barcodeMatch&&!partMatch&&!historyMatch&&!descriptionMatch)continue;
+  const evidence=barcodeMatch?"Exact barcode":partMatch?"Exact manufacturer number":historyMatch?"Prior received retailer item":"Exact description only";
+  const conflicts=[];
+  if(code&&(itemCode||aliases.length)&&!barcodeMatch)conflicts.push("Different barcode");
+  if(mpn&&number!==mpn)conflicts.push("Different or missing manufacturer number");
+  if(unit!==matchKey(item.unit||"each"))conflicts.push("Different unit");
+  if(verified(line.vehicleCompatibility)&&fitment(item.vehicleCompatibility)!==fitment(line.vehicleCompatibility))conflicts.push("Different fitment");
+  if(historyMatch&&historyIds.size>1)conflicts.push("Retailer code has multiple stock links");
+  const eligible=(barcodeMatch||partMatch||historyMatch)&&!conflicts.length&&verified(line.vehicleCompatibility)&&fitment(item.vehicleCompatibility)===fitment(line.vehicleCompatibility);
+  stock.push({id:String(item.id),description:item.description||"Stock item",partNumber:item.partNumber||"",vehicleCompatibility:fitment(item.vehicleCompatibility),quantity:Number(item.quantity)||0,available:Math.max(0,(Number(item.quantity)||0)-(Number(item.reservedQuantity)||0)),evidence,rank:barcodeMatch?4:partMatch?3:historyMatch?2:1,conflicts,eligible});
+ }
+ stock.sort((a,b)=>Number(b.eligible)-Number(a.eligible)||b.rank-a.rank||a.id.localeCompare(b.id));
+ const requirements=[];
+ for(const row of demand){
+  if(!(Number(row.shortage)>0))continue;
+  const number=partKey(row.partNumber),partMatch=!!mpn&&mpn===number,descriptionMatch=!!desc&&desc===descriptionKey(row.name),linked=!!line.inventoryId&&String(row.inventoryId??"")===String(line.inventoryId);
+  if(!partMatch&&!descriptionMatch&&!linked)continue;
+  const vehicle=vehicles.find(v=>String(v.id)===String(row.vehicleId)),conflicts=[];
+  if(number&&number!==mpn)conflicts.push("Confirm required manufacturer number");
+  if(!vehicle||!verified(line.vehicleCompatibility)||![vehicle.name,"Universal"].includes(line.vehicleCompatibility))conflicts.push("Confirm vehicle fitment");
+  if(row.unit!=="recorded unit"&&unit!==matchKey(row.unit))conflicts.push("Different unit");
+  if(!Number.isFinite(quantity)||quantity<=0||quantity>Number(row.shortage))conflicts.push("Quantity exceeds shortage or is invalid");
+  const eligible=!conflicts.length&&(partMatch||linked);
+  requirements.push({key:row.key,name:row.name,source:row.source,vehicleName:vehicle?.name||"Unknown vehicle",shortage:Number(row.shortage),evidence:partMatch?"Exact manufacturer number":linked?"Linked stock ID":"Exact description only",conflicts,eligible,rank:partMatch?3:linked?2:1});
+ }
+ requirements.sort((a,b)=>Number(b.eligible)-Number(a.eligible)||b.rank-a.rank||String(a.key).localeCompare(String(b.key)));
+ return {stock,requirements,duplicateWarning:stock.filter(s=>s.rank>=2&&!s.conflicts.length).length>1};
+}
+
+const api={suggestMatches,parseAmazonText,detectReceiptVendor,parseRetailText,parseReceiptText,extractPdfText,extractImageText,barcode,matches,applyBarcode,receiptFile,duplicateReceipt,scanImage};root.MotorNoteCapture=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

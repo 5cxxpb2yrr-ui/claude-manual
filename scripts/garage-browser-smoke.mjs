@@ -36,16 +36,21 @@ async function run(name,launcher){
  });page.on("dialog",async d=>{dialogs.push(d.message());await d.accept();});
  await page.route("**/*",route=>{const url=route.request().url();if(url.startsWith(origin+"/")||url.startsWith("data:")||url.startsWith("blob:"))return route.continue();external.push(url);return route.abort();});
  try{
- await context.addInitScript(({state,cart})=>{if(!sessionStorage.getItem("fixture-seeded")){localStorage.setItem("motornote_pro_app_state",JSON.stringify(state));localStorage.setItem("lifeos.repair.project-draft.v1",JSON.stringify({id:"fixture-draft",cart}));sessionStorage.setItem("fixture-seeded","1");}},{state:fixture,cart});
+ await context.addInitScript(({state,cart,origin})=>{if(location.origin!==origin)return;if(!sessionStorage.getItem("fixture-seeded")){localStorage.setItem("motornote_pro_app_state",JSON.stringify(state));localStorage.setItem("lifeos.repair.project-draft.v1",JSON.stringify({id:"fixture-draft",cart}));sessionStorage.setItem("fixture-seeded","1");}},{state:fixture,cart,origin});
  await page.goto(origin+"/garage?newProject=1&repairDraft=fixture-draft");await saved(page);await tab(page,"projects");
  await page.locator('[x-model="newProjectForm.title"]').fill("Fixture cart import");
  await page.locator('button[\\@click="saveNewProject()"]').click();
  await page.waitForFunction(sel=>window.Alpine.$data(document.querySelector(sel)).projects.some(p=>p.title==="Fixture cart import"),selector);await saved(page);
+ const detail=page.getByRole("dialog",{name:"Project detail",exact:true});
+ await detail.getByRole("heading",{name:"Fixture cart import",exact:true}).waitFor({state:"visible"});
  assert.deepEqual(await app(page,a=>{const p=a.projects.find(p=>p.title==="Fixture cart import");return {part:p.partRequirements[0]?.partNumber,source:p.procedures[0]?.sourcePath,linked:Object.values(JSON.parse(localStorage.getItem("lifeos.repair.carts.v1")||"{}")).some(c=>c.projectId===p.id)};}),{part:"FIX-1",source:cart.source,linked:true});
+ await detail.getByRole("button",{name:"Close project",exact:true}).click();await detail.waitFor({state:"hidden"});
  console.log(name,"manual-cart handoff passed");
  phase="order and receiving";
  // Synthetic plan avoids R2 calls; actual app methods, UI and IndexedDB remain in use.
- const ids=await app(page,async(a,plan)=>{a.modals.projectDetail=false;a.newProjectForm={title:plan.title,category:"Repair",description:plan.scope,budget:100,priority:"Medium",dueDate:""};await a.saveNewProject(plan);const p=a.projects.find(p=>p.title===plan.title);p.partRequirements[0].partNumber="FIX-1";p.partRequirements[0].unit="each";if(!await a.saveToStorage())throw Error("Fixture plan save failed");a.modals.projectDetail=false;return {p:p.id,r:p.partRequirements[0].id};},plan);
+ const ids=await app(page,async(a,plan)=>{a.newProjectForm={title:plan.title,category:"Repair",description:plan.scope,budget:100,priority:"Medium",dueDate:""};await a.saveNewProject(plan);const p=a.projects.find(p=>p.title===plan.title);p.partRequirements[0].partNumber="FIX-1";p.partRequirements[0].unit="each";if(!await a.saveToStorage())throw Error("Fixture plan save failed");return {p:p.id,r:p.partRequirements[0].id};},plan);
+ await detail.getByRole("heading",{name:plan.title,exact:true}).waitFor({state:"visible"});
+ await detail.getByRole("button",{name:"Close project",exact:true}).click();await detail.waitFor({state:"hidden"});
  await page.locator("nav").getByRole("button",{name:/Inventory/}).click();await tab(page,"inventory");assert.equal(await page.locator("[data-garage-tab]").count(),1);
  await app(page,a=>a.openVendorDraft());
  for(const [model,value] of [["vendorDraft.vendor","Fixture supplier"],["vendorDraft.orderNumber","TEST-001"],["line.description","Fixture filter"],["line.partNumber","FIX-1"],["line.quantity","2"],["line.unitCost","8"]])await page.locator('[x-model="'+model+'"]').fill(value);

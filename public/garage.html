@@ -4530,7 +4530,7 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 								this.applyState(saved);
 								this.normalizeData();
 								await this.migrateAttachmentData();
-								this.hydrateAttachments();
+								await this.hydrateAttachments();
 							}
 							this.applyGarageSetupAdjustments();
 							if(requestedVehicle&&this.vehicles.some(v=>String(v.id)===String(requestedVehicle)))this.activeVehicleId=requestedVehicle;
@@ -4997,18 +4997,48 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
                         if(value===null||!String(value).trim())return false;
                         return this.changeProjectStock(project,id,"consume",Number(value));
                     },
-                    async addProjectAttachments(project,event) {
+                    async storeGarageAttachment(id,file){
+ const bytes=await file.arrayBuffer();
+ if(!bytes.byteLength||bytes.byteLength!==file.size)throw Error("Attachment file is empty or incomplete.");
+ const row={id,bytes,name:file.name,type:file.type,createdAt:new Date().toISOString()};
+ await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').put(row);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||Error("Attachment write failed"));tx.onabort=()=>reject(tx.error||Error("Attachment write aborted"));});
+ // Verify the committed bytes are actually readable before recording the reference.
+ const saved=await this.readGarageAttachment(id);
+ if(!saved||saved.size!==file.size)throw Error("Stored attachment could not be verified.");
+ return saved;
+ },
+ async readGarageAttachment(key){
+ if(!key||!this.garageDB)return null;
+ const row=await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('attachments','readonly'),req=tx.objectStore('attachments').get(key);let result;req.onsuccess=()=>{result=req.result;};req.onerror=()=>reject(req.error||Error("Attachment read failed"));tx.oncomplete=()=>resolve(result);tx.onerror=()=>reject(tx.error||Error("Attachment read failed"));tx.onabort=()=>reject(tx.error||Error("Attachment read aborted"));});
+ if(!row)return null;
+ if(row.bytes instanceof ArrayBuffer&&row.bytes.byteLength>0)return new Blob([row.bytes],{type:row.type||"application/octet-stream"});
+ // Retain backward compatibility with previously stored File/Blob records.
+ if(row.blob instanceof Blob&&row.blob.size>0)return row.blob;
+ return null;
+ },
+ async hydrateGarageAttachment(att){
+ if(att.dataUrl){att.data=att.dataUrl;return true;}
+ if(att.data)return true;
+ if(!att.storageKey)return false;
+ const blob=await this.readGarageAttachment(att.storageKey);
+ if(!blob)throw Error("Attachment bytes unavailable: "+(att.name||att.id));
+ if(!att.data)att.data=URL.createObjectURL(blob);
+ return true;
+ },
+ async addProjectAttachments(project,event) {
 						const files=Array.from(event?.target?.files||[]); event.target.value=''; if(!project||!files.length)return;
 						const allowed=['image/jpeg','image/png','image/webp','application/pdf']; const valid=files.filter(file=>allowed.includes(file.type)&&file.size<=(this.garageDB?15:2)*1024*1024);
 						if(valid.length!==files.length)alert(this.garageDB?'Only JPG, PNG, WebP, and PDF files up to 15 MB each are accepted. Unsupported files were skipped.':'Without IndexedDB, local fallback is limited to 2 MB per file. Unsupported or oversized files were skipped.');
 						if(!Array.isArray(project.attachments))project.attachments=[];
 						for(const file of valid){const id='project-att-'+Date.now()+'-'+Math.random().toString(36).slice(2,8),draft=this.projectAttachmentDraft||{},att={id,storageKey:id,name:file.name,type:file.type,size:file.size,description:String(draft.description||'').trim(),receiptDate:draft.date||new Date().toISOString().slice(0,10),amount:draft.amount===''||draft.amount==null?null:Math.max(0,Number(draft.amount)||0),createdAt:new Date().toISOString()};
-							try{if(this.garageDB){await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').put({id,blob:file,name:file.name,type:file.type,createdAt:att.createdAt});tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Attachment storage failed'));});att.data=URL.createObjectURL(file);}else{att.dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||new Error('File read failed'));reader.readAsDataURL(file);});}project.attachments.unshift(att);}catch(error){console.error('Project attachment failed',error);alert('Could not save '+file.name+'. Check available browser storage and try again.');}}
-						this.projectAttachmentDraft={description:'',date:new Date().toISOString().slice(0,10),amount:''}; await this.saveToStorage();
+							try{if(this.garageDB){const stored=await this.storeGarageAttachment(id,file);att.data=URL.createObjectURL(stored);}else{att.dataUrl=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(reader.error||new Error('File read failed'));reader.readAsDataURL(file);});}project.attachments.unshift(att);}catch(error){console.error('Project attachment failed',error);alert('Could not save '+file.name+'. Check available browser storage and try again.');}}
+						this.projectAttachmentDraft={description:'',date:new Date().toISOString().slice(0,10),amount:''}; const saved=await this.saveToStorage();if(!saved)alert('Attachment metadata could not be saved. Export a backup or retry before closing.');return saved;
 					},
 					async removeProjectAttachment(project,id) { const att=(project?.attachments||[]).find(item=>String(item.id)===String(id)); if(!att)return; if(att.data?.startsWith('blob:'))URL.revokeObjectURL(att.data); if(att.storageKey&&this.garageDB){try{await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').delete(att.storageKey);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Attachment delete failed'));});}catch(error){alert('The stored file could not be deleted.');return;}} project.attachments=project.attachments.filter(item=>String(item.id)!==String(id)); await this.saveToStorage(); },
-					async hydrateProjectAttachments(project) { if(!project||!Array.isArray(project.attachments)||!this.garageDB)return; for(const att of project.attachments){if(att.data||att.dataUrl||!att.storageKey)continue; try{const record=await new Promise((resolve,reject)=>{const req=this.garageDB.transaction('attachments','readonly').objectStore('attachments').get(att.storageKey);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});if(record?.blob)att.data=URL.createObjectURL(record.blob);}catch(error){console.warn('Project attachment hydrate failed',error);}} },
-					async addProjectCostEntry(project) { const d=this.projectCostDraft,amount=Number(d.amount);if(!project||!d.description.trim()||!Number.isFinite(amount)||amount<=0){alert('Enter an expense description and an amount greater than zero.');return;}if(!Array.isArray(project.costEntries))project.costEntries=[];project.costEntries.unshift({id:'cost-'+Date.now(),description:d.description.trim(),category:d.category,amount,date:d.date||new Date().toISOString().split('T')[0],createdAt:new Date().toISOString()});project.actualCost=this.projectActualCost(project);this.syncProjectMaintenancePlan(project);this.projectCostDraft={description:'',category:'Labor',amount:0,date:new Date().toISOString().split('T')[0]};await this.saveToStorage(); },
+					async hydrateProjectAttachments(project) {
+ for(const att of project?.attachments||[]){try{await this.hydrateGarageAttachment(att);}catch(error){console.warn('Project attachment hydrate failed',error);}}
+ },
+ async addProjectCostEntry(project) { const d=this.projectCostDraft,amount=Number(d.amount);if(!project||!d.description.trim()||!Number.isFinite(amount)||amount<=0){alert('Enter an expense description and an amount greater than zero.');return;}if(!Array.isArray(project.costEntries))project.costEntries=[];project.costEntries.unshift({id:'cost-'+Date.now(),description:d.description.trim(),category:d.category,amount,date:d.date||new Date().toISOString().split('T')[0],createdAt:new Date().toISOString()});project.actualCost=this.projectActualCost(project);this.syncProjectMaintenancePlan(project);this.projectCostDraft={description:'',category:'Labor',amount:0,date:new Date().toISOString().split('T')[0]};await this.saveToStorage(); },
 					projectReadyToComplete(project) { if(!project || /^(completed|cancelled|canceled|archived)$/i.test(project.status||'') || !this.vehicles.some(v=>String(v.id)===String(project.vehicleId)))return false; if((project.partRequirements||[]).some(r=>r.reserved)||this.guidedOpenFindings(project).length||project.guidedExecution?.timerStartedAt)return false; if(project.guidedExecution&&(Object.keys(project.guidedExecution.completed||{}).length||project.guidedExecution.notes?.length||project.guidedExecution.torqueChecks?.length||project.guidedExecution.findings?.length)&&project.guidedExecution.status!=='completed')return false; const tasks=Array.isArray(project.tasks)?project.tasks:[]; return tasks.every(task=>!!task.done); },
 					openProjectCompletion(project) { if(!this.projectReadyToComplete(project)){alert('Complete tasks and any started guided repair, resolve findings, stop the timer, and record use or release remaining reservations before recording service.');return;} const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); this.projectCompletionForm={mileage:Number(vehicle?.odometer||0),date:new Date().toISOString().slice(0,10),notes:project.description||'',verified:false}; this.modals.projectCompletion=true; },
 					async completeProjectAndRecordService(project) {
@@ -5128,14 +5158,21 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 						finally{this.inventorySaving=false;}
 					},
 
-					handleFileUpload(event) {
-						const files=event.target.files; if(!files?.length)return;
-						Array.from(files).forEach(file=>{const storageKey=`att-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;const att={id:storageKey,storageKey,name:file.name,type:file.type,category:'Receipt',vendor:'AutoParts Store',receiptDate:new Date().toISOString().split('T')[0]};
-							if(this.garageDB){const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').put({id:storageKey,blob:file,name:file.name,type:file.type,createdAt:new Date().toISOString()});tx.oncomplete=()=>{att.data=URL.createObjectURL(file);this.attachToCurrentRepair(att);this.saveToStorage();};}
-							else{const reader=new FileReader();reader.onload=e=>{att.data=e.target.result;att.dataUrl=e.target.result;delete att.storageKey;this.attachToCurrentRepair(att);this.saveToStorage();};reader.readAsDataURL(file);}}); event.target.value='';
-					},
-
-					attachToCurrentRepair(att) {
+					async handleFileUpload(event){
+ const files=Array.from(event.target.files||[]);event.target.value="";
+ if(!files.length)return;
+ for(const file of files){
+ if(!["image/jpeg","image/png","image/webp","application/pdf"].includes(file.type)||file.size<=0||file.size>(this.garageDB?15:2)*1024*1024){alert("Unsupported or oversized attachment: "+file.name);continue;}
+ const storageKey="att-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),att={id:storageKey,storageKey,name:file.name,type:file.type,category:"Receipt",vendor:"AutoParts Store",receiptDate:new Date().toISOString().slice(0,10)};
+ try{
+ if(this.garageDB){const blob=await this.storeGarageAttachment(storageKey,file);att.data=URL.createObjectURL(blob);}
+ else{att.dataUrl=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||Error("File read failed"));r.readAsDataURL(file);});att.data=att.dataUrl;delete att.storageKey;}
+ this.attachToCurrentRepair(att);
+ if(!await this.saveToStorage())throw Error("Attachment metadata save failed. Retry before closing.");
+ }catch(e){alert("Could not save "+file.name+": "+e.message);}
+ }
+ },
+ attachToCurrentRepair(att) {
 						if(this.isEditingRepair){if(!this.editRepairForm.attachments)this.editRepairForm.attachments=[];this.editRepairForm.attachments.push(att);} else if(this.selectedRepair.id){if(!this.selectedRepair.attachments)this.selectedRepair.attachments=[];this.selectedRepair.attachments.push(att);const idx=this.logs.findIndex(l=>l.id===this.selectedRepair.id);if(idx!==-1)this.logs[idx].attachments=this.selectedRepair.attachments;}
 					},
 
@@ -5369,9 +5406,9 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 				async portableGarageState(state=this.getPersistableState()){
  return window.MotorNoteBackup.portable(state,async key=>{
  if(!key||!this.garageDB)return null;
- const row=await new Promise((resolve,reject)=>{const req=this.garageDB.transaction('attachments','readonly').objectStore('attachments').get(key);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});
- if(!row?.blob)return null;
- return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error);r.readAsDataURL(row.blob);});
+ const blob=await this.readGarageAttachment(key);
+ if(!blob)return null;
+ return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(r.error||Error("Attachment read failed"));r.readAsDataURL(blob);});
  });
  },
  async exportJSON(){
@@ -5388,9 +5425,9 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
  if(!await this.createSafetySnapshot(prior,reason))throw Error("Current data could not be backed up; no changes made.");
  this.applyState(next);applied=true;
  if(!await this.saveToStorage("Backup recovery"))throw Error(this.lastSaveError||"Restore write failed.");
- this.hydrateAttachments();this.modals.importExport=false;
+ await this.hydrateAttachments();this.modals.importExport=false;
  alert("Garage data restored. Previous data was backed up.");return true;
- }catch(e){if(applied){this.applyState(prior);this.hydrateAttachments();}alert("Recovery rejected: "+e.message);return false;}
+ }catch(e){if(applied){this.applyState(prior);await this.hydrateAttachments();}alert("Recovery rejected: "+e.message);return false;}
  finally{this.backupBusy=false;}
  },
  async importJSON(event){
@@ -5410,24 +5447,13 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 					return true;
 				},
 
-				hydrateAttachments() {
-					[...(this.logs||[]),...(this.projects||[])].forEach(log => {
-						(log.attachments || []).forEach(att => {
-							if(att.dataUrl){att.data=att.dataUrl;return;}
- if (!att.data && att.storageKey&&this.garageDB) {
-								try {
-									const tx=this.garageDB.transaction('attachments','readonly');
-									const req=tx.objectStore('attachments').get(att.storageKey);
-									req.onsuccess=()=>{ if(req.result?.blob) att.data=URL.createObjectURL(req.result.blob); };
-								} catch(e){ console.warn('Attachment hydrate failed',e); }
-							}
-						});
-					});
-				},
-
-
-
-async queueOfflineAction(action){this.offlineQueue.push({...action,queuedAt:new Date().toISOString()});localStorage.setItem('garage_offline_queue',JSON.stringify(this.offlineQueue));},
+				async hydrateAttachments(){
+ const results=await Promise.allSettled([...(this.logs||[]),...(this.projects||[])].flatMap(record=>(record.attachments||[]).map(att=>this.hydrateGarageAttachment(att))));
+ const failures=results.filter(r=>r.status==="rejected");if(failures.length)console.warn("Attachment recovery issues",failures.map(r=>r.reason?.message));
+ return failures.length===0;
+ },
+ 
+ async queueOfflineAction(action){this.offlineQueue.push({...action,queuedAt:new Date().toISOString()});localStorage.setItem('garage_offline_queue',JSON.stringify(this.offlineQueue));},
 async processOfflineQueue(){if(!navigator.onLine)return;for(const item of this.offlineQueue){console.log('Syncing',item.type);}this.offlineQueue=[];localStorage.removeItem('garage_offline_queue');},
 autoSnapshot(){return this.createSafetySnapshot(this.getPersistableState(),'automatic');},
 async captureReceipt(){alert('Receipt capture workflow initialized. Connect camera input to handleFileUpload().');},

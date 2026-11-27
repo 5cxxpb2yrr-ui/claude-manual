@@ -61,9 +61,17 @@ async function run(name,launcher){
  await page.waitForFunction(({sel,id})=>window.Alpine.$data(document.querySelector(sel)).logs.some(l=>l.projectId===id),{sel:selector,id:ids.p});await saved(page);
  const log=await app(page,(a,id)=>JSON.parse(JSON.stringify(a.logs.find(l=>l.projectId===id))),ids.p);assert.equal(log.materialConsumedValue,16);assert.equal(log.installedParts[0].quantity,2);assert.equal(log.guidedExecution.status,"completed");
  console.log(name,"guided execution and history passed");
- await app(page,async(a,id)=>{await a.addProjectAttachments(a.projects.find(x=>x.id===id),{target:{files:[new File(["fixture pdf bytes"],"fixture.pdf",{type:"application/pdf"})],value:""}});},ids.p);await saved(page);
+ const uploaded=await app(page,async(a,id)=>{
+ const p=a.projects.find(x=>x.id===id);
+ const ok=await a.addProjectAttachments(p,{target:{files:[new File(["fixture pdf bytes"],"fixture.pdf",{type:"application/pdf"})],value:""}});
+ const att=p.attachments?.[0],blob=att?.storageKey?await a.readGarageAttachment(att.storageKey):null;
+ return {ok,count:p.attachments?.length||0,storedBytes:blob?.size||0,storageKey:att?.storageKey||null};
+ },ids.p);
+ assert.equal(uploaded.ok,true,"Attachment metadata save");assert.equal(uploaded.count,1,"Attachment reference created");assert.equal(uploaded.storedBytes,17,"Committed attachment bytes readable");await saved(page);
+ console.log(name,"attachment committed and read back",uploaded.storedBytes);
  await page.reload();await saved(page);await balance(page,0,0);
- await page.waitForFunction(({sel,id})=>!!window.Alpine.$data(document.querySelector(sel)).projects.find(p=>p.id===id)?.attachments[0]?.data,{sel:selector,id:ids.p});
+ const hydrated=await app(page,async(a,id)=>{const att=a.projects.find(p=>p.id===id)?.attachments?.[0];const blob=att?.storageKey?await a.readGarageAttachment(att.storageKey):null;return {present:!!att,hydrated:!!att?.data,bytes:blob?.size||0};},ids.p);
+ assert.deepEqual(hydrated,{present:true,hydrated:true,bytes:17},"Attachment reload and hydration");
  const backup=await app(page,a=>a.portableGarageState());const payload="data:application/pdf;base64,Zml4dHVyZSBwZGYgYnl0ZXM=";
  assert.equal(backup.projects.find(p=>p.id===ids.p).attachments[0].dataUrl,payload);
  assert.equal(await app(page,(a,b)=>a.recoverGarageState(b),backup),true);await saved(page);
@@ -80,7 +88,7 @@ async function run(name,launcher){
  assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="OFFLINE-1")?.quantity),1);
  console.log(name,"offline local save and subsequent reload passed");
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");
- }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,dialogs,external,url:page.url()},null,2));throw e;}
+ }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,dialogs,external,url:page.url(),state:await app(page,a=>({saveState:a.saveState,lastSaveError:a.lastSaveError,projects:a.projects.map(p=>({id:p.id,title:p.title,attachments:(p.attachments||[]).map(x=>({id:x.id,storageKey:x.storageKey,name:x.name,hydrated:!!x.data}))}))})).catch(()=>null)},null,2));throw e;}
  finally{await context.close();await browser.close();}
 }
 try{const failures=[];for(const [name,launcher] of [["chromium",chromium],["webkit",webkit]]){try{await run(name,launcher)}catch(e){console.error(name,e);failures.push(name);}}if(failures.length)throw Error("Failed browsers: "+failures.join(", "));}finally{server.close();}

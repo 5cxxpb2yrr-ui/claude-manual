@@ -2561,7 +2561,7 @@
 							<div><p class="text-xs text-zinc-400" x-text="'PHASE '+(guidedPhaseIndex+1)+' / '+projectGuidedPhases(selectedProject).length"></p><h3 class="text-2xl font-black" x-text="phase.title"></h3></div>
 							<p class="text-sm leading-relaxed text-zinc-200" x-text="phase.detail"></p>
 							<p x-show="phase.critical" class="rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-200 p-3 text-sm">Safety / verification gate. Review the linked factory instructions before continuing.</p>
-							<template x-if="phase.id==='readiness'"><div class="space-y-2"><h4 class="text-amber-300 font-bold">Preparation checklist</h4><p class="text-xs text-zinc-400" x-text="projectReadiness(selectedProject).label"></p><p x-show="readinessError" class="text-xs text-rose-300" x-text="readinessError"></p><template x-for="item in projectReadiness(selectedProject).items" :key="item.id"><label class="flex items-start gap-2 border border-zinc-800 rounded-lg p-2 text-sm"><input type="checkbox" class="mt-1 accent-amber-500" :checked="item.done" :disabled="readinessSaving||item.blocked||projectGuidedPhaseDone(selectedProject,'readiness')" @change="setProjectReadiness(selectedProject,item.id,$event.target.checked)"><span><span x-text="item.name"></span><small class="block text-zinc-400" x-text="item.detail"></small></span></label></template><p x-show="!projectReadiness(selectedProject).ready" class="text-xs text-amber-300">Complete all preparation checks before continuing to physical work.</p></div></template>
+							<template x-if="phase.id==='readiness'"><div class="space-y-2"><h4 class="text-amber-300 font-bold">Unified preparation checklist</h4><p class="text-xs text-amber-300" x-text="projectReadiness(selectedProject).awaiting+' awaiting linked orders · '+projectReadiness(selectedProject).missing+' unmatched and unconfirmed'"></p><p class="text-xs text-zinc-400" x-text="projectReadiness(selectedProject).label"></p><p x-show="readinessError" class="text-xs text-rose-300" x-text="readinessError"></p><template x-for="item in projectReadiness(selectedProject).items" :key="item.id"><label class="flex items-start gap-2 border border-zinc-800 rounded-lg p-2 text-sm"><input type="checkbox" class="mt-1 accent-amber-500" :checked="item.done" :disabled="readinessSaving||item.blocked||projectGuidedPhaseDone(selectedProject,'readiness')" @change="setProjectReadiness(selectedProject,item.id,$event.target.checked)"><span><span x-text="item.name"></span><small class="block text-zinc-400" x-text="item.detail"></small></span></label></template><p x-show="!projectReadiness(selectedProject).ready" class="text-xs text-amber-300">Complete all preparation checks before continuing to physical work.</p></div></template>
 							<h4 class="font-bold text-amber-300">Factory source documents</h4>
 							<template x-for="doc in phase.documents" :key="doc.id">
 								<div class="rounded-xl border border-zinc-800 p-3 space-y-2">
@@ -2798,22 +2798,22 @@
 						<div class="rounded-xl border border-amber-500/30 bg-zinc-950 p-3 space-y-3">
 							<div class="flex items-center justify-between gap-2"><strong class="text-amber-300">Guided Repair</strong><a :href="manualProjectLink(selectedProject)" class="text-amber-400 text-xs font-bold">Browse manual ↗</a></div>
 							<template x-if="selectedProject.repairPlan"><details class="rounded-lg border border-amber-500/30 p-3 space-y-2">
-								<summary class="cursor-pointer font-bold text-amber-300">Project readiness · <span x-text="projectReadiness(selectedProject).label"></span></summary>
+								<summary class="cursor-pointer font-bold text-amber-300">Repair preparation · <span x-text="projectReadiness(selectedProject).label"></span></summary>
 								<div class="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full bg-amber-500" :style="'width:'+projectReadiness(selectedProject).percent+'%'"></div></div>
 								<div class="grid grid-cols-3 gap-1.5 text-center">
 									<div class="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2"><div class="text-lg font-black text-emerald-300" x-text="projectReadiness(selectedProject).matched"></div><div class="text-[10px] text-zinc-400">Stock/tool matches</div></div>
 									<div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2"><div class="text-lg font-black text-amber-300" x-text="projectReadiness(selectedProject).unmatched"></div><div class="text-[10px] text-zinc-400">Not matched</div></div>
 									<div class="rounded-lg border border-zinc-700 bg-zinc-950 p-2"><div class="text-lg font-black text-white" x-text="projectReadiness(selectedProject).confirmed"></div><div class="text-[10px] text-zinc-400">Checks confirmed</div></div>
 								</div>
-								<p class="text-xs text-zinc-400" x-text="'Next: '+projectReadiness(selectedProject).next"></p>
+								<p class="text-xs text-zinc-400" x-text="'Next: '+projectReadiness(selectedProject).next"></p><p class="text-xs text-amber-300" x-text="projectReadiness(selectedProject).awaiting+' requirements awaiting linked orders · '+projectReadiness(selectedProject).missing+' unmatched and unconfirmed resources'"></p>
 								<p x-show="readinessError" class="text-xs text-rose-300" x-text="readinessError"></p>
 								<template x-for="item in projectReadiness(selectedProject).items" :key="item.id"><label class="flex items-start gap-2 py-1 text-xs"><input type="checkbox" class="mt-0.5 accent-amber-500" :checked="item.done" :disabled="readinessSaving||item.blocked||projectGuidedPhaseDone(selectedProject,'readiness')" @change="setProjectReadiness(selectedProject,item.id,$event.target.checked)"><span><span x-text="item.name"></span><small class="block text-zinc-500" x-text="item.detail"></small></span></label></template>
-								<p class="text-xs text-zinc-500">Inventory matches are suggestions only. Confirm actual access, fitment and quantities. No parts are reserved or deducted automatically. Readiness is locked after its guided phase is confirmed.</p>
+								<p class="text-xs text-zinc-500">Inventory matches and allocations are read-only suggestions. Incoming orders are not available stock. Confirm physical access, fitment, quantities and tool condition. Readiness is locked after its guided phase is confirmed.</p>
 							</details></template>
 							<div x-show="selectedProject.repairPlan" class="rounded-lg border border-amber-500/30 p-3 space-y-2">
 								<div class="font-semibold text-white">Complete repair plan</div>
 								<p class="text-xs text-zinc-400" x-text="projectGuidedPhases(selectedProject).length+' phases · '+projectGuidedDone(selectedProject)+' completed'"></p>
-								<button type="button" @click="openProjectGuided(selectedProject)" :disabled="!projectGuidedPhases(selectedProject).length" class="w-full bg-amber-500 text-zinc-950 rounded-xl py-3 font-black disabled:opacity-40" x-text="projectGuidedDone(selectedProject) ? 'Resume / review complete repair →' : 'Start complete guided repair →'"></button>
+								<button type="button" @click="openProjectGuided(selectedProject)" :disabled="!projectGuidedPhases(selectedProject).length" class="w-full bg-amber-500 text-zinc-950 rounded-xl py-3 font-black disabled:opacity-40" x-text="projectGuidedDone(selectedProject) ? 'Resume / review complete repair →' : 'Open guided preparation & repair →'"></button>
 							</div>
 							<template x-for="entry in guidedRepairEntries(selectedProject)" :key="entry.route">
 								<div class="rounded-lg border border-zinc-800 p-3 space-y-2">
@@ -3743,25 +3743,103 @@
 						catch(e){this.toolInventory=prior;this.toolInventoryError=e.message;}
 						finally{this.toolInventoryBusy=false;}
 					},
-					projectReadiness(project) {
-						const plan=project?.repairPlan;if(!plan)return {items:[],ready:false,percent:0,label:"No plan",next:"Generate a repair plan"};
+					preparationOrders(project,req){
+ if(!req||req.id==null)return [];
+ const same=(a,b)=>a!=null&&b!=null&&String(a)===String(b),rows=[],key="project:"+project.id+":"+req.id;
+ for(const o of project.purchaseOrders||[]){
+  if(!/^(ordered|backordered|on order|received)$/i.test(o.status||""))continue;
+  for(const l of o.lines||[])if(same(l.requirementId,req.id)){
+   const n=Math.max(0,Number(l.quantity)||0);
+   if(!n)continue;
+   const received=/^received$/i.test(o.status);
+   rows.push({vendor:o.vendor||"Supplier",orderNumber:o.orderNumber||"",quantity:n,expectedDate:o.expectedDate||"",status:received?"Received — verify stock entry":o.status,incoming:!received});
+  }
+ }
+ for(const o of this.vendorOrders||[]){
+  if(!["Ordered","Partially received","Received"].includes(o.status))continue;
+  for(const l of o.lines||[])if(l.demandKey===key){
+   const n=Math.max(0,(Number(l.quantity)||0)-(Number(l.receivedQuantity)||0));
+   if(n&&o.status!=="Received")rows.push({vendor:o.vendor||"Supplier",orderNumber:o.orderNumber||"",quantity:n,expectedDate:o.expectedDate||"",status:o.status,incoming:true});
+  }
+ }
+ return rows;
+ },
+ preparationPartCandidates(project,part,req){
+ const normalize=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,""),same=(a,b)=>a!=null&&b!=null&&String(a)===String(b),pn=normalize(req?.partNumber||part.partNumber),name=this.inventoryMatchKey(req?.description||part.name),vehicle=(this.vehicles||[]).find(v=>same(v.id,project.vehicleId));
+ return (this.inventory||[]).filter(p=>{
+  if(!vehicle||!(p.vehicleCompatibility==="Universal"||p.vehicleCompatibility===vehicle.name||same(p.vehicleId,vehicle.id)))return false;
+  if(req?.unit&&normalize(req.unit)!==normalize(p.unit||"each"))return false;
+  if(req?.inventoryId!=null&&String(req.inventoryId)!=="")return same(p.id,req.inventoryId)&&(!pn||normalize(p.partNumber)===pn);
+  if(pn)return normalize(p.partNumber)===pn;
+  const demandKey=req?.id!=null?"project:"+project.id+":"+req.id:null;
+  const received=demandKey&&(this.vendorOrders||[]).some(o=>["Received","Partially received"].includes(o.status)&&(o.lines||[]).some(l=>l.demandKey===demandKey&&Number(l.receivedQuantity)>0&&same(l.inventoryId,p.id)));
+  return received||!!name&&this.inventoryMatchKey(p.description)===name;
+ }).map(p=>({id:p.id,name:p.description,partNumber:p.partNumber||"",location:p.storageLocation||"Unassigned",unit:p.unit||"each",quantity:Math.max(0,Number(p.quantity)||0),reserved:Math.max(0,Number(p.reservedQuantity)||0)}));
+ },
+ preparationPartRows(project,plan){
+ const requirements=project.partRequirements||[],seen=new Set(),parts=[];
+ for(const [i,part] of (plan.parts||[]).entries()){
+  const req=requirements.find(r=>String(r.id)===String(project.id)+"-plan-part-"+i);
+  if(req)seen.add(String(req.id));
+  parts.push({id:"part-"+i,part,req});
+ }
+ for(const req of requirements)if(!seen.has(String(req.id))&&!/^(cancelled|canceled)$/i.test(req.status||""))parts.push({id:"requirement-"+req.id,part:{name:req.description||req.partNumber||"Project part",relationship:req.relationship||"project requirement",quantity:req.quantity},req});
+ // Allocate reservations first, then a single shared pool of unreserved stock. This is a read-only projection.
+ const free=new Map(),reserved=new Map(),stock=this.inventory||[];
+ for(const p of stock){
+  const q=Math.max(0,Number(p.quantity)||0),r=Math.min(q,Math.max(0,Number(p.reservedQuantity)||0));
+  let legacy=0;
+  for(const m of this.maintenancePlans||[]){
+   if(/^(completed|cancelled|canceled|archived)$/i.test(m.status||""))continue;
+   if((this.projects||[]).some(x=>! /^(completed|cancelled|canceled|archived)$/i.test(x.status||"")&&(String(x.id)===String(m.projectId)||x.maintenancePlanId!=null&&String(x.maintenancePlanId)===String(m.id))&&(x.partRequirements||[]).length))continue;
+   for(const req of m.parts||[])if(req.reserved&&!req.used&&!/^(used|installed|cancelled|canceled)$/i.test(req.status||"")&&String(req.inventoryId)===String(p.id))legacy+=Math.max(0,Number(req.quantity)||0);
+  }
+  free.set(String(p.id),Math.max(0,q-r-legacy));reserved.set(String(p.id),r);
+ }
+ const rows=parts.map(({id,part,req})=>{
+  const raw=req?.quantity??part.quantity,quantity=Number(raw),known=raw!=null&&raw!==""&&Number.isFinite(quantity)&&quantity>0;
+  const used=!!req&&(req.used||/^(used|installed)$/i.test(req.status||""));
+  const remaining=used?0:known?Math.max(0,quantity-Math.max(0,Number(req?.consumedQuantity)||0)):null;
+  const matches=this.preparationPartCandidates(project,part,req);
+  return {id,part,req,quantity:known?quantity:null,remaining,used,matches,orders:this.preparationOrders(project,req),allocations:[],allocated:0};
+ });
+ for(const row of rows){
+  if(!row.req?.reserved||!row.remaining)continue;
+  const item=row.matches.find(m=>String(m.id)===String(row.req.inventoryId));if(!item)continue;
+  const id=String(item.id),n=Math.min(row.remaining,reserved.get(id)||0);
+  if(n){reserved.set(id,(reserved.get(id)||0)-n);row.allocated+=n;row.allocations.push({...item,allocated:n,kind:"reserved"});}
+ }
+ for(const row of rows){
+  if(!row.remaining)continue;
+  for(const item of row.matches){
+   const id=String(item.id),n=Math.min(Math.max(0,row.remaining-row.allocated),free.get(id)||0);
+   if(n){free.set(id,(free.get(id)||0)-n);row.allocated+=n;row.allocations.push({...item,allocated:n,kind:"available"});}
+  }
+ }
+ return rows;
+ },
+ projectReadiness(project) {
+						const plan=project?.repairPlan;if(!plan)return {items:[],ready:false,percent:0,label:"No plan",next:"Generate a repair plan",matched:0,unmatched:0,confirmed:0,awaiting:0,missing:0,sourceCount:0};
 						const checked=project.readinessChecks||{},items=[],add=(id,name,detail,blocked=false)=>items.push({id,name,detail,blocked,done:!blocked&&!!checked[id]});
 						add("scope","Diagnosis and scope confirmed","Confirm the affected components and selected vehicle.");
 						add("fitment","Replacement part fitment verified","Confirm VIN-specific part numbers and supplier compatibility.");
-						for(const [i,part] of (plan.parts||[]).entries()){
-							const matches=this.planPartMatches(project,part,i),qty=Math.max(1,Number(part.quantity)||1),available=matches.some(m=>m.available>=qty);
-							add("part-"+i,part.name,(available?"Possible stock match: "+matches.filter(m=>m.available>=qty).map(m=>m.name+" ("+m.available+" available)").join(", "):matches.length?"Matching stock insufficient":"No matching stock recorded")+". Verify quantity and fitment; "+part.relationship);
-							Object.assign(items.at(-1),{kind:"part",inventoryMatch:available,quantity:qty,matches});
-						}
-						for(const [i,tool] of (plan.tools||[]).entries()){
+						for(const row of this.preparationPartRows(project,plan)){
+ const {id,part,req,remaining,allocated,orders,allocations,matches}=row,available=remaining===0||remaining!==null&&allocated>=remaining,incoming=orders.filter(o=>o.incoming).reduce((n,o)=>n+o.quantity,0);
+ const status=remaining===0?"Already used / fulfilled":remaining===null?"Confirm required quantity":available?"Possible stock coverage":incoming?"Awaiting purchase / verify delivery":"Stock not fully matched";
+ const locations=allocations.map(m=>m.allocated+" "+m.unit+" · "+m.name+" · "+m.location+(m.kind==="reserved"?" (reserved)":"")).join("; ");
+ const delivery=orders.map(o=>o.vendor+(o.orderNumber?" #"+o.orderNumber:"")+" · "+o.quantity+" · "+o.status+(o.expectedDate?" · expected "+o.expectedDate:" · no delivery date")).join("; ");
+ add(id,part.name,status+(remaining!==null?" · "+allocated+" / "+remaining+" remaining units matched":"")+(locations?" · "+locations:"")+(delivery?" · "+delivery:"")+". Verify actual access, quantity and fitment; "+(part.relationship||"project requirement"));
+ Object.assign(items.at(-1),{kind:"part",inventoryMatch:available,quantity:row.quantity,matches,allocations,orders,incoming,remaining,allocated,status});
+ }
+ for(const [i,tool] of (plan.tools||[]).entries()){
 							const matches=this.planToolMatches(tool.name),available=matches.filter(t=>this.toolAvailability(t,project.id).available);
-							add("tool-"+i,tool.name,available.length?"Possible available tool: "+available.map(t=>t.name+" ("+this.toolAvailability(t,project.id).label+")").join(", ")+". Verify size, range and condition.":matches.length?"Matching tools unavailable: "+matches.map(t=>t.name+" ("+this.toolAvailability(t,project.id).label+")").join(", ")+". Confirm access to a suitable alternative.":"Not recorded in tool inventory; confirm access.");
+							add("tool-"+i,tool.name,available.length?"Possible available tool: "+available.map(t=>t.name+" ("+this.toolAvailability(t,project.id).label+" · "+(t.storageLocation||"Unassigned")+(t.calibrationDue?" · calibration "+t.calibrationDue:"")+")").join(", ")+". Verify size, range and condition.":matches.length?"Matching tools unavailable: "+matches.map(t=>t.name+" ("+this.toolAvailability(t,project.id).label+")").join(", ")+". Confirm access to a suitable alternative.":"Not recorded in tool inventory; confirm access.");
 							Object.assign(items.at(-1),{kind:"tool",inventoryMatch:available.length>0,matches});
 						}
 						add("sources","Factory procedures and precautions reviewed",plan.unavailable?.length?"Missing source documents — regenerate or obtain a complete plan.":"Review diagrams, torque assignments and safe access.",!!plan.unavailable?.length);
 						const done=items.filter(i=>i.done).length,ready=items.length>0&&done===items.length;
-						const resources=items.filter(i=>i.kind),matched=resources.filter(i=>i.inventoryMatch).length;
-						return {items,ready,percent:Math.round(done/items.length*100),label:ready?"Ready":done+"/"+items.length+" confirmed",next:items.find(i=>!i.done)?.name||"Start guided repair",matched,unmatched:resources.length-matched,confirmed:done};
+						const resources=items.filter(i=>i.kind),matched=resources.filter(i=>i.inventoryMatch).length,awaiting=resources.filter(i=>i.kind==="part"&&!i.inventoryMatch&&i.incoming>0).length;
+						return {items,ready,percent:Math.round(done/items.length*100),label:ready?"Ready":done+"/"+items.length+" confirmed",next:items.find(i=>!i.done)?.name||"Start guided repair",matched,unmatched:resources.length-matched,confirmed:done,awaiting,missing:resources.filter(i=>!i.inventoryMatch&&!i.done).length,sourceCount:(plan.documents||[]).length};
 					},
 					async setProjectReadiness(project,id,done) {
 						if(this.readinessSaving||this.projectGuidedPhaseDone(project,'readiness'))return;

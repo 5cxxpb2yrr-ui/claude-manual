@@ -7,7 +7,7 @@ test("primary and secondary navigation covers all existing destinations",()=>{
  const primary=html.match(/primaryTabIds: \[([^\]]+)\]/)[1].match(/'[^']+'/g).map(x=>x.slice(1,-1));
  const groups=html.slice(html.indexOf("get groupedMoreTabs(){"),html.indexOf("openCaptureDestination(kind){"));
  const secondary=[...groups.matchAll(/ids:\[([^\]]+)\]/g)].flatMap(m=>JSON.parse("["+m[1]+"]"));
- assert.deepEqual(primary,["dashboard","projects","inventory","maintenance"]);assert.deepEqual([...primary,...secondary].sort(),ids.sort());
+ assert.deepEqual(primary,["dashboard","projects","inventory"]);assert.deepEqual([...primary,...secondary].sort(),ids.sort());
 });
 test("capture delegates to existing forms and detail sections retain controls",()=>{
  for(const action of ["this.openNewRepairModal()","this.modals.newProject=true","this.openNewPartModal()","this.modals.updateMileage=true","this.modals.smartSearch=true"])assert.ok(html.slice(html.indexOf("openCaptureDestination(kind){"),html.indexOf("get moreTabActive() {")).includes(action));
@@ -25,4 +25,17 @@ test("Specs use collapsed details and Service Manuals has one header shortcut an
  assert.doesNotMatch(profile,/x-model="manualQuery"/);assert.equal((html.match(/x-model="manualQuery"/g)||[]).length,1);
  assert.match(html,/<dialog x-ref="serviceManualsDialog"[^>]*aria-label="Vehicle service manuals"/);
  assert.match(html,/openServiceManuals\(\)\{this\.\$refs\.serviceManualsDialog\.showModal\(\);\}/);
+});
+
+test("V20.1 shared navigation preserves secondary destinations and capture routes",()=>{
+ const nav=html.slice(html.indexOf('<nav class="mn-nav'),html.indexOf('</nav>',html.indexOf('<nav class="mn-nav')));
+ for(const label of ["Home","Projects","Capture","Inventory","Manuals"])assert.ok(nav.includes('<span>'+label+'</span>'));
+ assert.match(html,/else if\(h==="capture"\)\{this.modals.captureMenu=true/);
+ assert.match(html,/aria-label="More" :aria-expanded="modals.navMenu"/);
+ assert.match(html,/missionGroup=group.name;\$refs.missionDialog.showModal\(\)/);
+ assert.match(html,/\$refs.missionDialog.close\(\);openGarageMission\(item\)/);
+ const manual=readFileSync(new URL("../public/manuals.html",import.meta.url),"utf8");
+ for(const route of ["/garage","/garage#projects","/garage#capture","/garage#inventory"])assert.ok(manual.includes('["'+route+'",'));
+ assert.match(manual,/\["#\/","Manuals","book"\]/);
+ assert.match(manual,/id="cf"/);assert.match(manual,/id="cr"/);
 });

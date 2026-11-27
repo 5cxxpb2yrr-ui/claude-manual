@@ -53,16 +53,17 @@ async function run(name,launcher){
  await complete();await page.getByText("Unified preparation checklist",{exact:true}).waitFor();
  const readiness=page.locator('[x-show="modals.projectGuided"]').locator('input[type="checkbox"][\\@change*="setProjectReadiness"]');
  for(let i=0;i<await readiness.count();i++){await readiness.nth(i).check();await saved(page);}
- await complete();await page.getByText("Perform verified factory procedure",{exact:true}).waitFor();await page.getByText("Phase resources & installation",{exact:true}).click();
+ await complete();await page.getByRole("heading",{name:"Perform verified factory procedure",exact:true}).waitFor();await page.getByText("Phase resources & installation",{exact:true}).click();
  await page.locator('[x-model="guidedDraft.installId"]').selectOption(ids.r);await page.locator('[x-model="guidedDraft.installQty"]').fill("2");await page.getByRole("button",{name:"Record installed & consume reservation"}).click();
  await page.waitForFunction(sel=>window.Alpine.$data(document.querySelector(sel)).inventory.find(x=>x.partNumber==="FIX-1")?.quantity===0,selector);await saved(page);await balance(page,0,0);
- await complete();await page.getByText("Verify repair and record outcome",{exact:true}).waitFor();await complete();await page.getByText("Final inspection recorded",{exact:true}).waitFor();
+ await complete();await page.getByRole("heading",{name:"Verify repair and record outcome",exact:true}).waitFor();await complete();await page.getByText("Final inspection recorded",{exact:true}).waitFor();
  await page.getByRole("button",{name:"Record completed service →"}).click();await page.locator('[x-model="projectCompletionForm.verified"]').check();await page.getByRole("button",{name:"Confirm completion & create service record"}).click();
  await page.waitForFunction(({sel,id})=>window.Alpine.$data(document.querySelector(sel)).logs.some(l=>l.projectId===id),{sel:selector,id:ids.p});await saved(page);
  const log=await app(page,(a,id)=>JSON.parse(JSON.stringify(a.logs.find(l=>l.projectId===id))),ids.p);assert.equal(log.materialConsumedValue,16);assert.equal(log.installedParts[0].quantity,2);assert.equal(log.guidedExecution.status,"completed");
  console.log(name,"guided execution and history passed");
  await app(page,async(a,id)=>{await a.addProjectAttachments(a.projects.find(x=>x.id===id),{target:{files:[new File(["fixture pdf bytes"],"fixture.pdf",{type:"application/pdf"})],value:""}});},ids.p);await saved(page);
  await page.reload();await saved(page);await balance(page,0,0);
+ await page.waitForFunction(({sel,id})=>!!window.Alpine.$data(document.querySelector(sel)).projects.find(p=>p.id===id)?.attachments[0]?.data,{sel:selector,id:ids.p});
  const backup=await app(page,a=>a.portableGarageState());const payload="data:application/pdf;base64,Zml4dHVyZSBwZGYgYnl0ZXM=";
  assert.equal(backup.projects.find(p=>p.id===ids.p).attachments[0].dataUrl,payload);
  assert.equal(await app(page,(a,b)=>a.recoverGarageState(b),backup),true);await saved(page);
@@ -71,6 +72,13 @@ async function run(name,launcher){
  assert.equal(await app(page,a=>window.MotorNoteInventoryEngine.audit(a.inventoryLedger,a.inventory).length),0);
  assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
  console.log(name,"reload, attachment backup and restore passed");
+ // Already-open Garage must be able to save a local transaction without network.
+ await context.setOffline(true);
+ const offlineSaved=await app(page,async a=>{a.openNewPartModal();Object.assign(a.newPartForm,{description:"Offline fixture",partNumber:"OFFLINE-1",quantity:1,unitCost:3,vehicleCompatibility:"Universal"});return await a.saveNewPart();});
+ assert.equal(offlineSaved,true);await saved(page);
+ await context.setOffline(false);await page.reload();await saved(page);
+ assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="OFFLINE-1")?.quantity),1);
+ console.log(name,"offline local save and subsequent reload passed");
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");
  }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,dialogs,external,url:page.url()},null,2));throw e;}
  finally{await context.close();await browser.close();}

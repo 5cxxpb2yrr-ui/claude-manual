@@ -5411,7 +5411,7 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 				},
 
 				hydrateAttachments() {
-					this.logs.forEach(log => {
+					[...(this.logs||[]),...(this.projects||[])].forEach(log => {
 						(log.attachments || []).forEach(att => {
 							if(att.dataUrl){att.data=att.dataUrl;return;}
  if (!att.data && att.storageKey&&this.garageDB) {

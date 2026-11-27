@@ -1662,35 +1662,19 @@
 
 				<!-- 12. VEHICLE SPECS & GARAGE TAB -->
 				<template x-if="currentTab === 'profile'"><div class="space-y-4" data-garage-tab="profile">
-					<div class="flex justify-between items-center">
-						<div>
-							<h2 class="text-lg font-bold text-white">
-								Rig Specs & Garage Specifications
-							</h2>
-							<p class="text-xs text-zinc-400">
-								Fluid capacities, OEM parts, spark plug specs,
-								and VIN records
-							</p>
-						</div>
-						<button
-							@click="openEditVehicleModal()"
-							class="px-3 py-1.5 rounded-xl bg-amber-500 text-zinc-950 text-xs font-bold shadow-md shadow-amber-500/20"
-						>
-							Edit Specs
-						</button>
-					</div>
+					<div class="flex flex-wrap items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <h2 class="text-lg font-bold text-white">Vehicle Specs</h2>
+                            <p class="text-xs text-zinc-400">Specifications &amp; factory references</p>
+                        </div>
+                        <div class="flex gap-2 flex-wrap">
+                            <button type="button" @click="openServiceManuals()" class="garage-tap px-3 rounded-xl border border-amber-500/40 bg-amber-500/10 text-amber-400 text-xs font-bold" aria-label="Service manuals">Manuals <span aria-hidden="true" x-text="manualInfo?.guides.length||0"></span></button>
+                            <button type="button" @click="openEditVehicleModal()" class="garage-tap px-3 rounded-xl bg-amber-500 text-zinc-950 text-xs font-bold">Edit Specs</button>
+                        </div>
+                    </div>
 
-					<div class="glass-panel p-5 space-y-4">
-						<div class="flex justify-between items-center">
-							<h3
-								class="text-base font-bold text-amber-400"
-								x-text="activeVehicle.name"
-							></h3>
-							<span
-								class="text-xs px-2.5 py-1 rounded bg-zinc-950 text-zinc-300 font-mono border border-zinc-800"
-								x-text="'VIN: ' + activeVehicle.vin"
-							></span>
-						</div>
+					<details class="glass-panel garage-section p-4 space-y-3" data-vehicle-spec-summary>
+						<summary><span class="min-w-0"><span class="block text-sm font-bold text-amber-400" x-text="activeVehicle.name"></span><span class="block text-[10px] text-zinc-400 break-all" x-text="'VIN: ' + (activeVehicle.vin||'Not entered')"></span></span></summary>
 
 						<div
 							class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs"
@@ -1740,17 +1724,11 @@
 								></span>
 							</div>
 						</div>
-					</div>
+					</details>
 
 					<!-- COMMON SPECS (routine maintenance) -->
-					<div class="glass-panel p-5 space-y-4">
-						<div>
-							<h3 class="text-sm font-bold text-white">Common Specs</h3>
-							<p class="text-xs text-zinc-400">
-								Routine maintenance: capacities, fluids, battery, filters and tires
-								<span class="text-zinc-500" x-text="'· ' + specsFilled() + ' of ' + specsTotal() + ' filled'"></span>
-							</p>
-						</div>
+					<details class="glass-panel garage-section p-4 space-y-3" data-common-specs>
+						<summary><span><span class="block text-sm font-bold text-white">Common Specs</span><span class="block text-xs text-zinc-400" x-text="specsFilled() + ' of ' + specsTotal() + ' filled'"></span></span></summary>
 
 						<template x-if="specLinks.length">
 							<div>
@@ -1767,8 +1745,8 @@
 						</template>
 
 						<template x-for="g in commonSpecGroups" :key="g.title">
-							<div class="space-y-2">
-								<h4 class="text-[11px] font-bold uppercase tracking-widest text-amber-400" x-text="g.title"></h4>
+							<details class="garage-section rounded-xl border border-zinc-800 px-3 py-1" data-spec-category>
+                                <summary><span class="text-xs font-bold text-amber-400" x-text="g.title"></span><span class="ml-auto text-[10px] text-zinc-500" x-text="g.items.filter(it=>String(specVal(it)).trim()).length+' / '+g.items.length"></span></summary>
 								<div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
 									<template x-for="it in g.items" :key="it.k">
 										<label class="block bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 focus-within:border-amber-500 transition">
@@ -1784,65 +1762,9 @@
 										</label>
 									</template>
 								</div>
-							</div>
+							</details>
 						</template>
-					</div>
-
-					<!-- SERVICE MANUALS (LifeOS Manual Explorer) -->
-					<div class="glass-panel p-5 space-y-4">
-						<div class="flex justify-between items-start gap-3">
-							<div>
-								<h3 class="text-sm font-bold text-white">Service Manuals</h3>
-								<p class="text-xs text-zinc-400">Factory repair, diagnosis and labor times for this rig</p>
-							</div>
-							<a
-								:href="manualLink(manualInfo ? '/veh/' + manualInfo.idx : '/vehicles')"
-								target="_blank" rel="noopener"
-								class="text-xs font-bold text-amber-400 whitespace-nowrap"
-							>Open Library &#8599;</a>
-						</div>
-
-						<template x-if="manualInfo">
-							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-								<template x-for="g in manualInfo.guides" :key="g.hash">
-									<a
-										:href="manualLink(g.hash)"
-										target="_blank" rel="noopener"
-										class="block bg-zinc-950 p-3 rounded-xl border border-zinc-800 hover:border-amber-500 transition"
-									>
-										<span class="block text-sm font-bold text-amber-400" x-text="g.title"></span>
-										<span class="block text-[11px] text-zinc-500" x-text="g.sub"></span>
-									</a>
-								</template>
-							</div>
-						</template>
-						<template x-if="!manualInfo">
-							<p class="text-xs text-zinc-500">No manuals are linked to this vehicle yet. Use search below or open the library.</p>
-						</template>
-
-						<div class="flex gap-2">
-							<input
-								type="text"
-								x-model="manualQuery"
-								@keydown.enter="openManualSearch(manualQuery)"
-								placeholder="Search manuals (e.g. water pump)..."
-								class="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-500 transition"
-							/>
-							<button
-								@click="openManualSearch(manualQuery)"
-								class="px-4 rounded-2xl bg-amber-500 text-zinc-950 text-xs font-bold"
-							>Search</button>
-						</div>
-						<div class="flex flex-wrap gap-2">
-							<template x-for="q in manualLibrary.quick" :key="q">
-								<button
-									@click="openManualSearch(q)"
-									class="px-3 py-1.5 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 hover:border-amber-500 transition"
-									x-text="q"
-								></button>
-							</template>
-						</div>
-					</div>
+					</details>
 
 					<div class="glass-panel p-5 space-y-3">
 						<h3 class="text-sm font-bold text-white">
@@ -2946,6 +2868,61 @@
 				</div>
 			</div>
 
+            <!-- Service manuals moved from the Specs page into a dedicated modal. -->
+            <dialog x-ref="serviceManualsDialog" class="spec-preview-dialog" aria-label="Vehicle service manuals" @cancel.prevent="closeServiceManuals()">
+                <div class="spec-preview-content">
+                    <div class="spec-preview-header">
+                        <div class="min-w-0"><p class="text-[10px] text-zinc-400" x-text="activeVehicle?.name"></p><h2 class="text-sm font-bold text-amber-400">Service Manuals</h2></div>
+                        <button type="button" autofocus class="garage-close px-3 rounded-xl border border-zinc-700 text-xs font-bold" @click="closeServiceManuals()" aria-label="Close service manuals">Close ✕</button>
+                    </div>
+                    <div class="space-y-4" style="flex:1;min-height:0;overflow:auto;padding:12px">
+                        <a :href="manualLink(manualInfo ? '/veh/' + manualInfo.idx : '/vehicles')" target="_blank" rel="noopener" class="garage-tap flex items-center justify-center rounded-xl bg-amber-500 text-zinc-950 text-xs font-bold">Open Library &#8599;</a>
+                        <template x-if="manualInfo">
+							<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+								<template x-for="g in manualInfo.guides" :key="g.hash">
+									<a
+										:href="manualLink(g.hash)"
+										target="_blank" rel="noopener"
+										class="block bg-zinc-950 p-3 rounded-xl border border-zinc-800 hover:border-amber-500 transition"
+									>
+										<span class="block text-sm font-bold text-amber-400" x-text="g.title"></span>
+										<span class="block text-[11px] text-zinc-500" x-text="g.sub"></span>
+									</a>
+								</template>
+							</div>
+						</template>
+						<template x-if="!manualInfo">
+							<p class="text-xs text-zinc-500">No manuals are linked to this vehicle yet. Use search below or open the library.</p>
+						</template>
+
+						<div class="flex gap-2">
+							<input
+								type="text"
+								x-model="manualQuery"
+								@keydown.enter="openManualSearch(manualQuery)"
+								placeholder="Search manuals (e.g. water pump)..."
+								class="flex-1 min-w-0 bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3 text-xs text-white focus:outline-none focus:border-amber-500 transition"
+							/>
+							<button
+								@click="openManualSearch(manualQuery)"
+								class="px-4 rounded-2xl bg-amber-500 text-zinc-950 text-xs font-bold"
+							>Search</button>
+						</div>
+						<div class="flex flex-wrap gap-2">
+							<template x-for="q in manualLibrary.quick" :key="q">
+								<button
+									@click="openManualSearch(q)"
+									class="px-3 py-1.5 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-300 hover:border-amber-500 transition"
+									x-text="q"
+								></button>
+							</template>
+						</div>
+					
+
+					
+                    </div>
+                </div>
+            </dialog>
             <!-- Selected vehicle quick reference, shares the same values as Specs. -->
             <dialog x-ref="quickSpecsDialog" class="spec-preview-dialog" aria-label="Vehicle quick reference" @cancel.prevent="closeQuickSpecs()">
               <div class="spec-preview-content">
@@ -3752,6 +3729,8 @@
                         const items=this.commonSpecGroups.flatMap(g=>g.items);
                         return keys.map(k=>items.find(it=>it.k===k)).filter(Boolean);
                     },
+                    openServiceManuals(){this.$refs.serviceManualsDialog.showModal();},
+                    closeServiceManuals(){this.$refs.serviceManualsDialog.close();},
                     openQuickSpecs(){this.$refs.quickSpecsDialog.showModal();},
                     closeQuickSpecs(){this.$refs.quickSpecsDialog.close();},
 

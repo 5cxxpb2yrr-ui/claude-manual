@@ -17,3 +17,12 @@ test("capture delegates to existing forms and detail sections retain controls",(
 test("mobile details support safe areas and zoom",()=>{
  assert.doesNotMatch(html,/user-scalable=no|maximum-scale=1\.0/);assert.match(html,/\.garage-detail-panel\{[^}]*100dvh/);assert.match(html,/env\(safe-area-inset-bottom\)/);assert.match(html,/\[x-cloak\]\{display:none!important\}/);
 });
+
+test("Specs use collapsed details and Service Manuals has one header shortcut and modal",()=>{
+ const profile=html.slice(html.indexOf("<!-- 12. VEHICLE SPECS"),html.indexOf("<!-- 13. DATABASE HEALTH"));
+ assert.match(profile,/<details[^>]*data-vehicle-spec-summary>/);assert.match(profile,/<details[^>]*data-common-specs>/);assert.match(profile,/<details[^>]*data-spec-category>/);
+ assert.match(profile,/@click="openServiceManuals\(\)"/);assert.match(profile,/@click="openEditVehicleModal\(\)"/);
+ assert.doesNotMatch(profile,/x-model="manualQuery"/);assert.equal((html.match(/x-model="manualQuery"/g)||[]).length,1);
+ assert.match(html,/<dialog x-ref="serviceManualsDialog"[^>]*aria-label="Vehicle service manuals"/);
+ assert.match(html,/openServiceManuals\(\)\{this\.\$refs\.serviceManualsDialog\.showModal\(\);\}/);
+});

@@ -102,6 +102,12 @@
  .garage-section[open]>summary::after{content:'−'}
  .garage-detail-heading{position:sticky;top:0;background:#18181b;z-index:2;padding:8px 0;}
  .garage-close,.garage-tap{min-width:44px;min-height:44px;}
+ .spec-preview-dialog{box-sizing:border-box;margin:auto;width:min(96vw,1100px);height:94dvh;max-width:96vw;max-height:94dvh;padding:0;border:1px solid #52525b;border-radius:16px;background:#18181b;color:#fafafa;overflow:hidden;}
+ .spec-preview-dialog::backdrop{background:rgba(0,0,0,.82)}
+ .spec-preview-content{height:100%;display:flex;flex-direction:column;min-height:0;padding-bottom:env(safe-area-inset-bottom)}
+ .spec-preview-frame{display:block;flex:1 1 0;width:100%;height:0;min-height:0;border:0;background:#fff;}
+ .spec-preview-header{flex:none;padding:8px 12px;display:flex;align-items:center;justify-content:space-between;gap:8px;background:#18181b;border-bottom:1px solid #3f3f46;}
+ @media(max-width:639px){.spec-preview-dialog{width:98vw;max-width:98vw;height:94dvh;max-height:94dvh;border-radius:12px}}
  @media(max-width:639px){
  .glass-panel,.glass-card-subtle{backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 3px 12px rgba(0,0,0,.25)}
  .garage-detail-overlay{padding:0!important;align-items:stretch!important;background:#18181b!important;backdrop-filter:none!important;}
@@ -1752,13 +1758,11 @@
 							<div>
 								<p class="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Look it up in the factory manual</p>
 								<div class="flex flex-wrap gap-2">
-									<template x-for="l in specLinks" :key="l.h">
-										<a
-											:href="manualLink(l.h)"
-											target="_blank" rel="noopener"
-											class="px-3 py-1.5 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] text-amber-400 hover:border-amber-500 transition"
+									<template x-for="l in specLinks" :key="l.label">
+										<button type="button" @click="openSpecPreview(l)" 
+											class="garage-tap px-3 py-1.5 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] text-amber-400 hover:border-amber-500 transition"
 											x-text="l.label"
-										></a>
+										></button>
 									</template>
 								</div>
 							</div>
@@ -2943,6 +2947,20 @@
 				</div>
 			</div>
 
+            <!-- Factory reference preview: keep the Specs screen mounted. -->
+            <dialog x-ref="specPreviewDialog" class="spec-preview-dialog" aria-label="Factory manual specification" @cancel.prevent="closeSpecPreview()">
+              <template x-if="specPreview">
+                <div class="spec-preview-content">
+                  <div class="spec-preview-header">
+                    <div class="min-w-0"><p class="text-[10px] text-zinc-400" x-text="specPreview.vehicle"></p><h2 class="text-sm font-bold text-amber-400" x-text="specPreview.label"></h2><p class="text-[10px] text-zinc-400 break-words" x-text="specPreview.documentTitle"></p></div>
+                    <button type="button" autofocus class="garage-close px-3 rounded-xl border border-zinc-700 text-xs font-bold" @click="closeSpecPreview()" aria-label="Close factory manual">Close ✕</button>
+                  </div>
+                  <p x-show="!specPreview.ready&&!specPreview.error" role="status" class="p-3 text-xs text-zinc-300">Loading factory manual…</p>
+                  <p x-show="specPreview.error" role="alert" class="p-3 text-xs text-amber-300" x-text="specPreview.error"></p>
+                  <iframe class="spec-preview-frame" :style="{visibility:specPreview.ready?'visible':'hidden'}" :src="specPreview.src" title="Factory manual document" sandbox="allow-same-origin" referrerpolicy="no-referrer" @load="verifySpecPreview($event.target)"></iframe>
+                </div>
+              </template>
+            </dialog>
 			<!-- 10. LIGHTBOX PREVIEW MODAL -->
 			<div
 				x-show="showLightbox"
@@ -3007,6 +3025,7 @@
 					tempMileage: 0,
 					showLightbox: false,
 					lightboxImage: '',
+                    specPreview:null,specPreviewTimer:null,
 					isEditingRepair: false,
 					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",captureBusy:false,vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",reconcileDraft:null,reconcileError:"",storageDraft:null,storageError:"",storageFilter:"",priceSearch:"",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
 					garageDB: null,
@@ -3413,19 +3432,107 @@
 					],
 					// Factory manual pages for this vehicle (page numbers from the Manual Explorer index; /v/<vehicle>/<manual>/<page>)
 					commonSpecLinks: {
-						'scion-xb': [
-							{ label: 'Engine oil', h: '/v/1/0/1635' }, { label: 'Coolant', h: '/v/1/0/1632' },
-							{ label: 'A/T fluid', h: '/v/1/0/1633' }, { label: 'M/T fluid', h: '/v/1/0/1634' },
-							{ label: 'Brake fluid', h: '/v/1/0/1630' }, { label: 'Power steering', h: '/v/1/0/1636' },
-							{ label: 'Refrigerant', h: '/v/1/0/1637' }, { label: 'Spark plug', h: '/v/1/0/1618' },
-							{ label: 'Oil filter', h: '/v/1/0/1626' }, { label: 'Cabin filter', h: '/v/1/0/1624' },
-							{ label: 'Wheel & tire specs', h: '/v/1/0/1660' }, { label: 'Routine service', h: '/v/1/0/1667' }
-						],
-						'subaru-crosstrek': [
-							{ label: 'Common specs', h: '/v/0/0/510' }, { label: 'Fluids', h: '/v/0/0/614' },
-							{ label: 'Tire fitment', h: '/v/0/0/619' }, { label: 'Specifications index', h: '/v/0/0/12028' }
-						]
-					},
+  "scion-xb": [
+    {
+      "label": "Engine oil",
+      "page": 381,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "Engine Oil"
+    },
+    {
+      "label": "Coolant",
+      "page": 381,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "Engine Coolant"
+    },
+    {
+      "label": "A/T fluid",
+      "page": 381,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "Automatic Transmission Fluid"
+    },
+    {
+      "label": "M/T fluid",
+      "page": 381,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "Manual Transmission Fluid"
+    },
+    {
+      "label": "Brake fluid",
+      "page": 381,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "Brake Fluid"
+    },
+    {
+      "label": "Power steering",
+      "page": 381,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "Power Steering Fluid"
+    },
+    {
+      "label": "Refrigerant",
+      "page": 381,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "Air Cond Refrigerant"
+    },
+    {
+      "label": "Spark plug",
+      "page": 3368,
+      "heading": "Service Data",
+      "evidence": "Spark plug"
+    },
+    {
+      "label": "Oil filter",
+      "page": 2818,
+      "heading": "Oil Filter: Replacement",
+      "evidence": "Oil Filter"
+    },
+    {
+      "label": "Cabin filter",
+      "page": 6108,
+      "heading": "Removal & Installation (2004-2006)",
+      "evidence": "Cabin Air Filter"
+    },
+    {
+      "label": "Wheel & tire specs",
+      "page": 385,
+      "heading": "Tire Fitment",
+      "evidence": "Inflation"
+    },
+    {
+      "label": "Routine service",
+      "page": 8750,
+      "heading": "Repair and Diagnosis (Single Page): Maintenance: Procedures: Maintenance",
+      "evidence": "General Maintenance"
+    }
+  ],
+  "subaru-crosstrek": [
+    {
+      "label": "Common specs",
+      "page": 510,
+      "heading": "Common Specs & Procedures",
+      "evidence": "CROSSTREK COMMON SPECIFICATIONS"
+    },
+    {
+      "label": "Fluids",
+      "page": 614,
+      "heading": "Quick Lookups: Fluids",
+      "evidence": "FLUID CAPACITIES"
+    },
+    {
+      "label": "Tire fitment",
+      "page": 619,
+      "heading": "Tire Fitment",
+      "evidence": "Inflation"
+    },
+    {
+      "label": "Specifications index",
+      "page": 12028,
+      "heading": "Common Specs & Procedures",
+      "evidence": "Specifications Index"
+    }
+  ]
+},
 
 					// Service Manuals (LifeOS Manual Explorer) - not saved with garage data
 					manualQuery: '',
@@ -3434,11 +3541,11 @@
 						base: /^https?:$/.test(location.protocol) ? '' : 'https://claude-manual.phillipstg.workers.dev',
 						// idx = vehicle order in the explorer's manifest.json; /t/<idx>/<guide>/ opens that manual's index
 						vehicles: {
-							'scion-xb': { idx: 1, guides: [
+							'scion-xb': { idx: 1, manual:'scion-service-manual',folder:'2006 Scion xB Standard', guides: [
 								{ title: 'Repair and Diagnosis', sub: 'Engine, chassis, body, electrical', hash: '/t/1/0/' },
 								{ title: 'Parts and Labor', sub: 'Parts and labor times', hash: '/t/1/1/' }
 							] },
-							'subaru-crosstrek': { idx: 0, guides: [
+							'subaru-crosstrek': { idx: 0, manual:'subaru-service-manual',folder:'2019 Subaru Crosstrek Limited', guides: [
 								{ title: 'Repair and Diagnosis', sub: 'Engine, chassis, body, electrical', hash: '/t/0/0/' },
 								{ title: 'Labor Times', sub: 'Crosstrek Base variant', hash: '/t/0/1/' }
 							] }
@@ -3484,8 +3591,43 @@
 					get specLinks() {
 						const v = this.activeVehicle || {};
 						const m = this.commonSpecLinks;
-						return m[v.id] || (/scion/i.test(v.name || '') ? m['scion-xb'] : /subaru|crosstrek/i.test(v.name || '') ? m['subaru-crosstrek'] : []);
+						return m[v.id] || (/^2006 Scion xB(?: Standard)?$/i.test(v.name || '') ? m['scion-xb'] : /^2019 Subaru Crosstrek(?: Limited)?$/i.test(v.name || '') ? m['subaru-crosstrek'] : []);
 					},
+
+                    openSpecPreview(link){
+                        const info=this.manualInfo;
+                        if(!info||!this.specLinks.some(item=>item===link||item.label===link.label&&item.page===link.page))return;
+                        const root='/m/'+[info.manual,info.folder,'pages'].map(encodeURIComponent).join('/')+'/';
+                        this.specPreview={...link,vehicle:this.activeVehicle.name,root,src:root+link.page+'.html',ready:false,verified:false,error:'',documentTitle:''};
+                        this.$refs.specPreviewDialog.showModal();
+                        this.specPreviewTimer=setTimeout(()=>{if(this.specPreview&&!this.specPreview.ready)this.specPreview.error='Factory manual could not be verified. Reopen the reference when connected.';},15000);
+                    },
+                    closeSpecPreview(){
+                        clearTimeout(this.specPreviewTimer);
+                        this.$refs.specPreviewDialog.close();
+                        this.specPreview=null;
+                    },
+                    verifySpecPreview(frame){
+                        const state=this.specPreview;
+                        if(!state)return;
+                        state.ready=false;
+                        try{
+                            const doc=frame.contentDocument;
+                            if(doc?.URL==='about:blank')return;
+                            const url=new URL(doc.URL),heading=doc.querySelector('h1')?.textContent?.trim()||'';
+                            const text=(doc.body?.textContent||'').replace(/\s+/g,' ').toLowerCase();
+                            if(url.origin!==location.origin||!url.pathname.startsWith(state.root)||!/^\d+\.html$/.test(url.pathname.slice(state.root.length))||!heading)throw Error('Unexpected manual document');
+                            if(!state.verified||url.pathname===state.src){
+                                if(url.pathname!==state.src||heading!==state.heading||!text.includes(state.evidence.toLowerCase()))throw Error('Factory reference does not match this specification');
+                                state.verified=true;
+                                const row=[...doc.querySelectorAll('tr')].find(r=>r.cells?.length&&r.cells[0].textContent.trim().toLowerCase()===state.evidence.toLowerCase());
+                                if(row){row.style.outline='2px solid #d97706';row.style.outlineOffset='-2px';row.scrollIntoView({block:'center'});}
+                            }
+                            doc.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();this.closeSpecPreview();}});
+                            state.documentTitle=heading;state.ready=true;state.error='';
+                            clearTimeout(this.specPreviewTimer);
+                        }catch(error){state.error='Factory reference could not be verified. No unrelated page will be displayed.';clearTimeout(this.specPreviewTimer);}
+                    },
 
 					specVal(it) {
 						const v = this.activeVehicle || {};

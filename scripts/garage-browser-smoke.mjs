@@ -13,6 +13,12 @@ assert.equal(manualSandbox,"allow-same-origin");
 const isolationPath="/m/isolation-fixture/pages/";
 const server=createServer(async(req,res)=>{
  if(networkBlocked){blockedRequests++;req.socket.destroy();return;}
+ if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html"){
+  res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Quick Lookups: Fluids</h1><table><tr><td>Engine Oil</td><td>Fixture</td></tr><tr><td>Engine Coolant</td><td>Fixture</td></tr></table>');return;
+ }
+ if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/3368.html"){
+  res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Unrelated fixture</h1>');return;
+ }
  if(req.url==="/__manual-isolation"){
   res.writeHead(200,{"Content-Type":types[".html"]}).end('<iframe id="manual" sandbox="'+manualSandbox+'" src="'+isolationPath+'1.html"></iframe>');return;
  }
@@ -167,6 +173,22 @@ async function run(name,launcher){
  await page.reload();await saved(page);
  assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="COLD-OFFLINE-1")?.quantity),1);
  console.log(name,"offline cold startup, attachment access and durable save passed");
+ phase="specification preview";
+ await app(page,a=>{a.activeVehicleId="scion-xb";a.currentTab="profile";});await tab(page,"profile");
+ const beforeTabs=context.pages().length;
+ await page.getByRole("button",{name:"Engine oil",exact:true}).click();
+ const specDialog=page.getByRole("dialog",{name:"Factory manual specification"});
+ await specDialog.waitFor({state:"visible"});
+ await page.waitForFunction(()=>document.querySelector(".spec-preview-frame")?.style.visibility==="visible");
+ assert.equal(await page.evaluate(()=>document.querySelector(".spec-preview-frame").contentDocument.querySelector("h1").textContent),"Quick Lookups: Fluids");
+ assert.equal(context.pages().length,beforeTabs);
+ const box=await specDialog.boundingBox();assert.ok(box.height>=844*.85&&box.width>=390*.9);
+ await specDialog.getByRole("button",{name:"Close factory manual"}).click();await specDialog.waitFor({state:"hidden"});await tab(page,"profile");
+ await page.getByRole("button",{name:"Spark plug",exact:true}).click();
+ await specDialog.getByRole("alert").waitFor({state:"visible"});
+ assert.equal(await page.evaluate(()=>document.querySelector(".spec-preview-frame").style.visibility),"hidden");
+ await specDialog.getByRole("button",{name:"Close factory manual"}).click();await specDialog.waitFor({state:"hidden"});await tab(page,"profile");
+ console.log(name,"verified Specs modal opens in place and rejects mismatched documents");
 
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");assert.deepEqual(runtimeDetails,[],"Browser runtime diagnostics");
  await verifyManualIsolation(browser,name);

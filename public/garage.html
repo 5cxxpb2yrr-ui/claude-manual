@@ -5468,5 +5468,11 @@ resetToDefaultData() {
 				};
 			}
 		</script>
-	</body>
+	<script>
+ // Cache only application code; personal data stays in IndexedDB.
+ if (window.isSecureContext && "serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/garage-sw.js",{scope:"/"}).catch(error=>console.warn("Offline Garage shell unavailable",error));
+ }
+ </script>
+ </body>
 </html>

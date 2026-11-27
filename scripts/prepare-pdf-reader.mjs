@@ -42,3 +42,10 @@ if(cssBuild.status!==0)throw Error("Garage CSS compilation failed");
 copyFileSync(new URL("dist/cdn.min.js",pkg("alpinejs")),new URL("alpine.min.js",ui));
 for(const name of ["tailwindcss","alpinejs"]){const license=readdirSync(pkg(name)).find(x=>/^licen[cs]e(?:\.|$)/i.test(x));if(license)copyFileSync(new URL(license,pkg(name)),new URL(name+"-LICENSE.txt",ui));}
 console.log("Garage UI bytes",readFileSync(cssPath).length,readFileSync(new URL("alpine.min.js",ui)).length);
+
+// Version the offline shell from its actual built bytes, including the runtime and CSS.
+const offlineTemplate=readFileSync(new URL("garage-sw.template.js",import.meta.url),"utf8");
+const {createHash}=await import("node:crypto");
+const shellHash=createHash("sha256").update(offlineTemplate);
+for(const path of ["/garage","/garage-ui-v1/garage.css","/garage-ui-v1/alpine.min.js","/repair-workspace.js","/repair-planner.js","/inventory-engine.js","/repair-history.js","/garage-mission.js","/garage-backup.js","/inventory-demand.js","/inventory-purchasing.js","/inventory-capture.js","/inventory-prices.js"])shellHash.update(path).update(readFileSync(new URL("../public"+(path==="/garage"?"/garage.html":path),import.meta.url)));
+writeFileSync(new URL("../public/garage-sw.js",import.meta.url),offlineTemplate.replace("__GARAGE_BUILD_HASH__",shellHash.digest("hex")));

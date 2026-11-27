@@ -3,12 +3,22 @@ import {createServer} from "node:http";
 import {readFile,mkdir,writeFile} from "node:fs/promises";
 import {resolve,extname,sep} from "node:path";
 import {createRequire} from "node:module";
+import {MANUAL_DOCUMENT_CSP} from "../worker.js";
 const require=createRequire(import.meta.url);
 const {chromium,webkit}=require("../.browser-tests/node_modules/playwright");
 const root=resolve("public"),types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json",".svg":"image/svg+xml"};
 let networkBlocked=false,blockedRequests=0;
+const manualSandbox=(await readFile(resolve(root,"manuals.html"),"utf8")).match(/<iframe class="pg"[^>]*sandbox="([^"]+)"/)?.[1];
+assert.equal(manualSandbox,"allow-same-origin");
+const isolationPath="/m/isolation-fixture/pages/";
 const server=createServer(async(req,res)=>{
  if(networkBlocked){blockedRequests++;req.socket.destroy();return;}
+ if(req.url==="/__manual-isolation"){
+  res.writeHead(200,{"Content-Type":types[".html"]}).end('<iframe id="manual" sandbox="'+manualSandbox+'" src="'+isolationPath+'1.html"></iframe>');return;
+ }
+ if(req.url===isolationPath+"1.html"||req.url===isolationPath+"2.html"){
+  res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Fixture manual</h1><script>window.manualScriptExecuted=true;localStorage.setItem("manual-script-ran","yes")</script><a href="2.html">Next diagram</a>');return;
+ }
  try{const url=new URL(req.url,"http://localhost"),p=resolve(root,"."+decodeURIComponent(url.pathname==="/garage"?"/garage.html":url.pathname));if(!p.startsWith(root+sep)){res.writeHead(404).end();return;}res.writeHead(200,{"Content-Type":types[extname(p)]||"application/octet-stream","Cache-Control":"no-store"}).end(await readFile(p));}
  catch{if(!res.headersSent)res.writeHead(404);res.end();}
 });
@@ -22,6 +32,24 @@ const app=(page,fn,arg)=>page.evaluate(async({source,arg,selector})=>await (0,ev
 const saved=page=>page.waitForFunction(sel=>{const a=window.Alpine?.$data(document.querySelector(sel));return a?.lastSavedAt&&a.saveState==="saved"&&!a.backupBusy&&!a.startupReadFailed&&!a.vendorBusy&&!a.guidedSaving&&!a.readinessSaving&&!a.inventorySaving;},selector);
 const tab=(page,name)=>page.locator('[data-garage-tab="'+name+'"]').waitFor({state:"visible"});
 const balance=async(page,q,r)=>assert.deepEqual(await app(page,a=>{const p=a.inventory.find(x=>x.partNumber==="FIX-1");return p?[p.quantity,p.reservedQuantity]:[0,0];}),[q,r]);
+async function verifyManualIsolation(browser,name){
+ const ctx=await browser.newContext();
+ try{
+  const p=await ctx.newPage();
+  await p.goto(origin+"/__manual-isolation");
+  const frame=p.frameLocator("#manual");
+  await frame.getByRole("heading",{name:"Fixture manual"}).waitFor();
+  assert.equal(await p.evaluate(()=>document.getElementById("manual").contentDocument.querySelector("h1").textContent),"Fixture manual","Parent must retain manual DOM access");
+  assert.equal(await p.evaluate(()=>localStorage.getItem("manual-script-ran")),null);
+  await frame.getByRole("link",{name:"Next diagram"}).click();
+  await p.waitForFunction(()=>document.getElementById("manual").contentWindow.location.pathname.endsWith("/2.html"));
+  assert.equal(await p.evaluate(()=>localStorage.getItem("manual-script-ran")),null);
+  await p.goto(origin+isolationPath+"1.html");
+  assert.equal(await p.evaluate(()=>window.manualScriptExecuted||false),false,"Direct manual page must not run scripts");
+  assert.equal(await p.evaluate(()=>localStorage.getItem("manual-script-ran")),null);
+  console.log(name,"manual content isolation and same-origin navigation passed");
+ }finally{await ctx.close();}
+}
 async function run(name,launcher){
  const browser=await launcher.launch({headless:true}),context=await browser.newContext({viewport:{width:390,height:844},deviceScaleFactor:2,isMobile:name==="webkit",hasTouch:true,acceptDownloads:true}),page=await context.newPage(),errors=[],dialogs=[],external=[];
  page.setDefaultTimeout(15000);
@@ -141,6 +169,7 @@ async function run(name,launcher){
  console.log(name,"offline cold startup, attachment access and durable save passed");
 
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");assert.deepEqual(runtimeDetails,[],"Browser runtime diagnostics");
+ await verifyManualIsolation(browser,name);
  }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,runtimeDetails,consoleDetails,dialogs,external,url:page.url(),state:await app(page,a=>({saveState:a.saveState,lastSaveError:a.lastSaveError,projects:a.projects.map(p=>({id:p.id,title:p.title,attachments:(p.attachments||[]).map(x=>({id:x.id,storageKey:x.storageKey,name:x.name,hydrated:!!x.data}))}))})).catch(()=>null)},null,2));throw e;}
  finally{await context.close();await browser.close();}
 }

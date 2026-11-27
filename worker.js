@@ -44,6 +44,8 @@ const TYPES = {
   gif: "image/gif",
   txt: "text/plain; charset=utf-8",
 };
+// Manual documents are reference material, not trusted application code.
+export const MANUAL_DOCUMENT_CSP = "sandbox allow-same-origin; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 const NAVIGATION_FILES = new Set([
   "scion-repair.json",
   "scion-parts.json",
@@ -209,8 +211,12 @@ export default {
       headers.set("content-type", TYPES[extension]);
     }
     headers.set("etag", object.httpEtag);
+    headers.set("x-content-type-options", "nosniff");
+    if (extension === "html" || extension === "htm" || /(?:text\/html|application\/xhtml\+xml)/i.test(headers.get("content-type") || "")) {
+      headers.set("content-security-policy", MANUAL_DOCUMENT_CSP);
+    }
     // Manual HTML can link to pages replaced during a corpus publish; do not retain stale page documents.
-    headers.set("cache-control", extension === "html" ? "no-store" : "public, max-age=86400");
+    headers.set("cache-control", headers.has("content-security-policy") ? "no-store" : "public, max-age=86400");
 
     const response = new Response(request.method === "HEAD" ? null : object.body, { headers });
     if (extension === "html" && request.method !== "HEAD") {

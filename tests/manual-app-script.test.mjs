@@ -83,3 +83,12 @@ test("Garage return link is restricted to the same-origin Garage route",()=>{
  for(const value of ["https://evil.example/garage","//evil.example/garage","javascript:alert(1)",origin+"/manuals",origin+"/garage/other","https://user:pass@manual.example/garage","",null])assert.equal(safe(value,origin),"",String(value));
  assert.match(html,/const back=safeGarageBack\(LS\("mx.back",""\)\)/);
 });
+
+test("manual frame permits parent DOM inspection but does not execute mirrored scripts",()=>{
+ const html=readFileSync(new URL("../public/manuals.html",import.meta.url),"utf8");
+ const frame=html.match(/<iframe class="pg"[^>]*>/)?.[0];
+ assert.ok(frame);
+ assert.match(frame,/sandbox="allow-same-origin"/);
+ assert.doesNotMatch(frame,/allow-scripts|allow-top-navigation/);
+ assert.match(html,/fr\.contentDocument/);
+});

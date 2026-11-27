@@ -88,3 +88,18 @@ test("manual content and navigation endpoints reject non-read methods before tou
  }
  assert.equal(reads,0);
 });
+
+test("manual documents retain no-store and deny executable content even when opened directly",async()=>{
+ const env={MANUALS:{get:async()=>({body:"fixture",httpEtag:'"fixture"',writeHttpMetadata(headers){headers.set("content-type","text/html");}})}};
+ for(const ext of ["html","htm","txt"]){
+  const r=await worker.fetch(new Request("https://manual.example/m/fixture/pages/1."+ext,{method:"HEAD"}),env);
+  assert.equal(r.status,200);
+  assert.equal(r.headers.get("cache-control"),"no-store");
+  assert.equal(r.headers.get("x-content-type-options"),"nosniff");
+  const csp=r.headers.get("content-security-policy");
+  assert.match(csp,/sandbox allow-same-origin/);
+  assert.match(csp,/script-src 'none'/);
+  assert.match(csp,/form-action 'none'/);
+  assert.doesNotMatch(csp,/allow-scripts/);
+ }
+});

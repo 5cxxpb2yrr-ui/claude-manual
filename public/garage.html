@@ -755,7 +755,7 @@
 						<h3 class="text-base font-bold text-white">Complete Service</h3><p class="text-xs text-zinc-400" x-text="selectedMaintenancePlan ? selectedMaintenancePlan.title : ''"></p>
 						<div class="grid grid-cols-2 gap-3 text-xs"><div><label class="text-zinc-400">Mileage</label><input type="number" x-model.number="completeMaintenanceForm.mileage" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></div><div><label class="text-zinc-400">Date</label><input type="date" x-model="completeMaintenanceForm.date" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></div><div><label class="text-zinc-400">Parts</label><input type="number" x-model.number="completeMaintenanceForm.partsCost" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></div><div><label class="text-zinc-400">Labor</label><input type="number" x-model.number="completeMaintenanceForm.labor" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></div><div><label class="text-zinc-400">Other</label><input type="number" x-model.number="completeMaintenanceForm.other" class="w-full mt-1 bg-zinc-950 border border-zinc-800 rounded-xl p-2.5 text-white"></div></div>
 						<textarea x-model="completeMaintenanceForm.notes" rows="3" placeholder="Service notes" class="w-full bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-xs text-white"></textarea>
-						<button @click="completeMaintenancePlan()" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl">Complete & Record Service</button>
+						<p class="text-xs text-zinc-400">Enter actual cash expenses only. Reserved stock is deducted separately; do not count already-recorded purchases again.</p><label class="flex gap-2 text-xs"><input type="checkbox" x-model="completeMaintenanceForm.verified">I completed the service and used the reserved parts listed on this plan.</label><button @click="completeMaintenancePlan()" :disabled="maintenanceMutationBusy||!completeMaintenanceForm.verified" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl">Complete & Record Service</button>
 					</div>
 				</div>
 
@@ -2999,7 +2999,7 @@
 					<div class="grid grid-cols-2 gap-3"><label class="text-xs text-zinc-400">Completion date<input type="date" x-model="projectCompletionForm.date" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white"></label><label class="text-xs text-zinc-400">Odometer (mi)<input type="number" min="0" step="1" x-model.number="projectCompletionForm.mileage" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white"></label></div>
 					<label class="block text-xs text-zinc-400">Service notes<textarea x-model="projectCompletionForm.notes" rows="4" placeholder="What was completed? Any findings or follow-up?" class="mt-1 w-full bg-zinc-950 border border-zinc-700 rounded-lg p-3 text-white"></textarea></label>
 					<label class="flex items-start gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-xs text-zinc-300"><input type="checkbox" x-model="projectCompletionForm.verified" class="mt-0.5 accent-emerald-500 w-4 h-4"><span>I verified the project work is complete and ready to be recorded in service history.</span></label>
-					<button @click="completeProjectAndRecordService(selectedProject)" :disabled="!projectCompletionForm.verified || !projectCompletionForm.date || !Number.isFinite(Number(projectCompletionForm.mileage)) || Number(projectCompletionForm.mileage)<0" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl disabled:opacity-40">Confirm completion & create service record</button>
+					<button @click="completeProjectAndRecordService(selectedProject)" :disabled="guidedServiceBusy || !projectCompletionForm.verified || !projectCompletionForm.date || !Number.isFinite(Number(projectCompletionForm.mileage)) || Number(projectCompletionForm.mileage)<0" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl disabled:opacity-40">Confirm completion & create service record</button>
 					<button @click="modals.projectCompletion = false" class="w-full py-2 text-zinc-400">Not yet</button>
 				</div>
 			</div>
@@ -3108,7 +3108,7 @@
 					analyticsVehicleId: 'all',
 					activeVehicleId: 'scion-xb',
 					repairCartLinks: [],
-					guidedPhaseIndex:0,guidedSaving:false,guidedError:"",guidedDraft:{},guidedServiceBusy:false,readinessSaving:false,readinessError:"",pendingRepairProjectDraft: null, repairIntent:"", repairPlan:null, repairPlanBusy:false, repairPlanError:"",repairPlanRun:0,
+					guidedPhaseIndex:0,guidedSaving:false,guidedError:"",guidedDraft:{},guidedServiceBusy:false,maintenanceMutationBusy:false,readinessSaving:false,readinessError:"",pendingRepairProjectDraft: null, repairIntent:"", repairPlan:null, repairPlanBusy:false, repairPlanError:"",repairPlanRun:0,
 					sortOrder: 'desc',
 					smartQuery: '',
 					timelineSearch: '',
@@ -4741,7 +4741,7 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 					} catch (e) { console.warn('Safety snapshot failed', e); return null; }
 				},
 
-				async createManualBackup() { await this.createSafetySnapshot(this.getPersistableState(), 'manual'); alert('Safety snapshot created.'); await this.runDatabaseHealthCheck(); },
+				async createManualBackup() { const snapshot=await this.createSafetySnapshot(this.getPersistableState(), 'manual'); if(!snapshot){alert('Safety snapshot could not be created. Check storage and export a backup before continuing.');return false;} alert('Safety snapshot created.'); await this.runDatabaseHealthCheck();return true; },
 
 				async runDatabaseHealthCheck() {
 					const issues = [], warnings = [];
@@ -5006,7 +5006,16 @@ projectCompletion(project) { const tasks=project?.tasks||[]; return tasks.length
 					toggleProjectPartSelection(part,selected) { const id=String(part.id); if(!selected){delete this.projectPartSelections[id];return;} this.projectPartSelections[id]={selected:true,quantity:1}; },
 					setProjectPartSelectionQuantity(part,value) { const id=String(part.id); if(!this.projectPartSelections[id])return; this.projectPartSelections[id].quantity=Math.max(1,Math.floor(Number(value)||1)); },
 					async addSelectedProjectParts(project) { if(!project)return; const selected=Object.entries(this.projectPartSelections).filter(([,v])=>v?.selected); if(!selected.length)return; const additions=[]; for(const [id,draft] of selected){const part=this.inventory.find(p=>String(p.id)===id),qty=Math.max(1,Math.floor(Number(draft.quantity)||1)); if(!part || this.projectAvailableInventory(part)<qty){alert('Inventory changed or requested quantity exceeds available stock. Please review your selections.');return;} if((project.partRequirements||[]).some(req=>String(req.inventoryId)===id)){alert('An item in your selection is already on this project.');return;} additions.push({id:'project-part-'+Date.now()+'-'+id,inventoryId:part.id,partNumber:part.partNumber,description:part.description,quantity:qty,unitCost:Number(part.unitCost||0),status:'Required',reserved:false});} if(!Array.isArray(project.partRequirements))project.partRequirements=[]; project.partRequirements.push(...additions); this.closeProjectPartsPicker(); await this.saveToStorage(); },
-					projectReceiptCandidates(project,req){
+					legacyMaintenanceHeld(id,excludePlan=null){
+ const same=(a,b)=>a!=null&&b!=null&&String(a)===String(b);
+ let held=0;
+ for(const p of this.maintenancePlans||[]){
+ if(same(p.id,excludePlan)||/^(completed|cancelled|canceled|archived)$/i.test(p.status||""))continue;
+ if((this.projects||[]).some(x=>!/^(completed|cancelled|canceled|archived)$/i.test(x.status||"")&&(same(x.id,p.projectId)||same(x.maintenancePlanId,p.id))&&(x.partRequirements||[]).length))continue;
+ for(const r of p.parts||[])if(same(r.inventoryId,id)&&r.reserved&&!r.used&&!/^(used|installed|cancelled|canceled)$/i.test(r.status||"")){const q=Number(r.quantity);if(!Number.isFinite(q)||q<=0)throw Error("Invalid maintenance reservation.");held+=q;}
+ }return held;
+ },
+ projectReceiptCandidates(project,req){
  const key="project:"+project.id+":"+req.id;
  const ids=new Set((this.vendorOrders||[]).filter(o=>["Received","Partially received"].includes(o.status)).flatMap(o=>(o.lines||[]).filter(l=>l.demandKey===key&&Number(l.receivedQuantity)>0&&l.inventoryId!=null).map(l=>String(l.inventoryId))));
  const vehicle=(this.vehicles||[]).find(v=>String(v.id)===String(project.vehicleId));
@@ -5038,10 +5047,11 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
                         const onHand=Number(part?.quantity||0),held=Number(part?.reservedQuantity||0);
                         if(part&&(!Number.isFinite(onHand)||!Number.isFinite(held)||held<0||held>onHand))return fail("Inventory balances need review.");
                         if(req.reserved&&held<remaining)return fail("Reservation balance is inconsistent. Review inventory before continuing.");
+                        if(part&&action==="consume"){try{if(onHand<held+this.legacyMaintenanceHeld(part.id))return fail("Stock is over-reserved. Reconcile inventory before consumption.");}catch(e){return fail(e.message);}}
                         if(action==="reserve"){
                             if(req.reserved)return false;
                             if(req.purchaseOrderId&&!req.inventoryAddedAt)return fail("Receive the ordered stock first.");
-                            if(onHand-held<remaining)return fail("Not enough unreserved stock.");
+                            let legacy;try{legacy=this.legacyMaintenanceHeld(part.id);}catch(e){return fail(e.message);}if(onHand-held-legacy<remaining)return fail("Not enough unreserved stock.");
                         }
                         if(["consume","release"].includes(action)&&!req.reserved)return false;
                         const qty=action==="consume"?Number(amount):remaining;
@@ -5095,10 +5105,31 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 					async removeProjectAttachment(project,id) { const att=(project?.attachments||[]).find(item=>String(item.id)===String(id)); if(!att)return; if(att.data?.startsWith('blob:'))URL.revokeObjectURL(att.data); if(att.storageKey&&this.garageDB){try{await new Promise((resolve,reject)=>{const tx=this.garageDB.transaction('attachments','readwrite');tx.objectStore('attachments').delete(att.storageKey);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error||new Error('Attachment delete failed'));});}catch(error){alert('The stored file could not be deleted.');return;}} project.attachments=project.attachments.filter(item=>String(item.id)!==String(id)); await this.saveToStorage(); },
 					async hydrateProjectAttachments(project) { if(!project||!Array.isArray(project.attachments)||!this.garageDB)return; for(const att of project.attachments){if(att.data||att.dataUrl||!att.storageKey)continue; try{const record=await new Promise((resolve,reject)=>{const req=this.garageDB.transaction('attachments','readonly').objectStore('attachments').get(att.storageKey);req.onsuccess=()=>resolve(req.result||null);req.onerror=()=>reject(req.error);});if(record?.blob)att.data=URL.createObjectURL(record.blob);}catch(error){console.warn('Project attachment hydrate failed',error);}} },
 					async addProjectCostEntry(project) { const d=this.projectCostDraft,amount=Number(d.amount);if(!project||!d.description.trim()||!Number.isFinite(amount)||amount<=0){alert('Enter an expense description and an amount greater than zero.');return;}if(!Array.isArray(project.costEntries))project.costEntries=[];project.costEntries.unshift({id:'cost-'+Date.now(),description:d.description.trim(),category:d.category,amount,date:d.date||new Date().toISOString().split('T')[0],createdAt:new Date().toISOString()});project.actualCost=this.projectActualCost(project);this.syncProjectMaintenancePlan(project);this.projectCostDraft={description:'',category:'Labor',amount:0,date:new Date().toISOString().split('T')[0]};await this.saveToStorage(); },
-					projectReadyToComplete(project) { if(!project || project.status==='Completed' || !this.vehicles.some(v=>String(v.id)===String(project.vehicleId)))return false; if((project.partRequirements||[]).some(r=>r.reserved)||this.guidedOpenFindings(project).length||project.guidedExecution?.timerStartedAt)return false; const tasks=Array.isArray(project.tasks)?project.tasks:[]; return tasks.every(task=>!!task.done); },
-					openProjectCompletion(project) { if(!this.projectReadyToComplete(project)){alert('Complete all tasks, link a vehicle, and record use or release remaining stock reservations before recording service.');return;} const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); this.projectCompletionForm={mileage:Number(vehicle?.odometer||0),date:new Date().toISOString().slice(0,10),notes:project.description||'',verified:false}; this.modals.projectCompletion=true; },
-					async completeProjectAndRecordService(project) { if(!project || !this.projectReadyToComplete(project))return; const f=this.projectCompletionForm,vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)),mileage=Number(f.mileage); if(!vehicle || !f.verified || !f.date || !Number.isFinite(mileage) || mileage<0){alert('Confirm the work, date, and a valid odometer reading.');return;} const existing=this.logs.find(log=>String(log.projectId||'')===String(project.id)); if(existing){project.maintenanceLogId=existing.id;project.status='Completed';project.completion=100;project.completedAt=project.completedAt||new Date().toISOString();await this.saveToStorage();this.modals.projectCompletion=false;this.modals.projectDetail=false;return;} const now=new Date().toISOString(),cost=this.projectActualCost(project),plan=this.maintenancePlans.find(item=>String(item.id)===String(project.maintenancePlanId)); const log={id:'project-service-'+project.id,projectId:project.id,maintenancePlanId:plan?.id||null,vehicleId:vehicle.id,vehicle:vehicle.name,mileage,date:f.date,serviceType:project.title||'Completed vehicle project',category:'Maintenance',cost,notes:String(f.notes||'').trim(),attachments:[],history:[],projectCategory:project.category||'General',procedureReferences:(project.procedures||[]).map(item=>({id:item.id,title:item.title,sourceLabel:item.sourceLabel,sourcePath:item.sourcePath})),projectAttachmentIds:(project.attachments||[]).map(item=>item.id),projectCostEntryIds:(project.costEntries||[]).map(item=>item.id),materialConsumedValue:this.projectMaterialCost(project),guidedExecution:project.guidedExecution?JSON.parse(JSON.stringify(project.guidedExecution)):null,installedParts:(project.partRequirements||[]).flatMap(req=>(req.consumptionHistory||[]).map(entry=>({...JSON.parse(JSON.stringify(entry)),description:req.description,partNumber:req.partNumber||'',requirementId:req.id})))}; this.logs.unshift(log); project.status='Completed';project.completion=100;project.completedAt=now;project.maintenanceLogId=log.id;project.actualCost=cost;project.updatedAt=now; if(mileage>Number(vehicle.odometer||0))vehicle.odometer=mileage; if(plan && plan.status!=='Cancelled'){plan.status='Completed';plan.completedAt=now;plan.completion=100;plan.actualCost=cost;plan.tasks=(plan.tasks||[]).map(task=>({...task,done:true}));} const saved=await this.saveToStorage(); if(saved){this.modals.projectCompletion=false;this.modals.projectDetail=false;this.selectedProject=project;this.selectedMaintenancePlan=plan||null;}else{alert('The service record could not be saved. The project is still open; try confirming again.');} },
-					async saveProjectWorkspace(project) { if(!project)return; const canonical=this.projects.find(item=>String(item.id)===String(project.id)); const target=canonical||project; if(target!==project){ Object.assign(target,project); } if(!Array.isArray(target.partRequirements))target.partRequirements=[]; if(!Array.isArray(target.purchaseOrders))target.purchaseOrders=[]; if(!Array.isArray(target.costEntries))target.costEntries=[]; target.completion=this.projectCompletion(target); target.updatedAt=new Date().toISOString(); target.budget=Math.max(0,Number(target.budget)||0); target.actualCost=this.projectActualCost(target); this.syncProjectMaintenancePlan(target); const saved=await this.saveToStorage(); if(saved){this.selectedProject=target;this.modals.projectDetail=false;} else {alert('Project could not be saved. Your project remains open; try saving again.');} },
+					projectReadyToComplete(project) { if(!project || /^(completed|cancelled|canceled|archived)$/i.test(project.status||'') || !this.vehicles.some(v=>String(v.id)===String(project.vehicleId)))return false; if((project.partRequirements||[]).some(r=>r.reserved)||this.guidedOpenFindings(project).length||project.guidedExecution?.timerStartedAt)return false; if(project.guidedExecution&&(Object.keys(project.guidedExecution.completed||{}).length||project.guidedExecution.notes?.length||project.guidedExecution.torqueChecks?.length||project.guidedExecution.findings?.length)&&project.guidedExecution.status!=='completed')return false; const tasks=Array.isArray(project.tasks)?project.tasks:[]; return tasks.every(task=>!!task.done); },
+					openProjectCompletion(project) { if(!this.projectReadyToComplete(project)){alert('Complete tasks and any started guided repair, resolve findings, stop the timer, and record use or release remaining reservations before recording service.');return;} const vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)); this.projectCompletionForm={mileage:Number(vehicle?.odometer||0),date:new Date().toISOString().slice(0,10),notes:project.description||'',verified:false}; this.modals.projectCompletion=true; },
+					async completeProjectAndRecordService(project) {
+ if(this.guidedServiceBusy||this.inventorySaving||this.vendorBusy||!this.projectReadyToComplete(project))return false;
+ const f=this.projectCompletionForm,vehicle=this.vehicles.find(v=>String(v.id)===String(project.vehicleId)),mileage=Number(f.mileage);
+ if(!vehicle||!f.verified||!this.toolDateValid(f.date)||f.date>this.toolToday()||f.mileage===""||!Number.isFinite(mileage)||mileage<0){alert("Confirm the work, a valid nonfuture date and odometer reading.");return false;}
+ const priorProject={...project},priorLogs=this.logs,priorOdometer=vehicle.odometer,plan=this.maintenancePlans.find(item=>String(item.id)===String(project.maintenancePlanId)),priorPlan=plan?{...plan}:null;
+ const restore=(target,before)=>{for(const k of Object.keys(target))if(!Object.hasOwn(before,k))delete target[k];Object.assign(target,before);};
+ this.guidedServiceBusy=true;
+ try{
+ const existing=this.logs.filter(l=>String(l.projectId||"")===String(project.id));
+ if(existing.length>1||existing.some(l=>String(l.vehicleId)!==String(vehicle.id)))throw Error("Conflicting existing service records. Review history first.");
+ const now=new Date().toISOString(),cost=this.projectActualCost(project);
+ if(!Number.isFinite(cost)||cost<0)throw Error("Review recorded project expenses.");
+ if(!existing.length&&this.logs.some(l=>String(l.id)==="project-service-"+project.id))throw Error("Service record ID conflict.");
+ const log={id:'project-service-'+project.id,projectId:project.id,maintenancePlanId:plan?.id||null,vehicleId:vehicle.id,vehicle:vehicle.name,mileage,date:f.date,serviceType:project.title||'Completed vehicle project',category:'Maintenance',cost,notes:String(f.notes||'').trim(),attachments:[],history:[],projectCategory:project.category||'General',procedureReferences:(project.procedures||[]).map(item=>({id:item.id,title:item.title,sourceLabel:item.sourceLabel,sourcePath:item.sourcePath})),projectAttachmentIds:(project.attachments||[]).map(item=>item.id),projectCostEntryIds:(project.costEntries||[]).map(item=>item.id),materialConsumedValue:this.projectMaterialCost(project),guidedExecution:project.guidedExecution?JSON.parse(JSON.stringify(project.guidedExecution)):null,installedParts:(project.partRequirements||[]).flatMap(req=>(req.consumptionHistory||[]).map(entry=>({...JSON.parse(JSON.stringify(entry)),description:req.description,partNumber:req.partNumber||'',requirementId:req.id})))};
+ const record=existing[0]||log;if(!existing.length)this.logs=[record,...priorLogs];
+ Object.assign(project,{status:"Completed",completion:100,completedAt:project.completedAt||now,maintenanceLogId:record.id,actualCost:cost,updatedAt:now});
+ if(mileage>Number(vehicle.odometer||0))vehicle.odometer=mileage;
+ if(plan&&plan.status!=="Cancelled"){Object.assign(plan,{status:"Completed",completedAt:now,completion:100,actualCost:cost,tasks:(plan.tasks||[]).map(task=>({...task,done:true}))});}
+ if(!await this.saveToStorage("Project service recorded",{projectId:project.id,serviceLogId:record.id}))throw Error(this.lastSaveError||"Service record could not be saved.");
+ this.modals.projectCompletion=false;this.modals.projectDetail=false;this.selectedProject=project;this.selectedMaintenancePlan=plan||null;return true;
+ }catch(e){this.logs=priorLogs;restore(project,priorProject);vehicle.odometer=priorOdometer;if(plan)restore(plan,priorPlan);alert(e.message+" No completion was saved.");return false;}finally{this.guidedServiceBusy=false;}
+ },
+ async saveProjectWorkspace(project) { if(!project)return; const canonical=this.projects.find(item=>String(item.id)===String(project.id)); const target=canonical||project; if(target!==project){ Object.assign(target,project); } if(!Array.isArray(target.partRequirements))target.partRequirements=[]; if(!Array.isArray(target.purchaseOrders))target.purchaseOrders=[]; if(!Array.isArray(target.costEntries))target.costEntries=[]; target.completion=this.projectCompletion(target); target.updatedAt=new Date().toISOString(); target.budget=Math.max(0,Number(target.budget)||0); target.actualCost=this.projectActualCost(target); this.syncProjectMaintenancePlan(target); const saved=await this.saveToStorage(); if(saved){this.selectedProject=target;this.modals.projectDetail=false;} else {alert('Project could not be saved. Your project remains open; try saving again.');} },
 
 						async generateRepairPlan() {
 							const run=++this.repairPlanRun,vehicleId=this.activeVehicleId,scope=this.repairIntent;
@@ -5156,7 +5187,7 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 					},
 
 					inventoryCompatibilityOptions() {return [...new Set([...(this.vehicles||[]).map(v=>v.name),this.newPartForm.vehicleCompatibility].filter(n=>n&&n!=="Universal"))];},
-					inventoryReservedCount(id) {const item=(this.inventory||[]).find(p=>String(p.id)===String(id));return Math.max(0,Number(item?.reservedQuantity)||0);},
+					inventoryReservedCount(id) {const item=(this.inventory||[]).find(p=>String(p.id)===String(id));return Math.max(0,Number(item?.reservedQuantity)||0)+(this.legacyMaintenanceHeld?.(id)||0);},
 					inventoryHasActiveLinks(id) {return (this.projects||[]).some(p=>!["Completed","Cancelled"].includes(p.status)&&(p.partRequirements||[]).some(req=>String(req.inventoryId)===String(id)&&req.status!=="Used"));},
 					openNewPartModal() {
 						this.editingInventoryId=null;this.inventoryError="";
@@ -5365,29 +5396,69 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
 						this.maintenancePlans.unshift(plan); await this.saveToStorage(); this.modals.maintenancePlan = false;
 					},
 
-					async reserveMaintenanceParts(plan) {
-						if (!plan || !plan.parts?.length) { plan.status = 'Parts Reserved'; await this.saveToStorage(); return; }
-						for (const req of plan.parts) { const part = this.inventory.find(x => String(x.id) === String(req.inventoryId)); if (!part || Number(part.quantity || 0) < Number(req.quantity || 0)) { alert(`Insufficient inventory for ${req.description || req.partNumber}.`); return; } }
-						plan.parts.forEach(req => req.reserved = true); plan.status = 'Parts Reserved'; await this.saveToStorage();
-					},
-
-					async startMaintenancePlan(plan) { if (!plan) return; if (plan.parts?.length && !plan.parts.every(p => p.reserved)) { await this.reserveMaintenanceParts(plan); if (plan.status !== 'Parts Reserved') return; } plan.status = 'In Progress'; plan.startedAt = new Date().toISOString(); const linkedProject=this.projects.find(project=>String(project.id)===String(plan.projectId)); if(linkedProject){linkedProject.status='In Progress';linkedProject.updatedAt=plan.startedAt;} await this.saveToStorage(); },
-
-					openCompleteMaintenance(plan) { this.selectedMaintenancePlan = plan; this.completeMaintenanceForm = { mileage: this.activeVehicle?.odometer || 0, date: new Date().toISOString().split('T')[0], partsCost: (plan.parts || []).reduce((a,p)=>a + Number(p.unitCost||0)*Number(p.quantity||0),0), labor: 0, other: 0, notes: plan.notes || '' }; this.modals.completeMaintenance = true; },
-
-					async completeMaintenancePlan() {
-						const plan = this.selectedMaintenancePlan; const f = this.completeMaintenanceForm; if (!plan) return; const vehicle = this.vehicles.find(v => v.id === plan.vehicleId);
-						const partsCost = Number(f.partsCost||0), labor = Number(f.labor||0), other = Number(f.other||0), total = partsCost + labor + other;
-						if (plan.parts?.length) plan.parts.forEach(req => { const part=this.inventory.find(x=>String(x.id)===String(req.inventoryId)); if(part && req.reserved){ part.quantity=Math.max(0,Number(part.quantity||0)-Number(req.quantity||0)); req.used=true; } });
-						const log = { id: Date.now(), vehicleId: plan.vehicleId, vehicle: vehicle?.name || '', mileage: Number(f.mileage||0), date: f.date, serviceType: plan.title, category: 'Maintenance', cost: total, notes: f.notes || '', attachments: [], history: [], maintenancePlanId: plan.id };
-						this.logs.unshift(log); plan.status='Completed'; plan.completedAt=new Date().toISOString(); plan.actualCost=total; plan.completion=100; plan.tasks=(plan.tasks||[]).map(t=>({...t,done:true}));
-						if (vehicle && Number(f.mileage||0) > Number(vehicle.odometer||0)) vehicle.odometer=Number(f.mileage);
-						await this.saveToStorage("Maintenance completed",{maintenancePlanId:plan.id}); this.modals.completeMaintenance=false; this.selectedMaintenancePlan=null; await this.runDatabaseHealthCheck();
-					},
-
-					async cancelMaintenancePlan(plan) { if (!plan) return; plan.parts?.forEach(p=>p.reserved=false); plan.status='Cancelled'; await this.saveToStorage(); },
-
-					async toggleMaintenanceTask(plan, index) { if (!plan?.tasks?.[index]) return; const planTask=plan.tasks[index],linkedProject=this.projects.find(project=>String(project.id)===String(plan.projectId)); if(linkedProject){const projectTask=(linkedProject.tasks||[]).find(task=>String(task.id)===String(planTask.projectTaskId))||(linkedProject.tasks||[]).find(task=>String(task.name||'')===String(planTask.name||'')); if(projectTask){const nextDone=!projectTask.done; if(nextDone&&!this.projectTaskDependenciesMet(linkedProject,projectTask)){alert('Complete the prerequisite tasks in the project first.');return;} if(!nextDone)this.resetProjectDependentTasks(linkedProject,projectTask.id); projectTask.done=nextDone; linkedProject.completion=this.projectCompletion(linkedProject); this.syncProjectMaintenancePlan(linkedProject); await this.saveToStorage(); return; }} planTask.done=!planTask.done; const done=plan.tasks.filter(t=>t.done).length; plan.completion=Math.round(done/Math.max(1,plan.tasks.length)*100); await this.saveToStorage(); },
+					maintenanceLinkedProject(plan){return (this.projects||[]).find(p=>p.id!=null&&(String(p.id)===String(plan?.projectId)||p.maintenancePlanId!=null&&String(p.maintenancePlanId)===String(plan?.id)));},
+ maintenanceStockPlan(plan,consume=false){
+ const stock=this.inventory||[],amounts=new Map(),parts=(plan.parts||[]).map(r=>({...r}));
+ for(const req of parts){
+ if(req.used||/^(used|installed|cancelled|canceled)$/i.test(req.status||""))continue;
+ if(consume&&!req.reserved)throw Error("Reserve or remove each unused maintenance requirement before completing service.");
+ const id=String(req.inventoryId),q=Number(req.quantity),matches=stock.filter(p=>String(p.id)===id);
+ if(matches.length!==1||!Number.isFinite(q)||q<=0)throw Error("Missing or invalid maintenance stock requirement.");
+ amounts.set(id,(amounts.get(id)||0)+q);
+ }
+ for(const [id,q] of amounts){
+ const p=stock.find(p=>String(p.id)===id),on=Number(p.quantity),held=Number(p.reservedQuantity||0),other=this.legacyMaintenanceHeld(id,plan.id);
+ if(!Number.isFinite(on)||!Number.isFinite(held)||held<0||on<held+other+q)throw Error("Insufficient unreserved stock for "+(p.description||id)+".");
+ }
+ return {inventory:consume?stock.map(p=>amounts.has(String(p.id))?{...p,quantity:Number(p.quantity)-amounts.get(String(p.id))}:p):stock,parts:parts.map(r=>r.used||/^(used|installed|cancelled|canceled)$/i.test(r.status||"")?r:{...r,reserved:!consume,...(consume?{used:true,status:"Used"}:{})})};
+ },
+ async reserveMaintenanceParts(plan){
+ if(!plan||this.inventorySaving||this.vendorBusy||this.maintenanceMutationBusy||/^(completed|cancelled|canceled|archived)$/i.test(plan.status||""))return false;
+ if(this.maintenanceLinkedProject(plan)){alert("Manage reservations in the linked repair project.");return false;}
+ const before={...plan};this.maintenanceMutationBusy=true;this.inventorySaving=true;
+ try{const next=this.maintenanceStockPlan(plan);plan.parts=next.parts;plan.status="Parts Reserved";if(!await this.saveToStorage("Maintenance stock reserved",{maintenancePlanId:plan.id}))throw Error(this.lastSaveError||"Reservation save failed.");return true;}
+ catch(e){Object.assign(plan,before);alert(e.message);return false;}finally{this.maintenanceMutationBusy=false;this.inventorySaving=false;}
+ },
+ async startMaintenancePlan(plan){
+ if(!plan||this.maintenanceMutationBusy||/^(completed|cancelled|canceled|archived)$/i.test(plan.status||""))return false;
+ const linked=this.maintenanceLinkedProject(plan);if(linked){this.currentTab="projects";this.openProjectDetail(linked);return false;}
+ if(plan.parts?.length&&!plan.parts.every(r=>r.reserved||r.used)){if(!await this.reserveMaintenanceParts(plan))return false;}
+ const before={...plan};this.maintenanceMutationBusy=true;
+ try{plan.status="In Progress";plan.startedAt=plan.startedAt||new Date().toISOString();if(!await this.saveToStorage())throw Error(this.lastSaveError||"Could not start maintenance.");return true;}
+ catch(e){for(const k of Object.keys(plan))if(!Object.hasOwn(before,k))delete plan[k];Object.assign(plan,before);alert(e.message);return false;}finally{this.maintenanceMutationBusy=false;}
+ },
+ openCompleteMaintenance(plan){
+ if(!plan||/^(completed|cancelled|canceled|archived)$/i.test(plan.status||""))return;
+ const linked=this.maintenanceLinkedProject(plan);if(linked){this.currentTab="projects";this.openProjectDetail(linked);return;}
+ this.selectedMaintenancePlan=plan;const vehicle=this.vehicles.find(v=>String(v.id)===String(plan.vehicleId));
+ this.completeMaintenanceForm={mileage:vehicle?.odometer||0,date:this.toolToday(),partsCost:0,labor:0,other:0,notes:plan.notes||"",verified:false};this.modals.completeMaintenance=true;
+ },
+ async completeMaintenancePlan(){
+ const plan=this.selectedMaintenancePlan,f=this.completeMaintenanceForm;
+ if(!plan||this.maintenanceMutationBusy||this.inventorySaving||this.vendorBusy||/^(completed|cancelled|canceled|archived)$/i.test(plan.status||""))return false;
+ if(this.maintenanceLinkedProject(plan)){alert("Complete the linked repair project instead.");return false;}
+ const vehicle=this.vehicles.find(v=>String(v.id)===String(plan.vehicleId)),mileage=Number(f.mileage),costs=[f.partsCost,f.labor,f.other].map(Number);
+ if(!vehicle||!f.verified||!this.toolDateValid(f.date)||f.date>this.toolToday()||f.mileage===""||!Number.isFinite(mileage)||mileage<0||costs.some(n=>!Number.isFinite(n)||n<0)){alert("Confirm actual work, date, mileage and nonnegative expenses.");return false;}
+ const prior={...plan},oldStock=this.inventory,oldLogs=this.logs,oldMileage=vehicle.odometer;this.maintenanceMutationBusy=true;this.inventorySaving=true;
+ try{
+ if(this.logs.some(l=>String(l.maintenancePlanId||"")===String(plan.id)||String(l.id)==="maintenance-service-"+plan.id))throw Error("A service record already exists for this plan; reconcile history.");
+ const next=this.maintenanceStockPlan(plan,true),total=costs.reduce((a,b)=>a+b,0),now=new Date().toISOString();
+ const log={id:"maintenance-service-"+plan.id,vehicleId:vehicle.id,vehicle:vehicle.name,mileage,date:f.date,serviceType:plan.title,category:"Maintenance",cost:total,notes:f.notes||"",attachments:[],history:[],maintenancePlanId:plan.id};
+ this.inventory=next.inventory;this.logs=[log,...oldLogs];Object.assign(plan,{parts:next.parts,status:"Completed",completedAt:now,actualCost:total,completion:100,tasks:(plan.tasks||[]).map(t=>({...t,done:true}))});
+ if(mileage>Number(vehicle.odometer||0))vehicle.odometer=mileage;
+ if(!await this.saveToStorage("Maintenance completed",{maintenancePlanId:plan.id,serviceLogId:log.id}))throw Error(this.lastSaveError||"Maintenance save failed.");
+ this.modals.completeMaintenance=false;this.selectedMaintenancePlan=null;return true;
+ }catch(e){this.inventory=oldStock;this.logs=oldLogs;vehicle.odometer=oldMileage;for(const k of Object.keys(plan))if(!Object.hasOwn(prior,k))delete plan[k];Object.assign(plan,prior);alert(e.message);return false;}
+ finally{this.maintenanceMutationBusy=false;this.inventorySaving=false;}
+ },
+ async cancelMaintenancePlan(plan){
+ if(!plan||this.maintenanceMutationBusy||this.inventorySaving||this.vendorBusy||/^(completed|cancelled|canceled|archived)$/i.test(plan.status||""))return false;
+ if(this.maintenanceLinkedProject(plan)){alert("Manage the linked project first.");return false;}
+ const prior={...plan};this.maintenanceMutationBusy=true;this.inventorySaving=true;
+ try{plan.parts=(plan.parts||[]).map(p=>({...p,reserved:false}));plan.status="Cancelled";if(!await this.saveToStorage("Maintenance reservation released",{maintenancePlanId:plan.id}))throw Error(this.lastSaveError||"Cancellation save failed.");return true;}
+ catch(e){Object.assign(plan,prior);alert(e.message);return false;}finally{this.maintenanceMutationBusy=false;this.inventorySaving=false;}
+ },
+ async toggleMaintenanceTask(plan, index) { if (!plan?.tasks?.[index]) return; const planTask=plan.tasks[index],linkedProject=this.projects.find(project=>String(project.id)===String(plan.projectId)); if(linkedProject){const projectTask=(linkedProject.tasks||[]).find(task=>String(task.id)===String(planTask.projectTaskId))||(linkedProject.tasks||[]).find(task=>String(task.name||'')===String(planTask.name||'')); if(projectTask){const nextDone=!projectTask.done; if(nextDone&&!this.projectTaskDependenciesMet(linkedProject,projectTask)){alert('Complete the prerequisite tasks in the project first.');return;} if(!nextDone)this.resetProjectDependentTasks(linkedProject,projectTask.id); projectTask.done=nextDone; linkedProject.completion=this.projectCompletion(linkedProject); this.syncProjectMaintenancePlan(linkedProject); await this.saveToStorage(); return; }} planTask.done=!planTask.done; const done=plan.tasks.filter(t=>t.done).length; plan.completion=Math.round(done/Math.max(1,plan.tasks.length)*100); await this.saveToStorage(); },
 
 					maintenancePlanCost(plan) { return (plan?.parts||[]).reduce((a,p)=>a+Number(p.unitCost||0)*Number(p.quantity||0),0); },
 

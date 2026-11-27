@@ -39,3 +39,10 @@ test("V20.1 shared navigation preserves secondary destinations and capture route
  assert.match(manual,/\["#\/","Manuals","book"\]/);
  assert.match(manual,/id="cf"/);assert.match(manual,/id="cr"/);
 });
+
+test("V20.1 project workspace isolates presentation tabs without removing existing controls",()=>{
+ const start=html.indexOf("<!-- 8. PROJECT DETAIL MODAL -->"),end=html.indexOf("<!-- FULL-SCREEN PROJECT OBJECTIVE",start),modal=html.slice(start,end);
+ for(const view of ["overview","work","parts","manual","records"])assert.ok(modal.includes('data-project-view="'+view+'" x-show="projectDetailView===\''+view+'\'"'));
+ assert.match(html,/openProjectDetail\(proj\)\s*\{\s*this.projectDetailView = 'overview';/);
+ for(const action of ["openProjectGuided(selectedProject)","openProjectPartsPicker(selectedProject)","createProjectPurchaseOrder(selectedProject)","addProjectAttachments(selectedProject,$event)","addProjectCostEntry(selectedProject)","openProjectCompletion(selectedProject)","saveProjectWorkspace(selectedProject)","deleteProjectRecord(selectedProject.id)"])assert.equal(modal.split(action).length,2,action);
+});

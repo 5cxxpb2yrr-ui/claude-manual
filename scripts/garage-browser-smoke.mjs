@@ -131,6 +131,18 @@ async function run(name,launcher){
  // Synthetic plan avoids R2 calls; actual app methods, UI and IndexedDB remain in use.
  const ids=await app(page,async(a,plan)=>{a.newProjectForm={title:plan.title,category:"Repair",description:plan.scope,budget:100,priority:"Medium",dueDate:""};await a.saveNewProject(plan);const p=a.projects.find(p=>p.title===plan.title);p.partRequirements[0].partNumber="FIX-1";p.partRequirements[0].unit="each";if(!await a.saveToStorage())throw Error("Fixture plan save failed");return {p:p.id,r:p.partRequirements[0].id};},plan);
  await detail.getByRole("heading",{name:plan.title,exact:true}).waitFor({state:"visible"});
+ assert.equal(await detail.getByRole("button",{name:"Overview",exact:true}).getAttribute("aria-pressed"),"true");
+ for(const [label,key,heading] of [["Work","work","Project workspace"],["Parts","parts","Parts & procurement"],["Manual","manual","Browse vehicle manuals"],["Records","records","Receipts & project evidence"]]){
+  await detail.getByRole("button",{name:label,exact:true}).click();
+  await detail.locator('[data-project-view="'+key+'"]').waitFor({state:"visible"});
+  assert.equal(await detail.locator('[data-project-view]:visible').count(),1);
+  assert.equal(await detail.locator('[data-project-view="'+key+'"]').getByText(heading,{exact:false}).first().isVisible(),true);
+  assert.equal(await detail.getByRole("button",{name:"Save Project Workspace"}).isVisible(),true);
+ }
+ await detail.getByRole("button",{name:"Overview",exact:true}).click();
+ await detail.locator('[data-project-view="overview"]').waitFor({state:"visible"});
+ assert.equal(await detail.getByRole("button",{name:/Open guided preparation/}).isVisible(),true);
+ console.log(name,"project workspace views preserve guided repair and save controls");
  await detail.getByRole("button",{name:"Close project",exact:true}).click();await detail.waitFor({state:"hidden"});
  await page.locator("nav").getByRole("button",{name:/Inventory/}).click();await tab(page,"inventory");assert.equal(await page.locator("[data-garage-tab]").count(),1);
  await app(page,a=>a.openVendorDraft());

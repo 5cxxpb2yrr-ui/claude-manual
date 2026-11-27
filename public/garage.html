@@ -140,6 +140,20 @@
  .mn-tile-value{font-size:25px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}.mn-tile-label{color:var(--mn-text);font-size:13px;font-weight:650}.mn-tile-arrow{position:absolute;right:12px;top:12px}
  .mn-mission-dialog{margin:auto;width:min(94vw,480px);max-height:85dvh;overflow:auto;background:var(--mn-panel);color:var(--mn-text);border:1px solid var(--mn-line);border-radius:16px;padding:0}
  .mn-mission-dialog::backdrop{background:#000b}.mn-dialog-head{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--mn-panel);border-bottom:1px solid var(--mn-line);font-weight:750;font-size:17px}.mn-dialog-body{padding:12px}
+
+ .mn-project-panel{max-width:680px;background:var(--mn-panel);border-color:var(--mn-line)}
+ .mn-project-head{background:var(--mn-panel);padding:0 0 9px;top:0;z-index:3;border-bottom:1px solid var(--mn-line)}
+ .mn-project-head h3{font-size:19px;line-height:1.25;overflow-wrap:anywhere}
+ .mn-project-context{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;color:var(--mn-muted);padding:0 0 10px}
+ .mn-project-context span:last-child{color:var(--mn-accent);font-weight:700;text-align:right}
+ .mn-project-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:4px;background:var(--mn-bg);padding:4px;border-radius:12px}
+ .mn-project-tabs button{min-height:44px;padding:4px 1px;border-radius:8px;color:var(--mn-muted);font-size:11px;font-weight:700;overflow-wrap:anywhere}
+ .mn-project-tabs button[aria-pressed=true]{background:var(--mn-accent);color:#111}
+ .mn-project-panel [data-project-view]{min-width:0;font-size:13px}
+ .mn-project-panel [data-project-view] summary{min-height:44px}
+ .mn-project-link{display:flex;align-items:center;min-height:44px;color:var(--mn-accent);font-weight:700}
+ .mn-project-footer{position:sticky;bottom:0;z-index:2;background:var(--mn-panel);padding:9px 0 2px;border-top:1px solid var(--mn-line)}
+ .mn-project-save{min-height:48px;width:100%;background:var(--mn-accent);color:#111;border-radius:12px;font-weight:800;font-size:14px}
  .mn-mission-row{display:flex;align-items:center;justify-content:space-between;text-align:left;gap:12px;width:100%;min-height:56px;border-bottom:1px solid var(--mn-line);padding:10px 0}.mn-mission-row strong,.mn-mission-row small{display:block;overflow-wrap:anywhere}.mn-mission-row small{font-size:12px;color:var(--mn-muted)}
  :focus-visible{outline:2px solid var(--mn-accent);outline-offset:2px}
  }
@@ -2624,10 +2638,10 @@
 				class="garage-detail-overlay fixed inset-0 z-50 bg-black/80 flex items-start sm:items-center justify-center overflow-y-auto p-4" role="dialog" aria-modal="true" aria-label="Project detail" x-cloak
 			>
 				<div
-					class="garage-detail-panel w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-zinc-900 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-3 text-xs"
+					class="garage-detail-panel mn-project-panel w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-zinc-900 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-3 text-xs"
 					@click.away="modals.projectDetail = false"
 				>
-					<div class="garage-detail-heading flex justify-between items-center">
+					<div class="garage-detail-heading mn-project-head"><div class="flex justify-between items-center gap-2">
 						<h3
 							class="text-base font-bold text-white"
 							x-text="selectedProject.title"
@@ -2637,14 +2651,12 @@
 							class="garage-close text-zinc-400 hover:text-white rounded-lg leading-none" aria-label="Close project"
 						>
 							✕
-						</button>
-					</div>
+						</button></div>
+ <div class="mn-project-context"><span x-text="vehicleNameForProject(selectedProject)"></span><span x-text="selectedProject.status"></span></div>
+ <div class="mn-project-tabs" role="group" aria-label="Project workspace views"><template x-for="view in [{id:'overview',label:'Overview'},{id:'work',label:'Work'},{id:'parts',label:'Parts'},{id:'manual',label:'Manual'},{id:'records',label:'Records'}]" :key="view.id"><button type="button" @click="projectDetailView=view.id;$el.closest('.mn-project-panel').scrollTop=0" :aria-pressed="projectDetailView===view.id" x-text="view.label"></button></template></div>
+ </div>
+ <section data-project-view="overview" x-show="projectDetailView==='overview'" class="space-y-3">
 					<div class="space-y-1 text-zinc-300">
-						<div class="rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 mb-2"><div class="text-[10px] uppercase tracking-wider text-zinc-400">Vehicle</div><div class="text-sm font-bold text-amber-300" x-text="vehicleNameForProject(selectedProject)"></div></div>
-						<div>
-							<strong>Status:</strong>
-							<span x-text="selectedProject.status"></span>
-						</div>
 						<div class="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-1">
 							<div class="flex items-center justify-between gap-2"><strong class="text-zinc-300">Project health</strong><span :class="projectHealth(selectedProject).tone" class="font-bold" x-text="projectHealth(selectedProject).label"></span></div>
 							<div class="text-zinc-400">Next action: <span class="text-white" x-text="projectNextAction(selectedProject)"></span></div>
@@ -2700,7 +2712,11 @@
 							></span>
 						</div>
 					</div>
-					<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Project workspace</summary>
+					<div x-show="selectedProject.status !== 'Completed'" class="border-t border-emerald-500/20 pt-3 space-y-2"><p class="text-[11px] text-zinc-500">Finish every project task, then record the completed work in this vehicle's service history. Existing expenses and inventory usage are not added again.</p><p x-show="(selectedProject.tasks||[]).some(task=>!task.done)" class="text-[11px] text-amber-300">Complete all remaining tasks before closing this project.</p><button @click="openProjectCompletion(selectedProject)" :disabled="!projectReadyToComplete(selectedProject)" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">✓ Complete Project & Record Service</button></div>
+					<div x-show="selectedProject.status === 'Completed'" class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-emerald-300"><strong>Project completed</strong><p class="text-[11px] text-zinc-400 mt-1">A service-history record has been created for this project.</p></div>
+					</section>
+ <section data-project-view="work" x-show="projectDetailView==='work'" class="space-y-3">
+ <details open class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Project workspace</summary>
 						<div class="grid grid-cols-2 gap-2">
 							<label class="text-zinc-400">Target date<input type="date" x-model="selectedProject.dueDate" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></label>
 							<label class="text-zinc-400">Priority<select x-model="selectedProject.priority" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></label>
@@ -2712,7 +2728,10 @@
 						<div class="flex gap-2"><input x-model="projectMilestoneDraft" @keydown.enter.prevent="addProjectMilestone(selectedProject)" placeholder="Add a milestone…" class="min-w-0 flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><button @click="addProjectMilestone(selectedProject)" class="px-3 rounded-lg border border-zinc-700 text-white">Milestone</button></div>
 						<template x-for="(milestone,index) in (selectedProject.milestones||[])" :key="milestone.id || index"><div class="flex justify-between text-zinc-300 border-b border-zinc-800 py-1"><span x-text="milestone.title"></span><button @click="removeProjectMilestone(selectedProject,index)" class="text-rose-400">Remove</button></div></template>
 					</details>
-					<div class="border-t border-zinc-800 pt-3 space-y-2">
+					</section>
+ <section data-project-view="manual" x-show="projectDetailView==='manual'" class="space-y-3">
+ <a :href="manualProjectLink(selectedProject)" class="mn-project-link">Browse vehicle manuals →</a>
+ <div class="border-t border-zinc-800 pt-3 space-y-2">
 						<template x-if="(selectedProject.procedures||[]).length">
 							<div class="space-y-2">
 								<h4 class="text-sm font-bold text-white">Attached repair procedures</h4>
@@ -2733,7 +2752,9 @@
 							</details>
 						</div>
 					</div>
-					<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Parts & procurement</summary>
+					</section>
+ <section data-project-view="parts" x-show="projectDetailView==='parts'" class="space-y-3">
+ <details open class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Parts & procurement</summary>
 						<p class="text-zinc-500">Select stocked parts. Inventory is reserved only when requested and deducted only when marked used.</p>
 						<button @click="openProjectPartsPicker(selectedProject)" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-500/50 bg-purple-500/10 text-purple-200 font-semibold"><span class="text-lg">＋</span> Browse & add inventory parts</button>
 						<template x-for="part in (selectedProject.partRequirements||[])" :key="part.id"><div class="bg-zinc-950 rounded-lg p-2"><div class="flex justify-between gap-2"><span class="text-white" x-text="part.description+' × '+part.quantity+' · '+String.fromCharCode(36)+Number(part.unitCost||0).toFixed(2)"></span><button @click="removeProjectPart(selectedProject,part.id)" class="text-rose-400">Remove</button></div><div class="flex justify-between mt-2"><span class="text-amber-300" x-text="part.status+(part.consumedQuantity?' · Used '+part.consumedQuantity+'/'+part.quantity:'')"></span><div class="flex gap-2"><button x-show="part.inventoryId&&!part.reserved&&part.status!=='Used'&&(!part.purchaseOrderId||part.inventoryAddedAt)" @click="reserveProjectPart(selectedProject,part.id)" class="text-amber-300">Reserve</button><button x-show="part.reserved&&part.inventoryId" @click="useProjectPart(selectedProject,part.id)" class="text-emerald-300" :disabled="projectStockBusy">Record use</button><button x-show="part.reserved" @click="releaseProjectPart(selectedProject,part.id)" :disabled="projectStockBusy" class="text-zinc-300">Release</button></div></div><template x-if="!part.inventoryId&&part.status!=='Used'"><div class="mt-2 space-y-1"><template x-for="received in projectReceiptCandidates(selectedProject,part)" :key="received.id"><button type="button" @click="linkProjectReceipt(selectedProject,part.id,received.id)" :disabled="projectStockBusy||inventorySaving||vendorBusy" class="block w-full text-left text-xs text-emerald-300 border border-emerald-500/30 rounded p-2" x-text="'Link received stock: '+received.description+' · '+projectAvailableInventory(received)+' available'"></button></template></div></template></div></template>
@@ -2768,7 +2789,9 @@
 							</div></template>
 						</div>
 					</details>
-						<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Receipts & project evidence</summary>
+						</section>
+ <section data-project-view="records" x-show="projectDetailView==='records'" class="space-y-3">
+ <details open class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Receipts & project evidence</summary>
 							<p class="text-xs text-zinc-500">Attach receipt photos or PDFs to keep proof with this project. Receipt amounts are reference-only and do not automatically create expenses.</p>
 							<input x-model="projectAttachmentDraft.description" placeholder="Description (optional)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white">
 							<div class="grid grid-cols-2 gap-2"><label class="text-[10px] text-zinc-500">Receipt date<input type="date" x-model="projectAttachmentDraft.date" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></label><label class="text-[10px] text-zinc-500">Amount (optional)<input type="number" min="0" step="0.01" x-model="projectAttachmentDraft.amount" placeholder="$0.00" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></label></div>
@@ -2783,15 +2806,14 @@
 						<template x-for="entry in (selectedProject.costEntries||[])" :key="entry.id"><div class="flex justify-between border-b border-zinc-800 py-1"><span class="text-zinc-300" x-text="entry.description+' · '+entry.category"></span><strong class="text-emerald-300" x-text="String.fromCharCode(36)+Number(entry.amount).toFixed(2)"></strong></div></template>
 						<div class="flex justify-between text-zinc-400"><span>Material consumed (not additional cash expense)</span><strong x-text="String.fromCharCode(36)+projectMaterialCost(selectedProject).toFixed(2)"></strong></div><div class="flex justify-between text-white"><span>Actual total</span><strong x-text="String.fromCharCode(36)+projectActualCost(selectedProject).toFixed(2)"></strong></div>
 					</details>
-					<div x-show="selectedProject.status !== 'Completed'" class="border-t border-emerald-500/20 pt-3 space-y-2"><p class="text-[11px] text-zinc-500">Finish every project task, then record the completed work in this vehicle's service history. Existing expenses and inventory usage are not added again.</p><p x-show="(selectedProject.tasks||[]).some(task=>!task.done)" class="text-[11px] text-amber-300">Complete all remaining tasks before closing this project.</p><button @click="openProjectCompletion(selectedProject)" :disabled="!projectReadyToComplete(selectedProject)" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">✓ Complete Project & Record Service</button></div>
-					<div x-show="selectedProject.status === 'Completed'" class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-emerald-300"><strong>Project completed</strong><p class="text-[11px] text-zinc-400 mt-1">A service-history record has been created for this project.</p></div>
-					<button @click="saveProjectWorkspace(selectedProject)" class="w-full py-3 bg-purple-600 text-white font-bold rounded-xl">Save Project Workspace</button>
-					<button
+					<details class="garage-section"><summary class="text-sm text-zinc-400">Project management</summary><button
 						@click="deleteProjectRecord(selectedProject.id)"
 						class="w-full py-2 bg-rose-500/10 text-rose-400 font-bold rounded-xl border border-rose-500/30"
 					>
 						Delete Project
-					</button>
+					</button></details></section>
+ <div class="mn-project-footer"><button @click="saveProjectWorkspace(selectedProject)" class="mn-project-save">Save Project Workspace</button>
+					</div>
 				</div>
 			</div>
 
@@ -3362,6 +3384,7 @@
 					// Active Selections / Form States
 					selectedRepair: {},
 					selectedProject: {},
+                    projectDetailView: 'overview',
 					projectTaskDraft: '',
 					projectDependencyDrafts: {},
 					projectMilestoneDraft: '',
@@ -5056,6 +5079,7 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 					},
 
 					openProjectDetail(proj) {
+                        this.projectDetailView = 'overview';
 						this.selectedProject = proj;
 						this.projectTaskDraft = '';
 						this.projectDependencyDrafts = {};

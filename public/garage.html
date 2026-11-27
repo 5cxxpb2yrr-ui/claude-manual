@@ -142,14 +142,12 @@
 	class="garage-header sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800/80 px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 overflow-hidden"
 >
 	<div class="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
-		<div
-			class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center font-black text-zinc-950 shadow-lg shadow-amber-500/25 shrink-0 border border-amber-400/30 cursor-pointer"
-			@click="currentTab = 'dashboard'"
+		<button type="button"
+			class="garage-tap w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center font-black text-zinc-950 shadow-lg shadow-amber-500/25 shrink-0 border border-amber-400/30 cursor-pointer"
+			@click="openQuickSpecs()" aria-label="Quick specs for selected vehicle" title="Quick specs"
 		>
-			<span
-				x-text="activeVehicle?.name?.includes('Scion') ? 'xB' : 'MN'"
-			></span>
-		</div>
+			<span x-text="activeVehicle?.name?.includes('Scion') ? 'xB' : 'MN'"></span>
+		</button>
 		<div class="flex flex-col min-w-0 flex-1">
 			<div class="flex items-center space-x-2 min-w-0">
 				<select
@@ -1757,7 +1755,7 @@
 						<template x-if="specLinks.length">
 							<div>
 								<p class="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Look it up in the factory manual</p>
-								<div class="flex flex-wrap gap-2">
+								<div class="flex flex-wrap gap-2" data-spec-reference-chips>
 									<template x-for="l in specLinks" :key="l.label">
 										<button type="button" @click="openSpecPreview(l)" 
 											class="garage-tap px-3 py-1.5 rounded-full bg-zinc-950 border border-zinc-800 text-[11px] text-amber-400 hover:border-amber-500 transition"
@@ -1779,9 +1777,10 @@
 												type="text"
 												:value="specVal(it)"
 												@input="setSpec(it, $event.target.value)"
-												:placeholder="it.hint || '—'"
+												:placeholder="it.hint || 'Not verified'"
 												class="w-full bg-transparent text-sm text-white focus:outline-none placeholder-zinc-700"
 											/>
+                                            <span class="block text-[10px] text-zinc-400" x-show="factorySpec(it)" x-text="specSource(it)"></span>
 										</label>
 									</template>
 								</div>
@@ -2947,6 +2946,19 @@
 				</div>
 			</div>
 
+            <!-- Selected vehicle quick reference, shares the same values as Specs. -->
+            <dialog x-ref="quickSpecsDialog" class="spec-preview-dialog" aria-label="Vehicle quick reference" @cancel.prevent="closeQuickSpecs()">
+              <div class="spec-preview-content">
+                <div class="spec-preview-header"><div><p class="text-[10px] text-zinc-400">QUICK REFERENCE</p><h2 class="text-sm font-bold text-amber-400" x-text="activeVehicle?.name"></h2></div><button type="button" class="garage-close px-3 rounded-xl border border-zinc-700 text-xs font-bold" autofocus @click="closeQuickSpecs()">Close ✕</button></div>
+                <div style="flex:1;min-height:0;overflow:auto;padding:12px">
+                  <p class="text-xs text-zinc-400 mb-3">Saved vehicle values take precedence. Factory references are labeled; confirm vehicle configuration before service.</p>
+                  <template x-for="it in quickSpecItems()" :key="it.k">
+                    <div class="flex justify-between gap-3 border-b border-zinc-800 py-2"><span class="text-xs text-zinc-400" x-text="it.label"></span><div class="text-right min-w-0"><p class="text-xs font-bold text-white" x-text="specVal(it)||'Not verified'"></p><p class="text-[10px] text-zinc-400" x-show="factorySpec(it)" x-text="specSource(it)"></p></div></div>
+                  </template>
+                  <button type="button" class="garage-tap w-full mt-3 bg-amber-500 text-zinc-950 rounded-xl font-bold text-sm" @click="closeQuickSpecs();currentTab='profile'">View all specs &amp; factory references</button>
+                </div>
+              </div>
+            </dialog>
             <!-- Factory reference preview: keep the Specs screen mounted. -->
             <dialog x-ref="specPreviewDialog" class="spec-preview-dialog" aria-label="Factory manual specification" @cancel.prevent="closeSpecPreview()">
               <template x-if="specPreview">
@@ -3434,46 +3446,10 @@
 					commonSpecLinks: {
   "scion-xb": [
     {
-      "label": "Engine oil",
+      "label": "Fluids & capacities",
       "page": 381,
       "heading": "Quick Lookups: Fluids",
-      "evidence": "Engine Oil"
-    },
-    {
-      "label": "Coolant",
-      "page": 381,
-      "heading": "Quick Lookups: Fluids",
-      "evidence": "Engine Coolant"
-    },
-    {
-      "label": "A/T fluid",
-      "page": 381,
-      "heading": "Quick Lookups: Fluids",
-      "evidence": "Automatic Transmission Fluid"
-    },
-    {
-      "label": "M/T fluid",
-      "page": 381,
-      "heading": "Quick Lookups: Fluids",
-      "evidence": "Manual Transmission Fluid"
-    },
-    {
-      "label": "Brake fluid",
-      "page": 381,
-      "heading": "Quick Lookups: Fluids",
-      "evidence": "Brake Fluid"
-    },
-    {
-      "label": "Power steering",
-      "page": 381,
-      "heading": "Quick Lookups: Fluids",
-      "evidence": "Power Steering Fluid"
-    },
-    {
-      "label": "Refrigerant",
-      "page": 381,
-      "heading": "Quick Lookups: Fluids",
-      "evidence": "Air Cond Refrigerant"
+      "evidence": "FLUID CAPACITIES"
     },
     {
       "label": "Spark plug",
@@ -3524,17 +3500,139 @@
       "page": 619,
       "heading": "Tire Fitment",
       "evidence": "Inflation"
-    },
-    {
-      "label": "Specifications index",
-      "page": 12028,
-      "heading": "Common Specs & Procedures",
-      "evidence": "Specifications Index"
     }
   ]
 },
 
-					// Service Manuals (LifeOS Manual Explorer) - not saved with garage data
+					// Factory defaults are read-only reference values, never written over stored vehicle data.
+                    factorySpecDefaults: {
+  "scion-xb": {
+    "oilType": [
+      "5W-20 (ILSAC GF-4; see TSB EG018-06)",
+      381
+    ],
+    "oilCapacity": [
+      "3.9 US qt (with filter)",
+      381
+    ],
+    "plugGap": [
+      "0.7–0.8 mm (new plug)",
+      3368
+    ],
+    "fuelTank": [
+      "11.9 US gal",
+      381
+    ],
+    "coolantType": [
+      "Toyota Super Long Life Coolant or specified equivalent",
+      381
+    ],
+    "coolantCap": [
+      "4.7 US qt (manual transmission; confirm configuration)",
+      381
+    ],
+    "transType": [
+      "A/T: Type T-IV; M/T: SAE 75W-90 GL-4 or GL-5",
+      381
+    ],
+    "transCap": [
+      "A/T: 3.1 US qt; M/T: 2.0 US qt (reference; verify service procedure)",
+      381
+    ],
+    "brakeFluid": [
+      "DOT 3",
+      381
+    ],
+    "psFluid": [
+      "DEXRON II or III ATF",
+      381
+    ],
+    "washerFluid": [
+      "Water or antifreeze washer fluid as climate requires",
+      381
+    ],
+    "acRefrigerant": [
+      "R-134a; 0.90 lb",
+      381
+    ],
+    "acOil": [
+      "PAG 46; 3.50 oz",
+      381
+    ],
+    "tireSize": [
+      "P185/60R15 84T (original fitment)",
+      385
+    ],
+    "tirePsi": [
+      "29 / 29 psi (front / rear; confirm door placard)",
+      385
+    ],
+    "lugTorque": [
+      "76 ft-lb (original fitment)",
+      385
+    ]
+  },
+  "subaru-crosstrek": {
+    "oilType": [
+      "0W-20 synthetic",
+      614
+    ],
+    "oilCapacity": [
+      "4.7 US qt (with filter)",
+      614
+    ],
+    "fuelTank": [
+      "16.6 US gal",
+      614
+    ],
+    "coolantType": [
+      "Subaru Super Coolant",
+      614
+    ],
+    "coolantCap": [
+      "8.2 US qt (CVT)",
+      614
+    ],
+    "transType": [
+      "Subaru CVT Oil for Lineartronic II",
+      614
+    ],
+    "transCap": [
+      "11.3 US qt (published capacity; NOT drain/refill amount)",
+      614
+    ],
+    "diffFluid": [
+      "SAE 75W-90 GL-5 (front/rear; verify applicable OEM service guidance)",
+      614
+    ],
+    "brakeFluid": [
+      "DOT 3 or DOT 4",
+      614
+    ],
+    "washerFluid": [
+      "Windshield washer fluid",
+      614
+    ],
+    "acRefrigerant": [
+      "HFC-134; 1.10 lb",
+      614
+    ],
+    "tireSize": [
+      "225/55R18 98H (original fitment)",
+      619
+    ],
+    "tirePsi": [
+      "33 / 32 psi (front / rear; confirm door placard)",
+      619
+    ],
+    "lugTorque": [
+      "89 ft-lb (original fitment)",
+      619
+    ]
+  }
+},
+
+                    // Service Manuals (LifeOS Manual Explorer) - not saved with garage data
 					manualQuery: '',
 					manualLibrary: {
 						// same site when hosted with the explorer; full address when opened as a local file
@@ -3629,10 +3727,33 @@
                         }catch(error){state.error='Factory reference could not be verified. No unrelated page will be displayed.';clearTimeout(this.specPreviewTimer);}
                     },
 
+                    factorySpec(it){
+                        const v=this.activeVehicle||{};
+                        const id=this.factorySpecDefaults[v.id]?v.id:/^2006 Scion xB(?: Standard)?$/i.test(v.name||'')?'scion-xb':/^2019 Subaru Crosstrek(?: Limited)?$/i.test(v.name||'')?'subaru-crosstrek':null;
+                        return this.factorySpecDefaults[id]?.[it.k]||null;
+                    },
+                    savedSpec(it){
+                        const v=this.activeVehicle||{};
+                        return it.legacy?(v[it.legacy]??''):((v.commonSpecs||{})[it.k]??'');
+                    },
 					specVal(it) {
-						const v = this.activeVehicle || {};
-						return it.legacy ? (v[it.legacy] ?? '') : ((v.commonSpecs || {})[it.k] ?? '');
+                        const saved=this.savedSpec(it);
+                        return String(saved).trim()?saved:(this.factorySpec(it)?.[0]||'');
 					},
+                    specSource(it){
+                        const source=this.factorySpec(it);
+                        if(!source)return '';
+                        const saved=this.savedSpec(it);
+                        if(String(saved).trim()&&String(saved)!==source[0])return 'Saved • Factory #'+source[1]+': '+source[0];
+                        return 'Factory reference #'+source[1];
+                    },
+                    quickSpecItems(){
+                        const keys=['oilType','oilCapacity','oilFilter','sparkPlugs','plugGap','coolantType','transType','brakeFluid','tireSize','tirePsi','lugTorque'];
+                        const items=this.commonSpecGroups.flatMap(g=>g.items);
+                        return keys.map(k=>items.find(it=>it.k===k)).filter(Boolean);
+                    },
+                    openQuickSpecs(){this.$refs.quickSpecsDialog.showModal();},
+                    closeQuickSpecs(){this.$refs.quickSpecsDialog.close();},
 
 					setSpec(it, val) {
 						const v = this.activeVehicle;

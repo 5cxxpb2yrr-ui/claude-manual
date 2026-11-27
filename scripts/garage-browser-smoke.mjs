@@ -14,7 +14,7 @@ const isolationPath="/m/isolation-fixture/pages/";
 const server=createServer(async(req,res)=>{
  if(networkBlocked){blockedRequests++;req.socket.destroy();return;}
  if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html"){
-  res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Quick Lookups: Fluids</h1><table><tr><td>Engine Oil</td><td>Fixture</td></tr><tr><td>Engine Coolant</td><td>Fixture</td></tr></table>');return;
+  res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Quick Lookups: Fluids</h1><p>FLUID CAPACITIES</p><table><tr><td>Engine Oil</td><td>Fixture</td></tr><tr><td>Engine Coolant</td><td>Fixture</td></tr></table>');return;
  }
  if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/3368.html"){
   res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Unrelated fixture</h1>');return;
@@ -176,7 +176,7 @@ async function run(name,launcher){
  phase="specification preview";
  await app(page,a=>{a.activeVehicleId="scion-xb";a.currentTab="profile";});await tab(page,"profile");
  const beforeTabs=context.pages().length;
- await page.getByRole("button",{name:"Engine oil",exact:true}).click();
+ await page.locator("[data-spec-reference-chips]").getByRole("button",{name:"Fluids & capacities",exact:true}).click();
  const specDialog=page.getByRole("dialog",{name:"Factory manual specification"});
  await specDialog.waitFor({state:"visible"});
  await page.waitForFunction(()=>document.querySelector(".spec-preview-frame")?.style.visibility==="visible");
@@ -184,11 +184,18 @@ async function run(name,launcher){
  assert.equal(context.pages().length,beforeTabs);
  const box=await specDialog.boundingBox();assert.ok(box.height>=844*.85&&box.width>=390*.9);
  await specDialog.getByRole("button",{name:"Close factory manual"}).click();await specDialog.waitFor({state:"hidden"});await tab(page,"profile");
- await page.getByRole("button",{name:"Spark plug",exact:true}).click();
+ await page.locator("[data-spec-reference-chips]").getByRole("button",{name:"Spark plug",exact:true}).click();
  await specDialog.getByRole("alert").waitFor({state:"visible"});
  assert.equal(await page.evaluate(()=>document.querySelector(".spec-preview-frame").style.visibility),"hidden");
  await specDialog.getByRole("button",{name:"Close factory manual"}).click();await specDialog.waitFor({state:"hidden"});await tab(page,"profile");
- console.log(name,"verified Specs modal opens in place and rejects mismatched documents");
+ assert.equal(await page.locator("[data-spec-reference-chips] button").count(),6);
+ assert.equal(await app(page,a=>a.specVal({k:"brakeFluid"})),"DOT 3");
+ assert.equal(await app(page,a=>a.specVal({k:"oilType",legacy:"oilType"})),"5W-30");
+ await page.getByRole("button",{name:"Quick specs for selected vehicle"}).click();
+ const quick=page.getByRole("dialog",{name:"Vehicle quick reference"});
+ await quick.waitFor({state:"visible"});await quick.getByText("DOT 3",{exact:true}).waitFor();
+ await quick.getByRole("button",{name:"Close ✕"}).click();await quick.waitFor({state:"hidden"});await tab(page,"profile");
+ console.log(name,"verified Specs modal opens in place and rejects mismatched documents; quick reference shares safe defaults");
 
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");assert.deepEqual(runtimeDetails,[],"Browser runtime diagnostics");
  await verifyManualIsolation(browser,name);

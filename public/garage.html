@@ -902,7 +902,24 @@
 						</button>
 					</div>
 
-					<div class="space-y-3">
+					<details class="glass-panel p-3 space-y-3"><summary class="font-bold text-amber-300 text-sm">Personal repair knowledge · <span x-text="personalRepairHistory.summary.recordCount+' records'"></span></summary>
+ <p class="text-xs text-zinc-400">Current vehicle only. Completed service records are evidence of recorded work, not proof of present fitment, torque or mechanical condition.</p>
+ <div class="grid grid-cols-2 gap-2 text-xs"><div class="rounded border border-zinc-800 p-2"><p class="text-zinc-400">Recorded expenses</p><b x-text="inventoryMoney(personalRepairHistory.summary.costTotal)"></b><p class="text-[10px] text-zinc-400" x-text="personalRepairHistory.summary.costCount+' records with cost'"></p></div><div class="rounded border border-zinc-800 p-2"><p class="text-zinc-400">Recorded work time</p><b x-text="historyDuration(personalRepairHistory.summary.durationMs)"></b><p class="text-[10px] text-zinc-400" x-text="personalRepairHistory.summary.durationCount+' timed records'"></p></div></div>
+ <p x-show="personalRepairHistory.summary.duplicateIds" class="text-xs text-amber-300">Duplicate service record IDs exist; ambiguous records are excluded.</p>
+ <input x-model="repairHistoryQuery" placeholder="Search part #, finding, procedure, torque…" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-sm text-white">
+ <template x-for="record in personalRepairHistory.filtered" :key="record.id"><details class="border border-zinc-800 rounded p-2"><summary class="text-xs font-bold text-white" x-text="record.serviceType+' · '+(record.date||'Unknown date')"></summary><p class="text-xs text-zinc-400" x-text="(record.mileage===null?'Unknown mileage':record.mileage+' mi')+' · '+(record.cost===null?'Cost not recorded':inventoryMoney(record.cost))+' · '+(record.durationMs===null||record.running?'Duration unconfirmed':historyDuration(record.durationMs))"></p><p class="text-xs mt-2" x-text="record.notes"></p>
+ <template x-for="(part,i) in record.installed" :key="'part-'+i"><p class="text-xs text-zinc-300" x-text="'Installed: '+part.description+' · '+(part.partNumber||'No part #')+' · '+part.quantity+' '+part.unit"></p></template>
+ <template x-for="(finding,i) in record.findings" :key="'finding-'+i"><p class="text-xs text-amber-300" x-text="'Finding: '+finding.text+' · '+finding.status+(finding.resolution?' · '+finding.resolution:'')"></p></template>
+ <template x-for="(note,i) in record.workNotes" :key="'note-'+i"><p class="text-xs text-zinc-300" x-text="'Work note: '+note.text"></p></template>
+ <template x-for="(torque,i) in record.torque" :key="'torque-'+i"><p class="text-xs text-zinc-400" x-text="'Historical confirmation: '+torque.target+' · '+torque.specification+' · '+torque.source+' — reverify factory procedure'"></p></template>
+ <template x-for="(ref,i) in record.references" :key="'ref-'+i"><p class="text-xs text-zinc-400" x-text="'Reference: '+ref.title+' · '+ref.sourceLabel"></p></template>
+ <button type="button" @click="openRepairDetail(record.log)" class="text-xs font-bold text-amber-300 mt-2">Open original service log →</button></details></template>
+ <p x-show="!personalRepairHistory.filtered.length" class="text-xs text-zinc-400">No matching service history.</p>
+ <details class="border border-zinc-800 rounded p-2"><summary class="text-xs font-bold">Previously installed part numbers</summary><template x-for="(part,i) in personalRepairHistory.parts" :key="i"><p class="text-xs py-1" x-text="part.partNumber+' · '+part.description+' · '+part.quantity+' '+part.unit+' across '+part.records.length+' records'"></p></template><p x-show="!personalRepairHistory.parts.length" class="text-xs text-zinc-400">No recorded installed part numbers.</p></details>
+ <details class="border border-zinc-800 rounded p-2"><summary class="text-xs font-bold">Repeat service review</summary><p class="text-[10px] text-zinc-400">Matching service titles, not a confirmed recurring failure. Routine maintenance may repeat normally.</p><template x-for="(group,i) in personalRepairHistory.repeat" :key="i"><div class="text-xs py-1"><p x-text="group.name+' · '+group.records.length+' records'"></p><template x-for="record in group.records" :key="record.id"><button type="button" @click="openRepairDetail(record.log)" class="block text-amber-300" x-text="record.date||'Unknown date'"></button></template></div></template></details>
+ <details class="border border-zinc-800 rounded p-2"><summary class="text-xs font-bold">Scheduled maintenance review</summary><p class="text-[10px] text-zinc-400">Uses existing maintenance schedule predictions with recorded service history, not inferred failure intervals.</p><template x-for="item in personalRepairHistory.schedule" :key="item.id"><p class="text-xs py-1" x-text="item.name+' · '+item.status+' · last '+(item.lastPerformedDate||'unknown')+' · projected '+(item.nextDueDate||'unknown')"></p></template><p x-show="!personalRepairHistory.schedule.length" class="text-xs text-zinc-400">No due/overdue predictions with confirmed history.</p><button type="button" @click="currentTab='predictive'" class="text-xs text-amber-300">Open maintenance schedule →</button></details>
+ </details>
+ <div class="space-y-3">
 						<template
 							x-for="repair in activeRepairsList"
 							:key="repair.id"
@@ -3064,6 +3081,7 @@
 		<script src="/repair-workspace.js"></script>
 		<script src="/repair-planner.js"></script>
 		<script src="/inventory-engine.js"></script>
+<script src="/repair-history.js"></script>
 		<script src="/inventory-demand.js"></script>
 		<script src="/inventory-purchasing.js"></script>
 <script src="/inventory-capture.js"></script>
@@ -3089,7 +3107,7 @@
 					timelineCostFilter: 'all',
 					attachmentSearch: '',
 					attachmentCategoryFilter: 'all',
-					kbSearchQuery: '',
+					kbSearchQuery: '', repairHistoryQuery:'',
 					kbExpandedIds: [],
 					advisorQuery: '',
 					tempMileage: 0,
@@ -3966,7 +3984,9 @@
 						return (this.logs || []).filter(l => this.isLogForVehicle(l, this.activeVehicle));
 					},
 
-					get activeRepairsList() {
+					get personalRepairHistory(){return window.MotorNoteHistory.history({logs:this.logs||[],vehicle:this.activeVehicle,vehicles:this.vehicles||[],query:this.repairHistoryQuery,predictions:this.predictiveItems||[]});},
+ historyDuration(ms){const m=Math.floor(Math.max(0,Number(ms)||0)/60000);return Math.floor(m/60)+"h "+m%60+"m";},
+ get activeRepairsList() {
 						return this.vehicleLogs;
 					},
 
@@ -4542,7 +4562,7 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 						});
 						this.logs.forEach(l=>{
 							const cost=Number(l.cost||0), mileage=Number(l.mileage||0); if(filters.vehicle && !(l.vehicle||'').toLowerCase().includes(filters.vehicle)) return; if(filters.year && !(l.date||'').startsWith(filters.year)) return; if(!num(cost,filters.costOp,filters.cost)||!num(mileage,filters.mileageOp,filters.mileage)) return;
-							add(l,'Service Log',l.serviceType||'Service',`${l.vehicle} • ${mileage.toLocaleString()} mi • $${cost.toFixed(2)}`,`${l.serviceType||''} ${l.vehicle||''} ${l.notes||''} ${l.category||''} ${l.date||''}`,5);
+							add(l,'Service Log',l.serviceType||'Service',`${l.vehicle} • ${mileage.toLocaleString()} mi • $${cost.toFixed(2)}`,window.MotorNoteHistory.searchText(l),5);
 						});
 						this.projects.forEach(x=>{if(filters.vehicle && !(x.vehicleId && String(x.vehicleId).toLowerCase().includes(filters.vehicle))) return; add(x,'Project',x.title||'Project',`$${Number(x.budget||0).toFixed(2)} budget • ${x.status||'Planned'}`,`${x.title||''} ${x.category||''} ${x.status||''} ${x.priority||''}`,3);});
 						this.inventory.forEach(x=>{if(filters.vehicle && !(x.vehicleCompatibility||'').toLowerCase().includes(filters.vehicle)) return; add(x,'Part Inventory',x.description||'Part',`Part #: ${x.partNumber||'—'} • Qty: ${x.quantity||0}`,`${x.description||''} ${x.partNumber||''} ${x.vendor||''} ${x.vehicleCompatibility||''}`,3);});

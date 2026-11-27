@@ -9,6 +9,7 @@ const require=createRequire(import.meta.url);
 const {chromium,webkit}=require("../.browser-tests/node_modules/playwright");
 const root=resolve("public"),types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json",".svg":"image/svg+xml"};
 let networkBlocked=false,blockedRequests=0,rollbackMode=false;
+const blockedPaths=[];
 const rollbackCommit="4a2d43c5cdc8e6e98c72e03a57871a0ace4a5334";
 assert.ok(process.env.MOTORNOTE_RECOVERY_ROOT,"Build the pinned recovery fixture and set MOTORNOTE_RECOVERY_ROOT before running browser smoke");
 const rollbackRoot=resolve(process.env.MOTORNOTE_RECOVERY_ROOT,"public");
@@ -28,7 +29,7 @@ const manualSandbox=(await readFile(resolve(root,"manuals.html"),"utf8")).match(
 assert.equal(manualSandbox,"allow-same-origin");
 const isolationPath="/m/isolation-fixture/pages/";
 const server=createServer(async(req,res)=>{
- if(networkBlocked){blockedRequests++;req.socket.destroy();return;}
+ if(networkBlocked){blockedRequests++;blockedPaths.push(req.url);req.socket.destroy();return;}
  if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html"){
   res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Quick Lookups: Fluids</h1><p>FLUID CAPACITIES</p><table><tr><td>Engine Oil</td><td>Fixture</td></tr><tr><td>Engine Coolant</td><td>Fixture</td></tr></table>');return;
  }
@@ -296,12 +297,28 @@ async function run(name,launcher){
   },{prefix,version},{timeout:45000});
  };
  const checkOfflineShell=async(version,url)=>{
+  // Use a previously unvisited URL to rule out WebKit's reuse of the online navigation.
+  const cold=new URL(url);
+  cold.searchParams.set("offline-probe",version);
+  const blockedStart=blockedPaths.length;
   await page.goto("about:blank");networkBlocked=true;
   try{
    await assert.rejects(fetch(origin+"/garage",{cache:"no-store"}));
-   const response=await page.goto(url);assert.equal(response?.status(),200);await saved(page);
-   const pinned=await page.evaluate(()=>[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline")));
-   assert.equal(pinned.length,12);assert.ok(pinned.every(v=>v===version),"Offline resources must all use the selected build");
+   const response=await page.goto(cold.href);assert.equal(response?.status(),200);await saved(page);
+   const diagnostic=await page.evaluate(async()=>({
+    pinned:[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline")),
+    caches:(await caches.keys()).filter(k=>k.startsWith("motornote-garage-shell-")),
+    controlled:!!navigator.serviceWorker.controller,
+    url:location.href
+   }));
+   const attempted=blockedPaths.slice(blockedStart);
+   console.log(name,"offline recovery probe",JSON.stringify({expected:version,...diagnostic,attempted}));
+   assert.ok(attempted.includes(cold.pathname+cold.search),"Fresh offline navigation must attempt the blocked origin");
+   assert.equal(diagnostic.controlled,true);
+   assert.deepEqual(diagnostic.caches,[prefix+version]);
+   assert.equal(diagnostic.pinned.length,12);
+   assert.deepEqual(diagnostic.pinned,Array(12).fill(version),"Offline resources must all use the selected build");
+   if(name==="chromium")assert.equal(response.fromServiceWorker(),true);
    assert.deepEqual(await snapshot(),beforeRollback,"Offline startup must preserve the full V9 state");
   }finally{networkBlocked=false;}
  };

@@ -20,7 +20,9 @@ function reconcile(ledger,inventory,options={}){
  const old=Array.isArray(ledger)?ledger:[],latest=project(old),next=old.slice(),seen=new Set(),timestamp=options.timestamp||new Date().toISOString();
  const append=(key,part,prior,after,present)=>{
   const before=prior?.after||zero(),delta={onHand:after.onHand-before.onHand,reserved:after.reserved-before.reserved};
-  if(prior&&same(before,after)&&prior.present===present)return;
+  const count=options.reference?.action==="physical-count"&&String(options.reference.itemId)===key&&present;
+  const merge=options.reference?.action==="stock-merge"&&(String(options.reference.itemId)===key||String(options.reference.sourceId)===key);
+  if(prior&&same(before,after)&&prior.present===present&&!count&&!merge)return;
   let type;
   if(!prior)type=old.length?"stock-added":"opening-balance";
   else if(!present)type="stock-removed";
@@ -28,7 +30,9 @@ function reconcile(ledger,inventory,options={}){
   else if(!delta.onHand&&delta.reserved>0)type="reservation";
   else if(!delta.onHand&&delta.reserved<0)type="release";
   else type="stock-adjustment";
-  next.push({id:"inventory-movement-"+(next.length+1),itemId:key,name:String(part?.description||prior?.name||"Inventory item"),partNumber:String(part?.partNumber||prior?.partNumber||""),timestamp,type,reason:!prior&&!old.length?"Existing stock at ledger initialization":String(options.reason||"Saved inventory change"),reference:options.reference||null,before:{...before},after:{...after},delta,present});
+  if(count)type="physical-count";
+  if(merge)type=present?"merge-in":"merge-out";
+  next.push({id:"inventory-movement-"+(next.length+1),itemId:key,name:String(part?.description||prior?.name||"Inventory item"),partNumber:String(part?.partNumber||prior?.partNumber||""),timestamp,type,reason:!prior&&!old.length&&!count&&!merge?"Existing stock at ledger initialization":String(options.reason||"Saved inventory change"),reference:options.reference||null,before:{...before},after:{...after},delta,present});
  };
  for(const part of inventory||[]){
   if(part?.id==null)throw Error("Inventory item has no ID.");
@@ -48,5 +52,85 @@ function audit(ledger,inventory){
   return issues;
  }catch(e){return [e.message];}
 }
-const api={balance,project,reconcile,audit};root.MotorNoteInventoryEngine=api;if(typeof module!=="undefined")module.exports=api;
+
+const key=v=>String(v??"").trim().toLowerCase();
+const identity=v=>key(v).replace(/[^a-z0-9]/g,"");
+const idIs=(a,b)=>a!=null&&b!=null&&String(a)===String(b);
+const copy=v=>JSON.parse(JSON.stringify(v));
+const active=p=>! /^(completed|cancelled|canceled|archived)$/i.test(p?.status||"");
+const validNumber=v=>v!==null&&v!==undefined&&String(v).trim()!==""&&Number.isFinite(Number(v))&&Number(v)>=0;
+function reservationFloor(item,{projects=[],maintenancePlans=[]}={}){
+ const canonical=Number(item.reservedQuantity||0);
+ if(!validNumber(item.reservedQuantity??0))throw Error("Invalid reserved quantity.");
+ let legacy=0;
+ for(const plan of maintenancePlans.filter(active)){
+  if(projects.some(p=>active(p)&&(idIs(p.id,plan.projectId)||idIs(p.maintenancePlanId,plan.id))&&(p.partRequirements||[]).length))continue;
+  for(const req of plan.parts||[])if(idIs(req.inventoryId,item.id)&&req.reserved&&!req.used&&!/^(used|installed|cancelled|canceled)$/i.test(req.status||"")){
+   if(!validNumber(req.quantity))throw Error("Invalid maintenance reservation.");
+   legacy+=Number(req.quantity);
+  }
+ }
+ return canonical+legacy;
+}
+function references(id,context={}){
+ const links=[];
+ function visit(value,path){
+  if(!value||typeof value!=="object")return;
+  if(Array.isArray(value)){value.forEach((x,i)=>visit(x,path+"["+i+"]"));return;}
+  for(const [k,v] of Object.entries(value)){
+   if((k==="inventoryId"||k==="itemId"||k==="stockId"||k==="partInventoryId")&&idIs(v,id))links.push(path+"."+k);
+   else if((k==="inventoryIds"||k==="itemIds"||k==="stockIds")&&Array.isArray(v)&&v.some(x=>idIs(x,id)))links.push(path+"."+k);
+   else if(v&&typeof v==="object")visit(v,path+"."+k);
+  }
+ }
+ for(const name of ["projects","maintenancePlans","archivedMaintenance","vendorOrders","logs","vehicles"])visit(context[name]||[],name);
+ return links;
+}
+function inspectInventory(inventory=[],ledger=[],context={}){
+ const issues=[],groups=new Map(),counts=new Map();
+ for(const item of inventory){
+  const id=String(item.id),pn=identity(item.partNumber);
+  counts.set(id,(counts.get(id)||0)+1);
+  try{
+   const floor=reservationFloor(item,context);
+   if(!validNumber(item.quantity)||!validNumber(item.unitCost??0)||floor>Number(item.quantity))issues.push({id,message:(item.description||id)+": invalid balance, cost or insufficient reserved stock"});
+  }catch(err){issues.push({id,message:(item.description||id)+": "+err.message});}
+  if(pn){const group=JSON.stringify([pn,key(item.unit||"each"),key(item.vehicleCompatibility||"Not verified")]);if(!groups.has(group))groups.set(group,[]);groups.get(group).push(item);}
+ }
+ for(const [id,n] of counts)if(n>1)issues.push({id,message:"Duplicate stock ID: "+id});
+ const duplicates=[...groups.values()].filter(items=>items.length>1).map(items=>({key:String(items[0].id),items}));
+ const ledgerIssues=ledger.length?audit(ledger,inventory):[];
+ return {issues,duplicates,ledgerIssues,initialized:ledger.length>0,items:inventory.length};
+}
+function physicalCount(inventory,request,context={}){
+ const item=inventory.find(p=>idIs(p.id,request.id));
+ if(!item||inventory.filter(p=>idIs(p.id,request.id)).length!==1)throw Error("Stock record changed or is ambiguous.");
+ if(!validNumber(item.quantity)||Number(item.quantity)!==Number(request.expected))throw Error("Stock changed since count began. Start a fresh count.");
+ const reason=String(request.reason||"").trim(),n=Number(request.count);
+ if(!reason||reason.length>300)throw Error("Enter a count reason (up to 300 characters).");
+ if(!validNumber(request.count))throw Error("Enter a nonnegative physical count.");
+ const floor=reservationFloor(item,context);
+ if(n<floor)throw Error("Count is below reserved stock ("+floor+"). Resolve reservations first.");
+ return {inventory:inventory.map(p=>idIs(p.id,item.id)?{...p,quantity:n}:p),reference:{action:"physical-count",itemId:item.id,expected:Number(item.quantity),count:n,reservationFloor:floor,reason}};
+}
+function mergeStock(inventory,request,context={}){
+ const target=inventory.find(p=>idIs(p.id,request.targetId)),source=inventory.find(p=>idIs(p.id,request.sourceId));
+ if(!target||!source||idIs(target.id,source.id)||inventory.filter(p=>idIs(p.id,target.id)||idIs(p.id,source.id)).length!==2)throw Error("Choose two distinct, unambiguous records.");
+ const reason=String(request.reason||"").trim();
+ if(!reason||reason.length>300)throw Error("Enter a merge reason (up to 300 characters).");
+ if(!identity(target.partNumber)||identity(target.partNumber)!==identity(source.partNumber)||key(target.unit||"each")!==key(source.unit||"each")||key(target.vehicleCompatibility)!==key(source.vehicleCompatibility)||!key(target.vehicleCompatibility)||key(target.vehicleCompatibility)==="not verified")throw Error("Merge requires matching manufacturer number, unit and verified fitment.");
+ if(reservationFloor(target,context)||reservationFloor(source,context)||references(target.id,context).length||references(source.id,context).length||target.projectId||source.projectId||target.purchaseOrderId||source.purchaseOrderId)throw Error("Referenced or reserved records cannot be merged. Preserve the original links.");
+ if(![target.quantity,source.quantity,target.unitCost,source.unitCost].every(validNumber))throw Error("Invalid stock balance or cost.");
+ if(Number(target.quantity)!==Number(request.expectedTarget)||Number(source.quantity)!==Number(request.expectedSource))throw Error("Stock changed. Review both records again.");
+ const barcodes=p=>[p.barcode,...(Array.isArray(p.barcodes)?p.barcodes:[])].filter(x=>String(x??"").trim()).map(x=>String(x).trim());
+ const t=new Set(barcodes(target)),s=new Set(barcodes(source));
+ if(t.size&&s.size&&![...t].some(x=>s.has(x)))throw Error("Different barcodes; verify packaging and identity before merging.");
+ const all=[...new Set([...t,...s])];
+ if(inventory.some(p=>!idIs(p.id,target.id)&&!idIs(p.id,source.id)&&barcodes(p).some(x=>all.includes(x))))throw Error("Barcode also belongs to another record.");
+ const quantity=Number(target.quantity)+Number(source.quantity),value=Number(target.quantity)*Number(target.unitCost)+Number(source.quantity)*Number(source.unitCost);
+ const merged={...target,quantity,unitCost:quantity?value/quantity:Number(target.unitCost),reservedQuantity:0,...(all.length?{barcode:target.barcode||all[0],barcodes:all}:{})};
+ return {inventory:inventory.filter(p=>!idIs(p.id,source.id)).map(p=>idIs(p.id,target.id)?merged:p),reference:{action:"stock-merge",itemId:target.id,sourceId:source.id,targetBefore:copy(target),sourceBefore:copy(source),reason}};
+}
+
+const api={balance,project,reconcile,audit,inspectInventory,physicalCount,mergeStock,reservationFloor};root.MotorNoteInventoryEngine=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

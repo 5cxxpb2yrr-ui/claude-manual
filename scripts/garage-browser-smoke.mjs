@@ -6,9 +6,9 @@ import {createRequire} from "node:module";
 const require=createRequire(import.meta.url);
 const {chromium,webkit}=require("../.browser-tests/node_modules/playwright");
 const root=resolve("public"),types={".html":"text/html; charset=utf-8",".js":"text/javascript; charset=utf-8",".css":"text/css; charset=utf-8",".json":"application/json",".svg":"image/svg+xml"};
-let networkBlocked=false;
+let networkBlocked=false,blockedRequests=0;
 const server=createServer(async(req,res)=>{
- if(networkBlocked){req.socket.destroy();return;}
+ if(networkBlocked){blockedRequests++;req.socket.destroy();return;}
  try{const url=new URL(req.url,"http://localhost"),p=resolve(root,"."+decodeURIComponent(url.pathname==="/garage"?"/garage.html":url.pathname));if(!p.startsWith(root+sep)){res.writeHead(404).end();return;}res.writeHead(200,{"Content-Type":types[extname(p)]||"application/octet-stream","Cache-Control":"no-store"}).end(await readFile(p));}
  catch{if(!res.headersSent)res.writeHead(404);res.end();}
 });
@@ -113,16 +113,26 @@ async function run(name,launcher){
  await page.waitForFunction(()=>!!navigator.serviceWorker.controller);
  // Prove that the next document is not an already-open in-memory app.
  await page.goto("about:blank");
+ // Playwright WebKit's offline emulation can reject even literal service-worker
+ // responses (microsoft/playwright#42775). Test actual origin transport failure
+ // in both engines; the already-open offline transaction test above still uses
+ // setOffline(true). No app requests can succeed against this server here.
+ const blockedBefore=blockedRequests;
  networkBlocked=true;
  try {
-  await context.setOffline(true);
-  await page.goto(origin+"/garage");await saved(page);
+  await assert.rejects(fetch(origin+"/garage",{cache:"no-store"}),"Origin must be unreachable");
+  const response=await page.goto(origin+"/garage");
+  assert.equal(response?.status(),200,"Cold navigation must return a successful cached document");
+  assert.equal(await page.evaluate(()=>!!navigator.serviceWorker.controller),true,"Cold navigation must be service-worker controlled");
+  if(name==="chromium")assert.equal(response.fromServiceWorker(),true,"Chromium cold response must come from the service worker");
+  await saved(page);
   assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="OFFLINE-1")?.quantity),1);
   assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
   assert.equal(await app(page,async a=>{a.openNewPartModal();Object.assign(a.newPartForm,{description:"Cold offline fixture",partNumber:"COLD-OFFLINE-1",quantity:1,unitCost:4,vehicleCompatibility:"Universal"});return await a.saveNewPart();}),true);
   await saved(page);await page.reload();await saved(page);
   assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="COLD-OFFLINE-1")?.quantity),1);
- } finally {networkBlocked=false;await context.setOffline(false);}
+  assert.ok(blockedRequests>blockedBefore,"Actual origin transport failure verified");
+ } finally {networkBlocked=false;}
  await page.reload();await saved(page);
  assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="COLD-OFFLINE-1")?.quantity),1);
  console.log(name,"offline cold startup, attachment access and durable save passed");

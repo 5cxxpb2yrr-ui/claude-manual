@@ -74,3 +74,12 @@ test("search groups matching sibling pages in factory order, keeping vehicles an
  assert.match(html, /<details class="search-siblings"/);
  assert.match(html, /primarySections=groupSearchSiblings\(sections.primary/);
 });
+
+test("Garage return link is restricted to the same-origin Garage route",()=>{
+ const html=readFileSync(new URL("../public/manuals.html",import.meta.url),"utf8");
+ const source=html.slice(html.indexOf("function safeGarageBack("),html.indexOf("async function boot()"));
+ const safe=new Function(source+";return safeGarageBack")(),origin="https://manual.example";
+ for(const value of ["/garage","/garage?projectId=1#ignored",origin+"/garage","/garage.html"])assert.ok(["/garage","/garage.html"].includes(safe(value,origin)));
+ for(const value of ["https://evil.example/garage","//evil.example/garage","javascript:alert(1)",origin+"/manuals",origin+"/garage/other","https://user:pass@manual.example/garage","",null])assert.equal(safe(value,origin),"",String(value));
+ assert.match(html,/const back=safeGarageBack\(LS\("mx.back",""\)\)/);
+});

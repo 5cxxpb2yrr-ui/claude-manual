@@ -151,6 +151,10 @@ export default {
       return servePdfReader(request);
     }
 
+    if ((url.pathname.startsWith("/api/navigation/") || url.pathname.startsWith("/m/")) && !["GET", "HEAD"].includes(request.method)) {
+      return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD", "cache-control": "no-store" } });
+    }
+
     if (url.pathname.startsWith("/api/navigation/")) {
       const filename = url.pathname.slice("/api/navigation/".length);
       return serveNavigationIndex(request, env, filename);

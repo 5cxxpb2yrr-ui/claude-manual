@@ -81,7 +81,7 @@ test("stock and tool suggestions respect compatibility, reservations and explici
 
 
 test("editing inventory preserves identity and reservations and rolls back failed saves",async()=>{
- const code=garage.slice(garage.indexOf("inventoryCompatibilityOptions() {"),garage.indexOf("handleFileUpload(event) {"));
+ const code=garage.slice(garage.indexOf("inventoryCompatibilityOptions() {"),garage.indexOf("async handleFileUpload(event)"));
  const mock={...new Function("return ({"+code+"})")(),inventory:[{id:1,description:"Filter",quantity:4,reservedQuantity:2,unitCost:6,partNumber:"A",vehicleCompatibility:"Scion",custom:"keep"}],projects:[],vehicles:[{name:"Scion"}],modals:{},saveToStorage:async()=>true};
  mock.openEditPartModal(mock.inventory[0]);
  mock.newPartForm.quantity=1;

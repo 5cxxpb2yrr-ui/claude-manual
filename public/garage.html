@@ -243,7 +243,7 @@
 
 	<div class="p-3 space-y-3">
  <template x-for="group in groupedMoreTabs" :key="group.name"><section><h3 class="text-[10px] uppercase tracking-wide text-zinc-400 font-bold mb-1" x-text="group.name"></h3><div class="grid grid-cols-2 gap-2"><template x-for="tab in group.tabs" :key="tab.id"><button type="button" @click="currentTab=tab.id;modals.navMenu=false" class="garage-tap text-left px-3 py-2 rounded-lg text-xs font-bold bg-zinc-950 text-zinc-200 flex gap-2 items-center" :aria-current="currentTab===tab.id?'page':null"><span x-text="tab.icon"></span><span x-text="tab.label"></span></button></template></div></section></template>
- <div class="grid grid-cols-2 gap-2"><button type="button" @click="modals.navMenu=false;modals.importExport=true" class="garage-tap rounded-lg bg-zinc-950 text-xs font-bold text-zinc-200">Backup & export</button><a :href="dockUrl" class="garage-tap rounded-lg bg-zinc-950 flex items-center justify-center text-xs font-bold text-zinc-200">System Deck</a></div>
+ <button type="button" @click="modals.navMenu=false;modals.serviceImport=true;serviceImportRows=[];serviceImportError='';serviceImportSummary=''" class="garage-tap w-full rounded-lg bg-amber-500 text-zinc-950 text-xs font-bold">Import Service History</button><div class="grid grid-cols-2 gap-2"><button type="button" @click="modals.navMenu=false;modals.importExport=true" class="garage-tap rounded-lg bg-zinc-950 text-xs font-bold text-zinc-200">Backup & export</button><a :href="dockUrl" class="garage-tap rounded-lg bg-zinc-950 flex items-center justify-center text-xs font-bold text-zinc-200">System Deck</a></div>
  </div></div>
  <template x-if="modals.captureMenu"><div class="fixed inset-0 z-[60] bg-black/75 flex items-end justify-center" @click.self="modals.captureMenu=false" @keydown.escape.window="modals.captureMenu=false" role="dialog" aria-modal="true" aria-label="Capture menu"><div class="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-800 p-3 space-y-2 overflow-y-auto max-h-[85dvh]" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
  <div class="flex items-center justify-between"><h2 class="text-base font-bold text-amber-300">Capture</h2><button type="button" @click="modals.captureMenu=false" class="garage-close text-zinc-300" aria-label="Close capture">✕</button></div>
@@ -453,7 +453,7 @@
 										>
 											<span
 												class="px-2 py-1 rounded bg-zinc-950 font-mono text-xs font-bold text-amber-400 border border-zinc-800"
-												x-text="log?.mileage.toLocaleString() + ' mi'"
+												x-text="log?.mileage==null ? 'Mileage unknown' : Number(log.mileage).toLocaleString() + ' mi'"
 											></span>
 											<div>
 												<h4
@@ -468,7 +468,7 @@
 										</div>
 										<span
 											class="text-xs font-extrabold text-emerald-400 font-mono"
-											x-text="log?.cost > 0 ? String.fromCharCode(36) + log?.cost.toFixed(2) : 'DIY'"
+											x-text="log?.cost > 0 ? (log?.cost==null ? 'Unknown cost' : String.fromCharCode(36) + Number(log.cost).toFixed(2)) : 'DIY'"
 										></span>
 									</div>
 								</template>
@@ -767,7 +767,7 @@
 									<div class="flex items-center space-x-2">
 										<span
 											class="px-2.5 py-1 rounded-lg font-mono text-xs font-bold bg-zinc-950 text-amber-400 border border-amber-500/30"
-											x-text="log?.mileage.toLocaleString() + ' mi'"
+											x-text="log?.mileage==null ? 'Mileage unknown' : Number(log.mileage).toLocaleString() + ' mi'"
 										></span>
 										<span
 											class="text-xs font-bold text-purple-400 px-2 py-0.5 rounded bg-purple-500/10 border border-purple-500/20"
@@ -791,7 +791,7 @@
 										></span>
 										<span
 											class="text-xs font-extrabold text-emerald-400 font-mono"
-											x-text="log?.cost > 0 ? String.fromCharCode(36) + log?.cost.toFixed(2) : 'DIY'"
+											x-text="log?.cost > 0 ? (log?.cost==null ? 'Unknown cost' : String.fromCharCode(36) + Number(log.cost).toFixed(2)) : 'DIY'"
 										></span>
 									</div>
 								</div>
@@ -1514,11 +1514,11 @@
 									<div class="bg-zinc-950/60 border border-zinc-800 rounded-xl p-3 space-y-1">
 										<div class="flex justify-between items-start gap-2">
 											<span class="text-white font-sans font-bold text-xs" x-text="log?.serviceType"></span>
-											<span class="text-emerald-400 font-bold whitespace-nowrap" x-text="String.fromCharCode(36) + log?.cost.toFixed(2)"></span>
+											<span class="text-emerald-400 font-bold whitespace-nowrap" x-text="(log?.cost==null ? 'Unknown cost' : String.fromCharCode(36) + Number(log.cost).toFixed(2))"></span>
 										</div>
 										<div class="flex justify-between text-[11px] text-zinc-400">
 											<span x-text="log?.date"></span>
-											<span class="text-amber-400" x-text="log?.mileage.toLocaleString() + ' mi'"></span>
+											<span class="text-amber-400" x-text="log?.mileage==null ? 'Mileage unknown' : Number(log.mileage).toLocaleString() + ' mi'"></span>
 										</div>
 										<div class="text-[11px] text-zinc-500" x-text="log?.category || 'Maintenance'"></div>
 									</div>
@@ -1553,7 +1553,7 @@
 												></td>
 												<td
 													class="py-2 text-amber-400 whitespace-nowrap"
-													x-text="log?.mileage.toLocaleString() + ' mi'"
+													x-text="log?.mileage==null ? 'Mileage unknown' : Number(log.mileage).toLocaleString() + ' mi'"
 												></td>
 												<td
 													class="py-2 text-white font-sans font-bold"
@@ -1565,7 +1565,7 @@
 												></td>
 												<td
 													class="py-2 text-right text-emerald-400 font-bold whitespace-nowrap"
-													x-text="String.fromCharCode(36) + log?.cost.toFixed(2)"
+													x-text="(log?.cost==null ? 'Unknown cost' : String.fromCharCode(36) + Number(log.cost).toFixed(2))"
 												></td>
 											</tr>
 										</template>
@@ -2868,6 +2868,21 @@
 				</div>
 			</div>
 
+            <div x-show="modals.serviceImport" x-cloak class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-3">
+              <section role="dialog" aria-label="Import Service History" class="w-full max-w-lg max-h-[90dvh] overflow-y-auto bg-zinc-900 border border-amber-500/30 rounded-xl p-4 space-y-3">
+                <div class="flex justify-between items-center"><h2 class="font-bold text-white">Import Service History</h2><button type="button" :disabled="serviceImportBusy" @click="modals.serviceImport=false" class="px-3 py-2 text-xs">Close</button></div>
+                <p class="text-xs text-zinc-300">Merge normalized MotorNote history JSON or legacy serviceLogs JSON into existing records. No other data is replaced. Administrative records stay in the source file. Unknown costs and mileage remain unknown.</p>
+                <input type="file" accept=".json,application/json" :disabled="serviceImportBusy" @change="readServiceImport($event)" class="w-full text-xs">
+                <p class="text-xs text-rose-300" role="alert" x-text="serviceImportError"></p>
+                <p class="text-xs text-amber-300" aria-live="polite" x-text="serviceImportSummary"></p>
+                <template x-if="serviceImportRows.length"><div class="space-y-2">
+                  <p class="text-xs text-zinc-300" x-text="serviceImportRows.filter(r=>r.selected).length+' selected · '+serviceImportRows.filter(r=>r.duplicate).length+' duplicates · '+serviceImportRows.filter(r=>r.review).length+' require review'"></p>
+                  <div class="space-y-1 max-h-[45dvh] overflow-y-auto"><template x-for="(row,i) in serviceImportRows" :key="i"><label class="flex items-start gap-2 border border-zinc-700 rounded p-2 text-xs"><input type="checkbox" x-model="row.selected" :disabled="row.duplicate||serviceImportBusy"><span><b x-text="row.log.vehicle+' · '+row.log.date"></b><span class="block" x-text="row.log.serviceType"></span><span class="block text-zinc-400" x-text="row.log.mileage==null?'Mileage unknown':row.log.mileage.toLocaleString()+' mi'"></span><span class="block text-amber-300" x-text="row.reason"></span></span></label></template></div>
+                  <button type="button" class="w-full bg-amber-500 rounded py-3 text-zinc-950 font-bold text-xs" :disabled="serviceImportBusy||!serviceImportRows.some(r=>r.selected)" @click="commitServiceImport()">Merge selected service records</button>
+                </div></template>
+              </section>
+            </div>
+
             <!-- Service manuals moved from the Specs page into a dedicated modal. -->
             <dialog x-ref="serviceManualsDialog" class="spec-preview-dialog" aria-label="Vehicle service manuals" @cancel.prevent="closeServiceManuals()">
                 <div class="spec-preview-content">
@@ -3018,7 +3033,8 @@
 					isEditingRepair: false,
 					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",captureBusy:false,vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",reconcileDraft:null,reconcileError:"",storageDraft:null,storageError:"",storageFilter:"",priceSearch:"",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
 					garageDB: null,
-					saveState: 'saved', lastSaveError:'', backupBusy:false, startupReadFailed:false,
+					serviceImportRows: [], serviceImportError: '', serviceImportBusy: false, serviceImportSummary: '',
+                    saveState: 'saved', lastSaveError:'', backupBusy:false, startupReadFailed:false,
 					lastSavedAt: null,
 					databaseHealth: { status: 'checking', issues: [], warnings: [], counts: {}, indexedDB: false, schemaVersion: 0, lastCheckedAt: null },
 
@@ -3083,6 +3099,7 @@
 						updateMileage: false,
 						editVehicle: false,
 						importExport: false,
+                        serviceImport: false,
 						maintenancePlan: false,
 						completeMaintenance: false
 					},
@@ -4465,13 +4482,21 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 
 					predictiveForVehicle(vehicle, includeArchived = false) {
 						if (!vehicle) return [];
-						const logs = this.logs.filter(l => l.vehicleId === vehicle.id || l.vehicle === vehicle.name).filter(l => Number.isFinite(Number(l.mileage))).sort((a,b) => Number(a.mileage||0)-Number(b.mileage||0));
+						const logs = this.logs.filter(l => l.vehicleId === vehicle.id || l.vehicle === vehicle.name).filter(l => !l.importReviewRequired && l.mileage!=null && Number.isFinite(Number(l.mileage))).sort((a,b) => Number(a.mileage||0)-Number(b.mileage||0));
 						const today = new Date(), odometer = Number(vehicle.odometer)||0;
 						let dailyMiles = 28;
 						if (logs.length >= 2) { const first=logs[0], last=logs[logs.length-1]; const days=Math.max(1,(new Date(last.date||today)-new Date(first.date||today))/86400000); const distance=Math.max(0,Number(last.mileage)-Number(first.mileage)); if(distance>0) dailyMiles=Math.max(5,Math.min(150,distance/days)); }
 						const computed = this.schedules.filter(sch => !sch.vehicleId || sch.vehicleId === vehicle.id).map(sch => {
 							const terms=(sch.terms||[sch.serviceName.split(' ')[0]]).map(x=>x.toLowerCase());
-							const matched=logs.filter(l=>terms.some(t=>(l.serviceType||'').toLowerCase().includes(t)));
+							const matched=logs.filter(l=>{
+ if(!l.importedHistory)return terms.some(t=>(l.serviceType||'').toLowerCase().includes(t));
+ const actions=String(l.serviceType||'').toLowerCase().split(',').map(x=>x.trim());
+ return actions.some(a=>{
+ if(/oil/.test(sch.serviceName.toLowerCase())&&!/transmission|differential/.test(sch.serviceName.toLowerCase()))return /oil and filter changed|oil.*filter.*(?:change|replace)|synthetic oil change|engine oil.*(?:change|replace)/.test(a);
+ if(/tire rotation/.test(sch.serviceName.toLowerCase()))return /tires? rotated|tire rotation/.test(a);
+ return terms.some(t=>a.includes(t))&&/replac|chang|flush|rotat/.test(a);
+ });
+ });
 							const lastLog=matched[matched.length-1], hasHistory=!!lastLog;
 							// Without a matching service log, start a low-confidence projection from today's known odometer/date.
 							// Do not fabricate a prior service or mark the item overdue solely because history is missing.
@@ -5669,6 +5694,70 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
  alert("Garage data restored. Previous data was backed up.");return true;
  }catch(e){if(applied){this.applyState(prior);await this.hydrateAttachments();}alert("Recovery rejected: "+e.message);return false;}
  finally{this.backupBusy=false;}
+ },
+ serviceImportVehicle(value){
+ const key=String(value||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+ const aliases={xb:'scionxb',scionxb:'scionxb','2006scionxb':'scionxb',crosstrek:'subarucrosstrek',subarucrosstrek:'subarucrosstrek','2019subarucrosstrek':'subarucrosstrek'};
+ return this.vehicles.find(v=>[v.id,v.name].some(a=>{const k=String(a).toLowerCase().replace(/[^a-z0-9]/g,'');return k===key||(aliases[key]&&aliases[key]===aliases[k]);}));
+ },
+ serviceImportKey(log){
+ const v=this.serviceImportVehicle(log.vehicleId||log.vehicle);
+ const type=String(log.serviceType||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+ return JSON.stringify([v?.id||log.vehicleId,log.date,log.mileage==null||log.mileage===''?null:Number(log.mileage),type]);
+ },
+ planServiceImport(data){
+ const rows=Array.isArray(data?.records)?data.records:Array.isArray(data?.serviceLogs)?data.serviceLogs:null;
+ if(!rows||rows.length>5000)throw Error('Expected a history JSON with records or serviceLogs (maximum 5,000).');
+ const seen=new Set(this.logs.map(l=>this.serviceImportKey(l))), out=[];let excluded=0;
+ for(const raw of rows){
+ if(raw?.kind==='administrative'){excluded++;continue;}
+ if(!raw||typeof raw!=='object')throw Error('Invalid service record.');
+ const v=this.serviceImportVehicle(raw.vehicleId||raw.vehicle);
+ if(!v)throw Error('Unrecognized vehicle: '+String(raw.vehicleId||raw.vehicle||'missing'));
+ const date=String(raw.date||''), dt=new Date(date+'T00:00:00Z');
+ if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||!Number.isFinite(dt.getTime())||dt.toISOString().slice(0,10)!==date||date>this.toolToday())throw Error('Invalid service date: '+date);
+ const serviceType=Array.isArray(raw.services)?raw.services.map(x=>String(x).trim()).filter(Boolean).join(', '):String(raw.serviceType||'').trim();
+ if(!serviceType||serviceType.length>5000)throw Error('Missing or invalid service description.');
+ if(/^(registration issued|title issued|title or registration|loan or lien|vehicle color noted)/i.test(serviceType)){excluded++;continue;}
+ const mileage=raw.mileage==null||raw.mileage===''?null:Number(raw.mileage), cost=raw.cost==null||raw.cost===''?null:Number(raw.cost);
+ if(mileage!=null&&(!Number.isSafeInteger(mileage)||mileage<0)||cost!=null&&(!Number.isFinite(cost)||cost<0))throw Error('Invalid mileage or cost on '+date);
+ const log={vehicleId:v.id,vehicle:v.name,date,mileage,cost,serviceType,category:'Maintenance',notes:String(raw.notes||''),attachments:[],history:[],importProvider:String(raw.provider||''),importSources:Array.isArray(raw.sources)?raw.sources.map(String):[],importReceiptName:String(raw.attachment||''),importOriginalIds:Array.isArray(raw.originalIds)?raw.originalIds:raw.id!=null?[raw.id]:[],importedHistory:true};
+ if(log.importProvider&&!log.notes.includes(log.importProvider))log.notes=[log.notes,'Provider: '+log.importProvider].filter(Boolean).join('\n');
+ if(log.importReceiptName)log.notes=[log.notes,'Original receipt filename (file not imported): '+log.importReceiptName].filter(Boolean).join('\n');
+ const key=this.serviceImportKey(log), duplicate=seen.has(key);
+ const overlap=this.logs.some(l=>this.serviceImportVehicle(l.vehicleId||l.vehicle)?.id===v.id&&(l.date===date||(mileage!=null&&Number(l.mileage)===mileage&&Math.abs(new Date(l.date)-dt)<=7*86400000)));
+ const review=!!raw.reviewRequired||overlap||mileage==null;
+ log.importReviewRequired=review;
+ out.push({log,duplicate,review,selected:!duplicate&&!review,reason:duplicate?'Duplicate — skipped':review?'Review required — excluded from maintenance predictions': ''});
+ seen.add(key);
+ }
+ return {rows:out,excluded};
+ },
+ async readServiceImport(event){
+ const file=event.target.files?.[0];event.target.value='';if(!file)return;
+ this.serviceImportRows=[];this.serviceImportError='';this.serviceImportSummary='';
+ try{if(file.size>10*1024*1024)throw Error('Use a JSON file under 10 MB.');const result=this.planServiceImport(JSON.parse(await file.text()));this.serviceImportRows=result.rows;this.serviceImportSummary=result.excluded+' administrative records excluded.';}
+ catch(e){this.serviceImportError=e.message;}
+ },
+ async commitServiceImport(){
+ if(this.serviceImportBusy||this.backupBusy||this.startupReadFailed||this.inventorySaving||this.vendorBusy||this.guidedSaving||this.guidedServiceBusy||this.maintenanceMutationBusy)return false;
+ this.serviceImportBusy=true;this.serviceImportError='';let prior=null;
+ try{
+ await this.inventorySaveTail;
+ const seen=new Set(this.logs.map(l=>this.serviceImportKey(l)));
+ const added=[];
+ for(const row of this.serviceImportRows.filter(r=>r.selected&&!r.duplicate)){
+ const log=JSON.parse(JSON.stringify(row.log)),key=this.serviceImportKey(log);if(seen.has(key))continue;
+ if(this.logs.some(l=>this.serviceImportVehicle(l.vehicleId||l.vehicle)?.id===log.vehicleId&&l.date===log.date))log.importReviewRequired=true;
+ seen.add(key);log.id='history-import-'+crypto.randomUUID();added.push(log);
+ }
+ if(!added.length)throw Error('No new selected records.');
+ if(!await this.createSafetySnapshot(this.getPersistableState(),'pre-service-history-import'))throw Error('Safety snapshot failed; nothing imported.');
+ prior=this.logs;this.logs=[...added,...prior];
+ if(!await this.saveToStorage('Service history import'))throw Error(this.lastSaveError||'Storage write failed.');
+ this.serviceImportRows=[];this.serviceImportSummary=added.length+' service records imported. Vehicle odometers unchanged; review flagged records separately.';
+ return true;
+ }catch(e){if(prior)this.logs=prior;this.serviceImportError=e.message;return false;}finally{this.serviceImportBusy=false;}
  },
  async importJSON(event){
  const file=event.target.files?.[0];event.target.value="";if(!file)return false;

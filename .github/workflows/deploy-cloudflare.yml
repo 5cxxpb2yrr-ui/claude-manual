@@ -8,6 +8,7 @@ on:
     branches:
       - main
       - preview/repair-cart-scion-dedupe-20261125
+      - preview/scion-torque-sibling-fix-20261125
   workflow_dispatch:
 
 permissions:
@@ -20,7 +21,8 @@ concurrency:
 jobs:
   validate:
     name: Test and validate Worker bundle
-    runs-on: ubuntu-latest
+    # Playwright 1.51.1 supports Ubuntu 24.04; ubuntu-latest moved to 26.04.
+    runs-on: ubuntu-24.04
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -30,8 +32,37 @@ jobs:
         with:
           node-version: 22
 
+      - name: Prepare local PDF receipt reader
+        run: npm run build
+
       - name: Run tests
         run: npm test
+
+      - name: Install pinned browser test runtime
+        run: |
+          npm install --prefix .browser-tests --no-save --package-lock=false playwright@1.51.1
+          .browser-tests/node_modules/.bin/playwright install --with-deps chromium webkit
+
+      - name: Build pinned V9 recovery baseline for compatibility test
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin 4a2d43c5cdc8e6e98c72e03a57871a0ace4a5334
+          RECOVERY_ROOT="$(mktemp -d "$RUNNER_TEMP/motornote-recovery.XXXXXX")"
+          git archive 4a2d43c5cdc8e6e98c72e03a57871a0ace4a5334 | tar -x -C "$RECOVERY_ROOT"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$RECOVERY_ROOT/node_modules"
+          (cd "$RECOVERY_ROOT" && npm run build)
+          echo "MOTORNOTE_RECOVERY_ROOT=$RECOVERY_ROOT" >> "$GITHUB_ENV"
+
+      - name: Run isolated mobile browser lifecycle
+        run: node scripts/garage-browser-smoke.mjs
+
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: garage-browser-diagnostics
+          path: browser-diagnostics/
+          if-no-files-found: ignore
 
       - name: Validate Wrangler deployment bundle
         run: npx --yes wrangler@4 deploy --dry-run --outdir .wrangler/deploy-check
@@ -51,6 +82,9 @@ jobs:
         with:
           node-version: 22
 
+      - name: Prepare local PDF receipt reader
+        run: npm run build
+
       - name: Deploy Worker, static assets, and R2 binding
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -63,8 +97,9 @@ jobs:
   deploy-preview:
     name: Deploy isolated preview Worker
     needs: validate
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125'
+    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125' || github.ref == 'refs/heads/preview/scion-torque-sibling-fix-20261125')) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'preview/repair-cart-scion-dedupe-20261125' || github.event.pull_request.head.ref == 'preview/scion-torque-sibling-fix-20261125'))
     runs-on: ubuntu-latest
+    environment: preview
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -74,11 +109,110 @@ jobs:
         with:
           node-version: 22
 
-      - name: Deploy preview Worker, static assets, and read-only manual corpus binding
+      - name: Prepare local PDF receipt reader
+        run: npm run build
+
+      - name: Deploy isolated preview Worker for preview-branch push, dispatch, or pull request
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MOTORNOTE_ACCESS_CLIENT_ID: ${{ secrets.MOTORNOTE_ACCESS_CLIENT_ID }}
+          MOTORNOTE_ACCESS_CLIENT_SECRET: ${{ secrets.MOTORNOTE_ACCESS_CLIENT_SECRET }}
+          MOTORNOTE_PREVIEW_ACCESS_REQUIRED: ${{ vars.MOTORNOTE_PREVIEW_ACCESS_REQUIRED }}
         run: |
           test -n "$CLOUDFLARE_API_TOKEN" || { echo "::error::Missing CLOUDFLARE_API_TOKEN secret"; exit 1; }
           test -n "$CLOUDFLARE_ACCOUNT_ID" || { echo "::error::Missing CLOUDFLARE_ACCOUNT_ID secret"; exit 1; }
-          npx --yes wrangler@4 deploy --config wrangler.jsonc --name claude-manual-preview
+          # Credentials are scoped to this preview verification step only.
+          # Never follow redirects or send these headers to an arbitrary URL.
+          ACCESS_HEADERS=()
+          case "${MOTORNOTE_PREVIEW_ACCESS_REQUIRED:-false}" in
+            true|false) ;;
+            *) echo "::error::MOTORNOTE_PREVIEW_ACCESS_REQUIRED must be true or false"; exit 1 ;;
+          esac
+          if [[ -n "$MOTORNOTE_ACCESS_CLIENT_ID" && -n "$MOTORNOTE_ACCESS_CLIENT_SECRET" ]]; then
+            ACCESS_HEADERS=(-H "CF-Access-Client-Id: $MOTORNOTE_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $MOTORNOTE_ACCESS_CLIENT_SECRET")
+            echo "Preview verification: Access service authentication enabled"
+          elif [[ -n "$MOTORNOTE_ACCESS_CLIENT_ID" || -n "$MOTORNOTE_ACCESS_CLIENT_SECRET" || "$MOTORNOTE_PREVIEW_ACCESS_REQUIRED" == "true" ]]; then
+            echo "::error::Both MotorNote preview Access secrets are required"
+            exit 1
+          else
+            echo "Preview verification: transitional unauthenticated mode"
+          fi
+          BRANCH="${GITHUB_HEAD_REF:-${GITHUB_REF_NAME}}"
+          case "$BRANCH" in
+            preview/scion-torque-sibling-fix-20261125) ALIAS=preview-scion-torque-sibling-fix-20261125 ;;
+            preview/repair-cart-scion-dedupe-20261125) ALIAS=preview-repair-cart-scion-dedupe-20261125 ;;
+            *) echo "Unexpected preview branch"; exit 1 ;;
+          esac
+          test -s node_modules/pdfjs-dist/legacy/build/pdf.mjs
+          test -s node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs
+          npx --yes wrangler@4 versions upload --config wrangler.jsonc --preview-alias "$ALIAS"
+          BASE="https://$ALIAS-claude-manual.phillipstg.workers.dev"
+          for asset in pdf.mjs pdf.worker.mjs; do
+            verified=false
+            for attempt in 1 2 3 4 5 6; do
+              echo "Checking $asset (attempt $attempt)"
+              rm -f /tmp/pdf-headers /tmp/pdf-asset
+              if curl "${ACCESS_HEADERS[@]}" --silent --show-error --max-time 30 -H 'Cache-Control: no-cache' -D /tmp/pdf-headers -o /tmp/pdf-asset "$BASE/api/receipt-pdf/4.10.38/$asset?verify=$GITHUB_SHA-$attempt"; then
+                grep -Ei '^(HTTP/|content-type:|content-length:|cf-cache-status:)' /tmp/pdf-headers || true
+                echo "Expected / received bytes:"
+                wc -c "node_modules/pdfjs-dist/legacy/build/$asset" /tmp/pdf-asset
+                if grep -Eq '^HTTP/[^ ]+ 200([[:space:]]|$)' /tmp/pdf-headers && grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/pdf-headers && cmp -s /tmp/pdf-asset "node_modules/pdfjs-dist/legacy/build/$asset"; then
+                  verified=true
+                  echo "Verified $asset"
+                  break
+                fi
+              fi
+              sleep 5
+            done
+            test "$verified" = true || { echo "::error::Preview asset verification failed: $asset"; exit 1; }
+          done
+          for asset in tesseract.min.js worker.min.js tesseract-core-lstm.wasm.js tesseract-core-lstm.wasm eng.traineddata.gz; do
+            echo "Checking OCR asset $asset"
+            curl "${ACCESS_HEADERS[@]}" --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ocr-headers -o /tmp/ocr-asset "$BASE/receipt-ocr-v6/$asset?verify=$GITHUB_SHA"
+            grep -Ei '^(HTTP/|content-type:)' /tmp/ocr-headers
+            case "$asset" in
+              *.js) grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/ocr-headers ;;
+              *.wasm) grep -Eiq '^content-type: *application/wasm' /tmp/ocr-headers ;;
+              *.gz) grep -Eiq '^content-type: *application/octet-stream' /tmp/ocr-headers ;;
+            esac
+            cmp "/tmp/ocr-asset" "public/receipt-ocr-v6/$asset"
+          done
+
+          for asset in garage.css alpine.min.js; do
+            curl "${ACCESS_HEADERS[@]}" --fail --silent --show-error --retry 3 --max-time 60 -D /tmp/ui-headers -o /tmp/ui-asset "$BASE/garage-ui-v1/$asset?verify=$GITHUB_SHA"
+            case "$asset" in
+              *.css) grep -Eiq '^content-type: *text/css' /tmp/ui-headers ;;
+              *.js) grep -Eiq '^content-type: *(application|text)/(javascript|ecmascript)' /tmp/ui-headers ;;
+            esac
+            cmp /tmp/ui-asset "public/garage-ui-v1/$asset"
+          done
+
+          # Confirm live private R2 retrieval via the protected preview Worker.
+          # Fixed paths and no redirects keep service credentials on the intended host.
+          for path in '/api/navigation/scion-repair.json' '/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/381.html' '/m/subaru-service-manual/2019%20Subaru%20Crosstrek%20Limited/pages/614.html'; do
+            status=$(curl "${ACCESS_HEADERS[@]}" --silent --show-error --max-time 60 -D /tmp/manual-headers -o /tmp/manual-object -w '%{http_code}' "$BASE$path?verify=$GITHUB_SHA")
+            test "$status" = 200 || { echo "::error::Manual retrieval failed ($status): $path"; exit 1; }
+            case "$path" in
+              *.json) node -e 'const n=JSON.parse(require("fs").readFileSync("/tmp/manual-object","utf8"));if(!Array.isArray(n.c)||!n.c.length)process.exit(1)' ;;
+              *.html) grep -Eiq '^content-type: *text/html' /tmp/manual-headers
+                      grep -Eiq 'FLUID CAPACITIES' /tmp/manual-object ;;
+            esac
+            echo "Verified manual retrieval: $path"
+            if [[ "$MOTORNOTE_PREVIEW_ACCESS_REQUIRED" == "true" ]]; then
+              status=$(curl --silent --show-error --max-time 30 -o /dev/null -w '%{http_code}' "$BASE$path?anonymous-check=$GITHUB_SHA")
+              case "$status" in
+                302|303|307|308|401|403) echo "Anonymous manual retrieval denied ($status)" ;;
+                *) echo "::error::Anonymous manual retrieval not blocked ($status): $path"; exit 1 ;;
+              esac
+            fi
+          done
+
+          # A successful authenticated response alone does not prove protection.
+          if [[ "$MOTORNOTE_PREVIEW_ACCESS_REQUIRED" == "true" ]]; then
+            status=$(curl --silent --show-error --max-time 30 -o /dev/null -w '%{http_code}' "$BASE/garage?anonymous-check=$GITHUB_SHA")
+            case "$status" in
+              302|303|307|308|401|403) echo "Anonymous preview access denied ($status)" ;;
+              *) echo "::error::Anonymous preview request was not blocked (HTTP $status)"; exit 1 ;;
+            esac
+          fi

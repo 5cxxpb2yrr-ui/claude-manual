@@ -9,6 +9,33 @@ const Engine = require("../public/repair-workspace.js");
 const script = new URL("../public/repair-workspace.js", import.meta.url);
 const html = readFileSync(new URL("../public/manuals.html", import.meta.url), "utf8");
 
+
+const scionRepair = JSON.parse(readFileSync(new URL("../public/data/scion-repair.json", import.meta.url), "utf8"));
+test("Scion Repair Workspace finds matching specifications across both Scion navigation guides", () => {
+  const crossGuide = { c: [
+    { n: "Parts and Labor", c: [{ n: "Other Variant", c: [{ n: "Electrical", c: [{ n: "Charging System", c: [
+      { n: "Alternator Assembly: Remove & Replace", p: 110 },
+      { n: "Alternator Assembly: Remove, Install, and Overhaul", p: 111 }
+    ] }] }] }] },
+    { n: "Repair and Diagnosis", c: [{ n: "Starting and Charging", c: [{ n: "Charging System", c: [
+      { n: "Alternator: Specifications", p: 5690 }
+    ] }] }] }
+  ] };
+  for (const pageId of [110, 111]) {
+    const matches = Engine.findScionSiblingSpecificationPages(crossGuide, pageId);
+    assert.ok(matches.some(page => page.page === "5690" && /Alternator: Specifications/i.test(page.label)));
+  }
+});
+
+test("Scion Repair Workspace discovers specification siblings from the navigation tree", () => {
+  const waterPump = Engine.findScionSiblingSpecificationPages(scionRepair, 6552);
+  assert.ok(waterPump.some(page => page.page === "6553" && /Water Pump: Specifications/i.test(page.label)));
+  const alternator = Engine.findScionSiblingSpecificationPages(scionRepair, 5662);
+  assert.ok(alternator.some(page => page.page === "5690" && /Alternator: Specifications/i.test(page.label)));
+  const alternatorLanding = Engine.findScionSiblingSpecificationPages(scionRepair, 2601);
+  assert.ok(alternatorLanding.some(page => page.page === "5690" && /Alternator: Specifications/i.test(page.label)));
+});
+
 test("Alternator contents page resolves its related factory procedure pages as one bundle", () => {
   const html = '<a href="../pages/5661.html">Testing and Inspection</a><a href="../pages/5662.html">Removal and Installation</a><a href="../pages/5663.html">Disassembly and Reassembly</a><a href="../pages/5690.html">Specifications</a><a href="../pages/5664.html">Key to Diagrams</a>';
   const links = Engine.findRelatedProcedureLinks(html, "https://preview.example/m/scion/pages/2601");
@@ -22,7 +49,7 @@ test("Alternator contents page resolves its related factory procedure pages as o
 
 test("Repair Workspace fetches and displays linked factory pages and preserves their source references", () => {
   const source = readFileSync(script, "utf8");
-  assert.match(source, /const relatedLinks=findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
+  assert.match(source, /const linkedPages=findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
   assert.match(source, /Promise\.all\(relatedLinks\.map/);
   assert.match(source, /const combinedHtml=pageHtml/);
   assert.match(source, /Related factory manual pages/);
@@ -376,13 +403,90 @@ test("Repair Workspace can create a new Garage project for the active vehicle an
 });
 
 
+
+test("Repair Workspace merges Scion sibling specification pages with links on the active page", () => {
+  const source = readFileSync(script, "utf8");
+  assert.match(source, /findScionSiblingSpecificationLinks\(pageUrl\)/);
+  assert.match(source, /linkedPages=findRelatedProcedureLinks\(pageHtml,pageUrl\.href\),scionSpecPages=await findScionSiblingSpecificationLinks\(pageUrl\),relatedLinks=/);
+  assert.match(source, /new Map\(\[\.\.\.linkedPages,\.\.\.scionSpecPages\]/);
+});
+
 test("Repair Workspace keeps the active manual URL in scope while loading related factory pages", () => {
   const source = readFileSync(script, "utf8");
-  const start = source.indexOf("async function openWorkspace()");
+  const start = source.indexOf("async function openWorkspace(options={})");
   const end = source.indexOf('document.addEventListener("click"', start);
   assert.ok(start >= 0 && end > start);
   const handler = source.slice(start, end);
   assert.match(handler, /let doc,pageUrl,pageHtml;\s*try\{\s*pageUrl=new URL/);
   assert.match(handler, /pageHtml=await response\.text\(\)/);
   assert.match(handler, /findRelatedProcedureLinks\(pageHtml,pageUrl\.href\)/);
+});
+
+
+test("Scion generator installation recognizes star-separated torque units and explicit fasteners", () => {
+ const html = '<h1>Charging (1NZ-FE): Generator: Installation</h1><ol><li>Temporarily install the adjusting bar with bolt A, and tighten the nut to the specified torque.<div>Fig 2: adjusting bar</div><p>Torque: 11 N*m (112 kgf*cm, 8 ft.*lbf)</p></li><li>First tighten bolt A, and then tighten bolt B.<p>Torque: 18.5 N*m (189 kgf*cm, 14 ft.*lbf) for bolt A</p><p>54 N*m (551 kgf*cm, 40 ft.*lbf) for bolt B</p></li><li>Install the generator wire with the nut.<p>Torque: 9.8 N*m (100 kgf*cm, 7 ft.*lbf)</p></li></ol>';
+ const groups = Engine.extractProcedure(html, {}).torqueSpecs;
+ assert.deepEqual(groups.map(g => [g.association?.component, g.association?.fastener, ...g.values.map(v => v.value), g.selectable]), [
+  ["Alternator adjusting bar", "Nut", 11, 112, 8, true],
+  ["Alternator", "Bolt A", 18.5, 189, 14, true],
+  ["Alternator", "Bolt B", 54, 551, 40, true],
+  ["Alternator wire", "Nut", 9.8, 100, 7, true]
+ ]);
+});
+
+
+test("guided repair reads Scion factory ordered-list steps without losing nested instructions", () => {
+ const html = '<h1>Generator: Installation</h1><ol class="ARABICNUM"><li><span class="clsEmphBOLD">INSTALL GENERATOR ASSEMBLY</span><ol class="LOWERALPHA"><li>Tighten bolt A.<p>Torque: 18.5 N*m</p></li><li>Tighten bolt B.<p>54 N*m</p><div>NOTE: Verify tension.</div></li></ol></li><li><span class="clsEmphBOLD">ADJUST GENERATOR V BELT (see <a href="../pages/7891.html">INSTALLATION</a>)</span></li><li><span class="clsEmphBOLD">CONNECT CABLE TO NEGATIVE BATTERY TERMINAL</span></li></ol>';
+ const steps = Engine.extractRepairSteps(Engine.htmlToText(html), html);
+ assert.equal(steps.length, 3);
+ assert.equal(steps[0].title, "INSTALL GENERATOR ASSEMBLY");
+ assert.ok(steps[0].detail.includes("18.5 N*m"));
+ assert.ok(steps[0].detail.includes("54 N*m"));
+ assert.ok(steps[0].detail.includes("Verify tension"));
+ assert.ok(steps[1].title.includes("ADJUST GENERATOR V BELT"));
+ assert.equal(steps[2].safetyCritical, true);
+ assert.equal(Engine.repairStepCanOpen(steps, {}, 1), false);
+ assert.equal(Engine.repairStepCanOpen(steps, {}, 2), false);
+ assert.equal(Engine.extractRepairSteps("Parts list", '<ol><li>Alternator</li></ol>').length, 0);
+});
+
+
+test("Garage guided repair launches the same procedure route once and keeps project context", () => {
+ const garage=readFileSync(new URL("../public/garage.html",import.meta.url),"utf8");
+ const workspace=readFileSync(script,"utf8");
+ const methods=garage.slice(garage.indexOf("guidedRepairRoute(entry) {"),garage.indexOf("refreshRepairCartLinks() {"));
+ const loc={protocol:"https:",origin:"https://preview.example",pathname:"/garage"};
+ const mock={...new Function("location","URLSearchParams","return ({"+methods+"})")(loc,URLSearchParams),manualLibrary:{base:"",vehicles:{"scion-xb":{idx:1}}},repairCartsForProject:()=>[{route:"#/v/1/0/1881",procedure:"Generator"}]};
+ const project={id:"project-1",vehicleId:"scion-xb",procedures:[{sourcePath:"/v/1/0/1881"},{sourcePath:"/v/1/0/1877"},{sourcePath:"/v/0/0/6570"},{sourcePath:"https://example.com/"}]};
+ const entries=mock.guidedRepairEntries(project);
+ assert.deepEqual(entries.map(e=>e.route),["#/v/1/0/1881","#/v/1/0/1877"]);
+ const link=mock.guidedRepairLink(entries[0],project);
+ assert.match(link,/^\/manuals\.html\?guided=1&projectId=project-1&back=/);
+ assert.ok(link.endsWith(entries[0].route));
+ assert.match(workspace,/openWorkspace\(\{guided:true,projectId,repairId\}\)/);
+ assert.match(workspace,/url.searchParams.delete\("guided"\)/);
+ assert.match(workspace,/if\(options.guided\)content.querySelector\("#rw-start-mode"\).click\(\)/);
+ assert.match(workspace,/if\(returnToGarage\)location.assign\(returnToGarage\)/);
+ assert.match(html,/document.dispatchEvent\(new Event\("manual-viewer-ready"\)\)/);
+});
+
+
+test("actual repair record modal exposes guided repair from record and linked project references", () => {
+ const garage=readFileSync(new URL("../public/garage.html",import.meta.url),"utf8");
+ const workspace=readFileSync(script,"utf8");
+ const modal=garage.slice(garage.indexOf('x-show="modals.repairDetail"'),garage.indexOf('<!-- 3-Column Responsive Grid -->'));
+ assert.match(modal,/guidedRepairRecordEntries\(selectedRepair\)/);
+ assert.match(modal,/guidedRepairRecordLink\(entry,selectedRepair\)/);
+ assert.match(modal,/repairRecordSearchLink\(selectedRepair\)/);
+ const methods=garage.slice(garage.indexOf("guidedRepairRoute(entry) {"),garage.indexOf("refreshRepairCartLinks() {"));
+ const loc={protocol:"https:",origin:"https://preview.example",pathname:"/garage"};
+ const vehicle={id:"scion-xb"},project={id:"p",vehicleId:vehicle.id,procedures:[{sourcePath:"/v/1/0/1881",title:"Install"}]};
+ const mock={...new Function("location","URLSearchParams","return ({"+methods+"})")(loc,URLSearchParams),projects:[project],vehicles:[vehicle],isLogForVehicle:(r,v)=>r.vehicleId===v.id,repairCartsForProject:()=>[],manualLibrary:{base:"",vehicles:{"scion-xb":{idx:1}}}};
+ const record={id:"r",projectId:"p",vehicleId:vehicle.id,procedureReferences:[{sourcePath:"/v/1/0/1877",title:"Remove"},{sourcePath:"/v/0/0/6570"}]};
+ const entries=mock.guidedRepairRecordEntries(record);
+ assert.deepEqual(entries.map(e=>e.route),["#/v/1/0/1881","#/v/1/0/1877"]);
+ assert.match(mock.guidedRepairRecordLink(entries[0],record),/guided=1&repairId=r&projectId=p/);
+ assert.deepEqual(mock.guidedRepairRecordEntries({...record,projectId:null,procedureReferences:[]}),[]);
+ assert.match(garage,/if\(requestedRepair\).*?this.openRepairDetail\(record\)/);
+ assert.match(workspace,/openWorkspace\(\{guided:true,projectId,repairId\}\)/);
 });

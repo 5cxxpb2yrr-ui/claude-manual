@@ -1,4 +1,35 @@
 import { resolveManualRootPath, resolveScionPageKey } from "./manual-link-repairs.mjs";
+import { PDF_READER_FILES } from "./pdf-reader-data.mjs";
+
+const OCR_TYPES={"tesseract.min.js":"text/javascript","worker.min.js":"text/javascript","tesseract-core-lstm.wasm.js":"text/javascript","tesseract-core-lstm.wasm":"application/wasm","eng.traineddata.gz":"application/octet-stream"};
+export async function serveGarageUi(request,env){
+ const name=new URL(request.url).pathname.slice("/garage-ui-v1/".length),types={"garage.css":"text/css; charset=utf-8","alpine.min.js":"text/javascript; charset=utf-8","tailwindcss-LICENSE.txt":"text/plain; charset=utf-8","alpinejs-LICENSE.txt":"text/plain; charset=utf-8"};
+ if(!Object.hasOwn(types,name))return new Response("Not found",{status:404});
+ if(!["GET","HEAD"].includes(request.method))return new Response("Method not allowed",{status:405});
+ const response=await env.ASSETS.fetch(new Request(request.url,{method:request.method,headers:{Accept:"*/*"}}));
+ if(!response.ok||/text\/html/i.test(response.headers.get("content-type")||""))return new Response("Garage UI asset unavailable",{status:503,headers:{"cache-control":"no-store"}});
+ const headers=new Headers(response.headers);headers.set("content-type",types[name]);headers.set("x-content-type-options","nosniff");headers.set("cache-control","no-cache");
+ return new Response(request.method==="HEAD"?null:response.body,{status:200,headers});
+}
+export async function serveReceiptOcr(request,env){
+ const name=new URL(request.url).pathname.slice("/receipt-ocr-v6/".length);
+ if(!Object.hasOwn(OCR_TYPES,name))return new Response("Not found",{status:404});
+ if(!["GET","HEAD"].includes(request.method))return new Response("Method not allowed",{status:405});
+ const response=await env.ASSETS.fetch(new Request(request.url,{method:request.method,headers:{"Accept":"*/*"}}));
+ if(!response.ok||/text\/html/i.test(response.headers.get("content-type")||""))return new Response("OCR asset unavailable",{status:503,headers:{"content-type":"text/plain","cache-control":"no-store"}});
+ const headers=new Headers(response.headers);headers.set("content-type",OCR_TYPES[name]);headers.set("x-content-type-options","nosniff");
+ return new Response(request.method==="HEAD"?null:response.body,{status:200,headers});
+}
+export function servePdfReader(request, files = PDF_READER_FILES) {
+  const path = new URL(request.url).pathname;
+  const name = path.split("/").pop();
+  if (!["pdf.mjs", "pdf.worker.mjs", "LICENSE"].includes(name)) return new Response("Not found", { status: 404 });
+  if (!["GET", "HEAD"].includes(request.method)) return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
+  const body = files[name];
+  if (typeof body !== "string" || !body.length) return new Response("PDF reader unavailable; build assets first", { status: 503, headers: { "content-type": "text/plain", "cache-control": "no-store" } });
+  return new Response(request.method === "HEAD" ? null : body, { headers: { "content-type": name === "LICENSE" ? "text/plain; charset=utf-8" : "text/javascript; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
+}
+
 
 // /m/<manual-id>/<vehicle folder>/... -> R2 key manuals/<manual-id>/<vehicle folder>/...
 // Pages retain their real paths so relative stylesheets, images and icons continue to work.
@@ -13,6 +44,8 @@ const TYPES = {
   gif: "image/gif",
   txt: "text/plain; charset=utf-8",
 };
+// Manual documents are reference material, not trusted application code.
+export const MANUAL_DOCUMENT_CSP = "sandbox allow-same-origin; script-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
 const NAVIGATION_FILES = new Set([
   "scion-repair.json",
   "scion-parts.json",
@@ -114,6 +147,16 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith("/garage-ui-v1/")) return serveGarageUi(request,env);
+    if (url.pathname.startsWith("/receipt-ocr-v6/")) return serveReceiptOcr(request,env);
+    if (url.pathname.startsWith("/api/receipt-pdf/4.10.38/") || url.pathname.startsWith("/vendor/pdfjs/")) {
+      return servePdfReader(request);
+    }
+
+    if ((url.pathname.startsWith("/api/navigation/") || url.pathname.startsWith("/m/")) && !["GET", "HEAD"].includes(request.method)) {
+      return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD", "cache-control": "no-store" } });
+    }
+
     if (url.pathname.startsWith("/api/navigation/")) {
       const filename = url.pathname.slice("/api/navigation/".length);
       return serveNavigationIndex(request, env, filename);
@@ -168,8 +211,12 @@ export default {
       headers.set("content-type", TYPES[extension]);
     }
     headers.set("etag", object.httpEtag);
+    headers.set("x-content-type-options", "nosniff");
+    if (extension === "html" || extension === "htm" || /(?:text\/html|application\/xhtml\+xml)/i.test(headers.get("content-type") || "")) {
+      headers.set("content-security-policy", MANUAL_DOCUMENT_CSP);
+    }
     // Manual HTML can link to pages replaced during a corpus publish; do not retain stale page documents.
-    headers.set("cache-control", extension === "html" ? "no-store" : "public, max-age=86400");
+    headers.set("cache-control", headers.has("content-security-policy") ? "no-store" : "public, max-age=86400");
 
     const response = new Response(request.method === "HEAD" ? null : object.body, { headers });
     if (extension === "html" && request.method !== "HEAD") {

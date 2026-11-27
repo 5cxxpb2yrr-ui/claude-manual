@@ -1,0 +1,44 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
+const module={exports:{}};
+new Function("module",readFileSync(new URL("../public/inventory-engine.js",import.meta.url),"utf8"))(module);
+const engine=module.exports;
+const item={id:1,description:"Filter",quantity:4,reservedQuantity:0};
+test("opening balances, reservation, consumption and removal reconcile without duplicate entries",()=>{
+ let ledger=engine.reconcile([],[item]);
+ assert.equal(ledger[0].type,"opening-balance");
+ ledger=engine.reconcile(ledger,[{...item,reservedQuantity:2}]);
+ assert.equal(ledger[1].type,"reservation");
+ const stock=[{...item,quantity:2}];
+ ledger=engine.reconcile(ledger,stock);
+ assert.equal(ledger[2].type,"consumption");
+ assert.deepEqual(ledger[2].delta,{onHand:-2,reserved:-2});
+ assert.deepEqual(engine.audit(ledger,stock),[]);
+ assert.equal(engine.reconcile(ledger,stock).length,3);
+ assert.ok(engine.audit(ledger,[item]).length);
+ const removed=engine.reconcile(ledger,[]);
+ assert.equal(removed.at(-1).type,"stock-removed");
+ assert.deepEqual(engine.audit(removed,[]),[]);
+});
+test("failed persistence does not advance journal and retry records movement once",async()=>{
+ const garage=readFileSync(new URL("../public/garage.html",import.meta.url),"utf8");
+ const source=garage.slice(garage.indexOf("async saveToStorage(reason="),garage.indexOf("async createSafetySnapshot("));
+ let fail=false;const records=[];
+ const methods=new Function("window","localStorage","console","return ({"+source+"})")({MotorNoteInventoryEngine:engine},{setItem(k,v){if(fail)throw Error("write failed");records.push(JSON.parse(v));}},{error(){}});
+ const mock={...methods,inventory:[{...item}],inventoryLedger:[],getPersistableState(){return {inventory:JSON.parse(JSON.stringify(this.inventory)),savedAt:"2026-11-26"}},publishRepairProjectIndex(){}};
+ assert.equal(await mock.saveToStorage(),true);
+ mock.inventory[0].quantity=3;fail=true;
+ assert.equal(await mock.saveToStorage(),false);
+ assert.equal(mock.inventoryLedger.length,1);
+ fail=false;
+ assert.equal(await mock.saveToStorage(),true);
+ await mock.saveToStorage();
+ assert.equal(mock.inventoryLedger.length,2);
+ assert.equal(records.at(-1).inventoryLedger.length,2);
+});
+test("corrupted chain and duplicate stock IDs are rejected",()=>{
+ const ledger=engine.reconcile([],[item]);
+ assert.throws(()=>engine.reconcile(ledger,[item,{...item,id:"1"}]),/Duplicate/);
+ assert.ok(engine.audit([{...ledger[0],before:{onHand:9,reserved:0}}],[item]).length);
+});

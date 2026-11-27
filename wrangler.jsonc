@@ -3,11 +3,12 @@
   "name": "claude-manual",
   "main": "worker.js",
   "compatibility_date": "2026-11-01",
+  "build": { "command": "npm run build" },
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/m/*", "/api/navigation/*"]
+    "run_worker_first": ["/m/*", "/api/navigation/*", "/api/receipt-pdf/*", "/vendor/pdfjs/*", "/receipt-ocr-v6/*", "/garage-ui-v1/*"]
   },
   "r2_buckets": [
     { "binding": "MANUALS", "bucket_name": "motornote-manual-site" }

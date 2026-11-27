@@ -94,7 +94,7 @@ if(re.test(work)){found.set(x.part.id,x.part);work=work.replace(re,m=>" ".repeat
 });
 return [...found.values()];
 }
-const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.\-•]?\s*m|kgf\s*[·.\-•]?\s*(?:m|cm)|ft\s*[·.\-•]?\s*(?:lbf?|lbs?)|in(?:ch)?\s*[·.\-•]?\s*(?:lbf?|lbs?))(?![a-z])/gi;
+const TORQUE_RE=/(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)\s*(N\s*[·.*\-•×]*\s*m|kgf\s*[·.*\-•×]*\s*(?:m|cm)|ft\s*[·.*\-•×]*\s*(?:lbf?|lbs?)|in(?:ch)?\s*[·.*\-•×]*\s*(?:lbf?|lbs?))(?![a-z])/gi;
 function normalizeTorqueUnit(raw){
  const u=raw.toLowerCase().replace(/[^a-z]/g,"");
  if(u.startsWith("kgf"))return u.endsWith("cm")?"kgf·cm":"kgf·m";
@@ -138,11 +138,11 @@ function extractTorque(text){
  }
  return out;
 }
-function groupTorque(torque){
+function groupTorque(torque,text,title){
  const groups=[];
  torque.forEach(item=>{
   let group=groups[groups.length-1];
-  if(item.unit==="N·m"||!group||group.stepContext!==item.nearbyContext){
+  if(item.unit==="N·m"||!group||(group.lineIndex!==item.lineIndex&&group.stepContext!==item.nearbyContext)){
    group={id:"torque-"+groups.length,lineIndex:item.lineIndex,startIndex:item.matchIndex,context:item.context,nearbyContext:item.nearbyContext,stepContext:item.nearbyContext,values:[]};
    groups.push(group);
   }
@@ -151,7 +151,18 @@ function groupTorque(torque){
  return groups.map(group=>{
   const evidence=group.stepContext||group.nearbyContext||group.context;
   let association=null;
-  if(/install (?:the )?water pump assembly/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
+  // Toyota generator installation pages use HTML list items and explicit A/B labels.
+  // Do not infer a fastener from surrounding unrelated steps.
+  if(/\b(?:generator|alternator)\s*:\s*installation\b/i.test(title||"")){
+   const line=group.context;
+   const bolt=/\bfor bolt ([AB])\b/i.exec(line);
+   const preceding=String(text||"").slice(0,group.startIndex).split("\n");
+   const step=preceding.slice(0,-1).reverse().find(x=>/^\s*-\s/.test(x))||"";
+   if(bolt)association={component:"Alternator",fastener:"Bolt "+bolt[1].toUpperCase(),evidence:line,associationSource:"Explicit factory torque label"};
+   else if(/install the generator wire with the nut/i.test(line))association={component:"Alternator wire",fastener:"Nut",evidence:line,associationSource:"Explicit factory installation step"};
+   else if(/adjusting bar.*tighten the nut/i.test(step))association={component:"Alternator adjusting bar",fastener:"Nut",evidence:step+" "+line,associationSource:"Explicit preceding factory installation step"};
+  }
+  else if(/install (?:the )?water pump assembly/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
    association={component:"Water Pump Assembly",fastener:/\bnuts?\b/i.test(evidence)?"Bolts and nuts":"Bolts",evidence,associationSource:"Numbered installation step explicitly identifies the water pump assembly fasteners"};
   else if(/install (?:the )?(?:water )?pump pulley/i.test(evidence)&&/\bbolts?\b/i.test(evidence))
    association={component:"Water Pump Pulley",fastener:"Bolts",evidence,associationSource:"Numbered installation step explicitly identifies the water pump pulley fasteners"};
@@ -216,6 +227,78 @@ function findRelatedProcedureLinks(html,baseUrl){
  });
  return links;
 }
+
+function findScionSiblingSpecificationPages(tree,pageId){
+ const wanted=String(pageId);let targetPath=null;
+ function locate(node,path){
+  for(const child of node.c||[]){
+   const next=[...path,child];
+   if(child.p!==undefined&&String(child.p)===wanted){targetPath=next;return true;}
+   if(child.c&&locate(child,next))return true;
+  }
+  return false;
+ }
+ locate(tree,[]);
+ if(!targetPath)return [];
+ let component="";
+ for(let i=targetPath.length-1;i>=0;i--){
+  const name=String(targetPath[i].n||"").trim();
+  const head=name.split(":")[0].trim();
+  if(/^(removal and installation|disassembly and reassembly|removal|installation|testing and inspection|specifications|service and repair|key to diagrams)$/i.test(head))continue;
+  const candidate=head.replace(/\b(?:assembly|unit|subassembly|remove|replace|install|overhaul|testing|inspection|service|repair|specifications)\b/gi," ").replace(/\s+/g," ").trim();
+  if(candidate&&!/^(additional pages|part \d+|other variant|electrical|charging system)$/i.test(candidate)){
+   component=candidate;break;
+  }
+ }
+ if(!component)return [];
+ const norm=value=>String(value||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();
+ const componentKey=norm(component),containers=[...targetPath.slice(0,-1).reverse(),tree];
+ for(const container of containers){
+  const matches=[];
+  function collect(node,path){
+   for(const child of node.c||[]){
+    const next=[...path,String(child.n||"")];
+    if(child.p!==undefined&&String(child.p)!==wanted&&/specifications?/i.test(child.n||"")&&norm(next.join(" ")).includes(componentKey)){
+     matches.push({page:String(child.p),label:String(child.n),component,path:next});
+    }
+    if(child.c)collect(child,next);
+   }
+  }
+  collect(container,[String(container.n||"")]);
+  if(matches.length){
+   matches.sort((a,b)=>{
+    const exactA=norm(a.label)===norm(component+": Specifications")?0:1;
+    const exactB=norm(b.label)===norm(component+": Specifications")?0:1;
+    return exactA-exactB||a.page.localeCompare(b.page,undefined,{numeric:true});
+   });
+   return matches;
+  }
+ }
+ return [];
+}
+async function findScionSiblingSpecificationLinks(pageUrl){
+ if(!/scion-service-manual/i.test(pageUrl.pathname))return [];
+ const match=/\/pages\/(\d+)\.html$/i.exec(pageUrl.pathname);
+ if(!match)return [];
+ try{
+  const routeMatch=/^#\/v\/\d+\/(\d+)\//.exec(location.hash||"");
+  const preferred=routeMatch&&Number(routeMatch[1])===1
+   ?["scion-parts.json","scion-repair.json"]
+   :["scion-repair.json","scion-parts.json"];
+  const trees=await Promise.all(preferred.map(async filename=>{
+   try{
+    const response=await fetch("/api/navigation/"+filename,{credentials:"same-origin",cache:"no-store"});
+    return response.ok?await response.json():null;
+   }catch(_){return null;}
+  }));
+  const combined={c:trees.filter(Boolean)};
+  return findScionSiblingSpecificationPages(combined,match[1]).map(page=>{
+   const url=new URL(pageUrl.href);url.pathname=url.pathname.replace(/\/pages\/\d+\.html$/i,"/pages/"+page.page+".html");
+   return {...page,url:url.href};
+  });
+ }catch(_){return [];}
+}
+
 function extractProcedure(html,context){
 context=context||{};const h1=/<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(html),tt=/<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(html);
 const title=context.title||strip(h1?h1[1]:tt?tt[1]:"")||"Manual procedure";
@@ -255,7 +338,7 @@ const warnings=extractWarnings(lines);
 const isEyesight=/eyesight|stereo camera/i.test(title+" "+text),requiresCalibration=isEyesight&&/\bcalibrat/i.test(text);
 const requiredTools=requiresCalibration&&(/\bSSM\s?-?4\b|select monitor/i.test(text))?["subaru-ssm4"]:[];
 const torque=extractTorque(text);
-return {procedureId,title,pageText:text,parts,tools:toolDetails.map(t=>t.id),toolDetails,toolReferences,torque,torqueSpecs:groupTorque(torque),warnings,requiresCalibration,requiredTools};
+return {procedureId,title,pageText:text,parts,tools:toolDetails.map(t=>t.id),toolDetails,toolReferences,torque,torqueSpecs:groupTorque(torque,text,title),warnings,requiresCalibration,requiredTools};
 }
 function torqueAssignmentOptions(facts){const components=(facts.parts||[]).filter(p=>p.category!=="Consumable"&&(p.relationship!=="mention"||p.confidence>=0.6)).map(p=>p.name);const text=facts.pageText||"";const fasteners=[];[["Bolt(s)",/\bbolts?\b/i],["Nut(s)",/\bnuts?\b/i],["Screw(s)",/\bscrews?\b/i],["Stud(s)",/\bstuds?\b/i],["Plug(s)",/\bplugs?\b/i]].forEach(([name,re])=>{if(re.test(text))fasteners.push(name);});if(/PULLEY WRENCH PIN SET/i.test(text)&&/\bV[- ]BELTS?\b/i.test(text))fasteners.push("Pulley mounting fastener");if(/\bfastener\b/i.test(text))fasteners.push("Other fastener");return {components:[...new Set(components)],fasteners};}function toRelationships(facts,minConfidence){
 minConfidence=minConfidence===undefined?0.6:minConfidence;
@@ -264,7 +347,46 @@ return {procedureId:facts.procedureId,requiredParts:ids("required"),recommendedP
 serviceTargets:ids("target"),consumables:ids("consumable"),tools:[...new Set(facts.tools.concat(facts.requiredTools||[]))]};
 }
 
-function extractRepairSteps(text){
+// Read actual ordered-list boundaries before flattening the document.
+// Only explicit factory procedure lists qualify, not index or parts lists.
+function extractFactoryListSteps(html){
+ const source=String(html||"").replace(/<(script|style|noscript)\b[\s\S]*?<\/\1>/gi,"");
+ const tokens=/<\/?(?:ol|ul|li)\b[^>]*>/gi;
+ const stack=[],items=[];let current=null,m;
+ while((m=tokens.exec(source))){
+  const tag=m[0],closing=/^<\//.test(tag),name=/^<\/?(\w+)/.exec(tag)[1].toLowerCase();
+  if(name==="ol"||name==="ul"){
+   if(!closing){
+    const factory=name==="ol"&&/\bclass\s*=\s*["'][^"']*\bARABICNUM\b[^"']*["']/i.test(tag)&&!stack.length;
+    stack.push({name,factory});
+   }else{
+    if(current&&stack.length===1&&stack[0].factory){items.push(source.slice(current.start,m.index));current=null;}
+    stack.pop();
+   }
+   continue;
+  }
+  if(stack.length!==1||!stack[0].factory)continue;
+  if(!closing){if(current)items.push(source.slice(current.start,m.index));current={start:tokens.lastIndex};}
+  else if(current){items.push(source.slice(current.start,m.index));current=null;}
+ }
+ const steps=[];
+ for(const item of items){
+  const heading=/<span\b[^>]*class\s*=\s*["'][^"']*\bclsEmphBOLD\b[^"']*["'][^>]*>([\s\S]*?)<\/span>/i.exec(item);
+  // Heading must begin the item; do not mistake an inline torque value for a step.
+  if(!heading||htmlToText(item.slice(0,heading.index)).trim())continue;
+  const title=htmlToText(heading[1]).replace(/\s+/g," ").trim();
+  if(!/^(?:INSTALL|REMOVE|CHECK|INSPECT|DISCONNECT|CONNECT|ADJUST|TIGHTEN|LOOSEN|DRAIN|FILL|REPLACE|CLEAN|APPLY|SET|REPAIR|MEASURE|VERIFY|BLEED|REFILL|TORQUE|LUBRICATE|POSITION|SECURE|SUPPORT|LOWER|RAISE|ALIGN|SEPARATE|ATTACH|DETACH|PREPARE|RESET|INITIALIZE)\b/i.test(title))continue;
+  const detail=htmlToText(item.slice(heading.index+heading[0].length));
+  const number=steps.length+1;
+  const safetyCritical=/\b(brake|airbag|srs|fuel|high pressure|spring|strut|suspension|steering|jack|support vehicle|lift vehicle|high voltage|hybrid battery|ev battery|coolant under pressure|hot coolant|flammable|fire|battery terminal|disconnect battery|torque.*wheel|wheel.*torque)\b/i.test(title+" "+detail);
+  steps.push({id:"step-"+number+"-"+slugify(title),number,title,detail,instruction:title+(detail?"\n"+detail:""),safetyCritical,requiresPrevious:number>1});
+ }
+ // Never silently drop an unrecognized top-level factory step.
+ return steps.length===items.length?steps:[];
+}
+function extractRepairSteps(text,html){
+ const listSteps=extractFactoryListSteps(html);
+ if(listSteps.length)return listSteps;
  const source=String(text||"");
  const heading=/\b(\d{1,2})\.\s+((?:INSTALL|REMOVE|CHECK|INSPECT|DISCONNECT|CONNECT|ADJUST|TIGHTEN|LOOSEN|DRAIN|FILL|REPLACE|CLEAN|APPLY|SET|REPAIR|MEASURE|VERIFY|BLEED|REFILL|TORQUE|LUBRICATE|POSITION|SECURE|SUPPORT|LOWER|RAISE|ALIGN|SEPARATE|ATTACH|DETACH|PREPARE|RESET|INITIALIZE)\b[A-Z0-9 /(),.&'-]{2,90}?)(?=\s+[a-z]\)\s+|\s+\d{1,2}\.\s+|\n|$)/g;
  const matches=[...source.matchAll(heading)],seen=new Set(),steps=[];
@@ -288,7 +410,7 @@ function repairProgress(steps,states){
  const done=steps.filter(x=>states[x.id]?.status==="done").length,skipped=steps.filter(x=>states[x.id]?.status==="skipped").length,safetySkipped=steps.filter(x=>x.safetyCritical&&states[x.id]?.status==="skipped").length;
  return {total:steps.length,done,skipped,remaining:steps.length-done-skipped,percent:steps.length?Math.round(done/steps.length*100):0,safetySkipped,canFinish:steps.length>0&&done+skipped===steps.length&&safetySkipped===0};
 }
-const Engine={CATALOG,TOOLS,htmlToText,findRelatedProcedureLinks,extractTorque,extractProcedure,extractRepairSteps,repairStepCanOpen,repairProgress,torqueAssignmentOptions,toRelationships,slugify};
+const Engine={CATALOG,TOOLS,htmlToText,findRelatedProcedureLinks,findScionSiblingSpecificationPages,extractTorque,extractProcedure,extractRepairSteps,repairStepCanOpen,repairProgress,torqueAssignmentOptions,toRelationships,slugify};
 root.LifeOSRepairEngine=Engine;if(typeof module!=="undefined"&&module.exports)module.exports=Engine;
 
 if(typeof document!=="undefined"){
@@ -304,7 +426,7 @@ document.head.append(style);const modeStyle=document.createElement("style");mode
 shell.innerHTML='<section class="rw-panel" role="dialog" aria-modal="true"><div class="rw-head"><div><h2>Repair Workspace</h2><div class="muted" id="rw-sub"></div></div><button id="rw-close">Close</button></div><div id="rw-content"></div></section>';
 document.body.append(shell);shell.addEventListener("click",e=>{if(e.target===shell||e.target.id==="rw-close")shell.classList.remove("open");});
 }
-async function openWorkspace(){
+async function openWorkspace(options={}){
 const frame=document.getElementById("fr");
 if(!frame){alert("Open a manual procedure page first.");return;}
 let doc,pageUrl,pageHtml;
@@ -317,7 +439,7 @@ pageHtml=await response.text();
 doc=new DOMParser().parseFromString(pageHtml,"text/html");
 if(!doc.body)throw new Error("The manual page returned no readable content.");
 }catch(error){alert("Could not open Repair Workspace: "+error.message);return;}
-const relatedLinks=findRelatedProcedureLinks(pageHtml,pageUrl.href);
+const linkedPages=findRelatedProcedureLinks(pageHtml,pageUrl.href),scionSpecPages=await findScionSiblingSpecificationLinks(pageUrl),relatedLinks=[...new Map([...linkedPages,...scionSpecPages].map(link=>[link.url,link])).values()];
 const relatedResults=await Promise.all(relatedLinks.map(async link=>{try{const response=await fetch(link.url,{credentials:"same-origin",cache:"no-store"});if(!response.ok)return {...link,available:false};const html=await response.text();const parsed=new DOMParser().parseFromString(html,"text/html");return {...link,available:true,title:parsed.querySelector("h1")?.innerText||link.label,html};}catch(_){return {...link,available:false};}}));
 const relatedPages=relatedResults.filter(x=>x.available);
 const combinedHtml=pageHtml+"\\n"+relatedPages.map(x=>x.html).join("\\n");
@@ -328,6 +450,12 @@ const all=load(),small=document.querySelector(".vwrap .ht small")?.innerText||""
 const vehicle=small.split("•").slice(1).join("•").trim()||"Selected vehicle";
 const garageVehicleId=/scion/i.test(vehicle)?"scion-xb":/subaru|crosstrek/i.test(vehicle)?"subaru-crosstrek":null,garageProjects=loadProjects().filter(p=>garageVehicleId&&String(p.vehicleId)===garageVehicleId),cart=all[key]||{vehicle,procedure:title,items:[],tools:[]},selected=new Set((cart.items||[]).map(x=>x.id)),selectedTools=new Set(cart.tools||[]),savedTorque=new Map((cart.torqueSpecs||[]).map(x=>[x.id,x])),selectedTorque=new Set((cart.torqueSpecs||[]).map(x=>x.id));
 const shell=document.getElementById("repair-workspace"),content=shell.querySelector("#rw-content");
+const requestedProject=options.projectId&&garageProjects.find(p=>String(p.id)===String(options.projectId));
+if(options.guided&&options.projectId&&(!requestedProject||(cart.projectId&&String(cart.projectId)!==String(options.projectId)))){
+ alert("This procedure is not available for the requested Garage project, or its cart belongs to another project. Open the correct linked procedure.");
+ return;
+}
+const returnToGarage=options.guided&&(options.repairId||requestedProject)?"/garage?"+new URLSearchParams({...garageVehicleId&&{vehicleId:garageVehicleId},...options.repairId?{repairId:String(options.repairId)}:{projectId:String(requestedProject.id)}}).toString():"";
 shell.querySelector("#rw-sub").textContent=vehicle;
 const visibleParts=facts.parts.filter(p=>p.relationship!== "mention" || p.confidence>=0.6);
 const rows=visibleParts.map(p=>{
@@ -343,7 +471,7 @@ const quickTorque=(facts.torqueSpecs||[]).map(group=>'<div class="line"><b>Torqu
 const quickTools=facts.toolDetails.map(tool=>'<div class="line"><b>Tool:</b> '+esc(tool.name)+'</div>').join("")+refs;
 const quickSpecs=(quickTorque||'<div class="muted">No torque specifications detected.</div>')+(quickTools||'<div class="muted">No special tools detected.</div>');
 const relatedMarkup=relatedPages.length?'<section class="cart" aria-label="Related factory manual pages" style="margin:0 0 16px"><h3 style="margin-top:0">Related factory manual pages</h3>'+relatedPages.map(page=>'<div class="line"><a href="'+esc(page.url)+'" target="_blank" rel="noopener" style="color:#ffb066;text-decoration:underline">'+esc(page.label)+' · page '+esc(page.page)+'</a></div>').join("")+'</section>':"";
-content.innerHTML='<h1 class="rw-procedure-title">'+esc(title)+'</h1><section class="cart" aria-label="Quick Specs" style="margin:0 0 16px;border-color:#ff9a3d"><h3 style="margin-top:0">QUICK SPECS</h3>'+quickSpecs+'</section>'+relatedMarkup+'<h3>Parts and service targets</h3><div class="muted">Required means the procedure explicitly calls for replacement. Service targets are components being worked on, not proof that a new part is needed. Review evidence before adding items to the cart.</div><div class="grid">'+(rows||'<div class="muted">No catalog matches found.</div>')+'</div><h3>Tools</h3><div class="grid">'+(toolRows||'<div class="muted">No catalog tool matches found.</div>')+'</div>'+refs+'<h3>Torque specifications · cart assignment</h3>'+(torque||'<div class="muted">No torque values detected.</div>')+'<h3>Warnings and notes</h3>'+(warnings||'<div class="muted">No explicit warning or note labels detected.</div>')+(facts.requiresCalibration?'<div class="line">EyeSight-related calibration language detected. Verify the exact calibration procedure and equipment requirements before returning the vehicle to service.</div>':"")+'<div style="margin:14px 0"><button type="button" id="rw-start-mode" class="primary" style="width:100%;padding:14px;font-size:15px">Start full-screen guided repair →</button><div class="muted" style="margin-top:6px">Step-by-step execution with saved progress. Manual instructions remain the source of truth.</div></div><div class="cart"><h3>Repair cart</h3><label class="muted" style="display:block;margin:8px 0">Garage project<select id="rw-project" style="display:block;width:100%;padding:10px;margin-top:5px;background:#0b121c;color:#edf4ff;border:1px solid #3b526d;border-radius:8px"><option value="">Not linked to a project</option>'+garageProjects.map(p=>'<option value="'+esc(p.id)+'" '+(String(cart.projectId||"")===String(p.id)?"selected":"")+' >'+esc(p.title||"Repair Project")+' · '+esc(p.status||"Planned")+'</option>').join("")+'</select></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px"><button type="button" id="rw-create-project" class="primary">＋ Create new Garage project</button><button type="button" id="rw-refresh-projects">Refresh project list</button></div><div id="rw-lines"></div><p class="muted">Stored in this browser only. No account or server sync.</p><button class="primary" id="rw-save">Save cart</button> <button id="rw-export">Export JSON</button> <button id="rw-clear">Clear</button></div>';
+content.innerHTML='<h1 class="rw-procedure-title">'+esc(title)+'</h1><section class="cart" aria-label="Quick Specs" style="margin:0 0 16px;border-color:#ff9a3d"><h3 style="margin-top:0">QUICK SPECS</h3>'+quickSpecs+'</section>'+relatedMarkup+'<h3>Parts and service targets</h3><div class="muted">Required means the procedure explicitly calls for replacement. Service targets are components being worked on, not proof that a new part is needed. Review evidence before adding items to the cart.</div><div class="grid">'+(rows||'<div class="muted">No catalog matches found.</div>')+'</div><h3>Tools</h3><div class="grid">'+(toolRows||'<div class="muted">No catalog tool matches found.</div>')+'</div>'+refs+'<h3>Torque specifications · cart assignment</h3>'+(torque||'<div class="muted">No torque values detected.</div>')+'<h3>Warnings and notes</h3>'+(warnings||'<div class="muted">No explicit warning or note labels detected.</div>')+(facts.requiresCalibration?'<div class="line">EyeSight-related calibration language detected. Verify the exact calibration procedure and equipment requirements before returning the vehicle to service.</div>':"")+'<div style="margin:14px 0"><button type="button" id="rw-start-mode" class="primary" style="width:100%;padding:14px;font-size:15px">Start full-screen guided repair →</button><div class="muted" style="margin-top:6px">Step-by-step execution with saved progress. Manual instructions remain the source of truth.</div><div id="rw-mode-status" role="status" class="muted" style="color:#ffb3a1;margin-top:6px"></div></div><div class="cart"><h3>Repair cart</h3><label class="muted" style="display:block;margin:8px 0">Garage project<select id="rw-project" style="display:block;width:100%;padding:10px;margin-top:5px;background:#0b121c;color:#edf4ff;border:1px solid #3b526d;border-radius:8px"><option value="">Not linked to a project</option>'+garageProjects.map(p=>'<option value="'+esc(p.id)+'" '+(String(requestedProject?.id||cart.projectId||"")===String(p.id)?"selected":"")+' >'+esc(p.title||"Repair Project")+' · '+esc(p.status||"Planned")+'</option>').join("")+'</select></label><div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px"><button type="button" id="rw-create-project" class="primary">＋ Create new Garage project</button><button type="button" id="rw-refresh-projects">Refresh project list</button></div><div id="rw-lines"></div><p class="muted">Stored in this browser only. No account or server sync.</p><button class="primary" id="rw-save">Save cart</button> <button id="rw-export">Export JSON</button> <button id="rw-clear">Clear</button></div>';
 const snapshot=()=>{
 const items=Array.from(content.querySelectorAll("[data-part]:checked")).map(el=>facts.parts.find(p=>p.id===el.dataset.part)).filter(Boolean);
 const tools=Array.from(content.querySelectorAll("[data-tool]:checked")).map(el=>el.dataset.tool);
@@ -354,14 +482,14 @@ const projectId=content.querySelector("#rw-project")?.value||"";const project=ga
 
 };
 const startRepairMode=()=>{
- const steps=extractRepairSteps(facts.pageText);
- if(!steps.length){alert("This manual page does not contain reliably numbered repair steps. Open the factory procedure directly; Repair Mode will not invent a sequence.");return;}
+ const steps=extractRepairSteps(htmlToText(pageHtml),pageHtml);
+ if(!steps.length){const status=content.querySelector("#rw-mode-status");status.textContent="No reliably numbered factory steps found on this page. Open the original procedure; guided repair will not invent a sequence.";return;}
  const sessionStore="lifeos.repair.sessions.v1";
  let sessions={};try{sessions=JSON.parse(localStorage.getItem(sessionStore))||{};}catch(_){}
  const sessionKey=key+"::"+facts.procedureId,prior=sessions[sessionKey]||{},states={};
  steps.forEach(step=>{states[step.id]=prior.states&&prior.states[step.id]||{status:"pending"};});
  let current=steps.findIndex(step=>step.id===prior.currentStepId);if(current<0)current=steps.findIndex(step=>states[step.id].status!=="done"&&states[step.id].status!=="skipped");if(current<0)current=0;
- const persist=()=>{const updatedAt=new Date().toISOString(),execution={status:"in-progress",updatedAt,currentStepId:steps[current].id,steps:steps.map(step=>({id:step.id,number:step.number,title:step.title,safetyCritical:step.safetyCritical,requiresPrevious:step.requiresPrevious,...states[step.id]}))};sessions[sessionKey]={procedure:title,vehicle,source:frame.src,updatedAt,currentStepId:steps[current].id,states};try{localStorage.setItem(sessionStore,JSON.stringify(sessions));all[key]={...snapshot(),execution};save(all);}catch(error){alert("Repair progress could not be saved locally: "+error.message);}};
+ const persist=()=>{if(all[key]?.execution?.status==="completed"&&JSON.stringify(states)===JSON.stringify(prior.states||{}))return;const updatedAt=new Date().toISOString(),execution={status:"in-progress",updatedAt,currentStepId:steps[current].id,steps:steps.map(step=>({id:step.id,number:step.number,title:step.title,safetyCritical:step.safetyCritical,requiresPrevious:step.requiresPrevious,...states[step.id]}))};sessions[sessionKey]={procedure:title,vehicle,source:frame.src,updatedAt,currentStepId:steps[current].id,states};try{localStorage.setItem(sessionStore,JSON.stringify(sessions));all[key]={...snapshot(),execution};save(all);}catch(error){alert("Repair progress could not be saved locally: "+error.message);}};
  let mode=document.getElementById("repair-mode");
  if(!mode){mode=document.createElement("section");mode.id="repair-mode";mode.setAttribute("role","dialog");mode.setAttribute("aria-modal","true");document.body.append(mode);}
  const progress=()=>repairProgress(steps,states);
@@ -372,18 +500,18 @@ const startRepairMode=()=>{
   const modeTorque=(facts.torqueSpecs||[]).map(group=>'<div class="rm-spec"><b>Torque:</b> '+esc(group.values.map(x=>x.value+" "+x.unit).join(" / "))+' <span>· '+esc(group.association?group.association.component+" · "+group.association.fastener:group.nearbyContext||group.context||"Verify in manual")+'</span></div>').join("");
   const modeTools=facts.toolDetails.map(tool=>'<div class="rm-spec"><b>Tool:</b> '+esc(tool.name)+'</div>').join("")+facts.toolReferences.map(x=>'<div class="rm-spec"><b>Manual reference:</b> '+esc(x.reference)+'</div>').join("");
   const modeQuickSpecs=(modeTorque||'<div class="rm-spec">No torque specifications detected.</div>')+(modeTools||'<div class="rm-spec">No special tools detected.</div>');
-  mode.innerHTML='<header class="rm-top"><div class="rm-topline"><div><div class="rm-muted">MOTORNOTE · REPAIR MODE</div><b>'+esc(vehicle)+'</b><div class="rm-muted">'+p.done+' of '+p.total+' steps complete · '+p.percent+'%</div></div><button type="button" id="rm-exit">Exit</button></div><div class="rm-progress"><span style="width:'+p.percent+'%"></span></div></header><section class="rm-procedure-heading"><h1>'+esc(title)+'</h1></section><section class="rm-quick-specs" aria-label="Quick Specs"><h2>QUICK SPECS</h2>'+modeQuickSpecs+'</section><main class="rm-layout"><aside class="rm-list"><details open><summary><b>Procedure steps</b> <span class="rm-muted">('+p.done+'/'+p.total+')</span></summary>'+list+'</details><p class="rm-muted">Independent steps can be opened out of order. Safety-critical and dependent steps stay locked until every earlier step is complete.</p></aside><section class="rm-card"><div class="rm-muted">STEP '+step.number+' OF '+p.total+'</div>'+safety+dependency+'<h1>'+esc(step.title)+'</h1><div class="rm-instruction">'+esc(step.instruction)+'</div><div class="rm-muted" style="margin-top:14px">Status: '+esc(status.status.toUpperCase())+(status.skipReason?" · "+esc(status.skipReason):"")+'</div><label class="rm-muted" style="display:block;margin-top:18px">Skip reason (required to skip)<textarea id="rm-skip-reason" placeholder="Explain why this step is being skipped…">'+esc(status.skipReason||"")+'</textarea></label>'+(step.safetyCritical?'<p class="rm-muted" style="color:#ffb3a1">This step is safety-critical. Skipping it will block repair completion.</p>':"")+'<p class="rm-muted">Verify the instruction, warnings, and applicable specifications against the original factory manual before proceeding.</p></section></main><footer class="rm-actions"><button type="button" id="rm-prev" '+(current===0?"disabled":"")+'>← Previous</button><button type="button" id="rm-skip">Skip with reason</button><button type="button" id="rm-complete" class="primary" '+(status.status==="done"?"disabled":"")+'>Mark complete ✓</button><button type="button" id="rm-next" '+(current===steps.length-1?"disabled":"")+'>Next →</button><button type="button" id="rm-finish" '+(p.canFinish?"":"disabled")+'>Finish repair</button></footer>';
+  mode.innerHTML='<header class="rm-top"><div class="rm-topline"><div><div class="rm-muted">MOTORNOTE · REPAIR MODE</div><b>'+esc(vehicle)+'</b><div class="rm-muted">'+p.done+' of '+p.total+' steps complete · '+p.percent+'%</div></div><button type="button" id="rm-exit">Exit</button></div><div class="rm-progress"><span style="width:'+p.percent+'%"></span></div></header><section class="rm-procedure-heading"><h1>'+esc(title)+'</h1></section><section class="rm-quick-specs" aria-label="Quick Specs"><h2>QUICK SPECS</h2>'+modeQuickSpecs+'</section><main class="rm-layout"><aside class="rm-list"><details open><summary><b>Procedure steps</b> <span class="rm-muted">('+p.done+'/'+p.total+')</span></summary>'+list+'</details><p class="rm-muted">Independent steps can be opened out of order. Safety-critical and dependent steps stay locked until every earlier step is complete.</p></aside><section class="rm-card"><div class="rm-muted">STEP '+step.number+' OF '+p.total+'</div>'+safety+dependency+'<h1>'+esc(step.title)+'</h1><div class="rm-instruction">'+esc(step.instruction)+'</div><div class="rm-muted" style="margin-top:14px">Status: '+esc(status.status.toUpperCase())+(status.skipReason?" · "+esc(status.skipReason):"")+'</div><label class="rm-muted" style="display:block;margin-top:18px">Skip reason (required to skip)<textarea id="rm-skip-reason" placeholder="Explain why this step is being skipped…">'+esc(status.skipReason||"")+'</textarea></label>'+(step.safetyCritical?'<p class="rm-muted" style="color:#ffb3a1">This step is safety-critical. Skipping it will block repair completion.</p>':"")+'<p class="rm-muted">Verify the instruction, warnings, and applicable specifications against the original factory manual before proceeding. <a href="'+esc(pageUrl.href)+'" target="_blank" rel="noopener" style="color:#ffb066;text-decoration:underline">Open factory page and diagrams ↗</a></p></section></main><footer class="rm-actions"><button type="button" id="rm-prev" '+(current===0?"disabled":"")+'>← Previous</button><button type="button" id="rm-skip">Skip with reason</button><button type="button" id="rm-complete" class="primary" '+(status.status==="done"?"disabled":"")+'>Mark complete ✓</button><button type="button" id="rm-next" '+(current===steps.length-1?"disabled":"")+'>Next →</button><button type="button" id="rm-finish" '+(p.canFinish?"":"disabled")+'>Finish repair</button></footer>';
   mode.querySelectorAll("[data-step-index]").forEach(button=>button.addEventListener("click",()=>{const index=Number(button.dataset.stepIndex);if(repairStepCanOpen(steps,states,index)){current=index;persist();render();}}));
-  mode.querySelector("#rm-exit").onclick=()=>mode.classList.remove("open");
+  mode.querySelector("#rm-exit").onclick=()=>{mode.classList.remove("open");if(returnToGarage)location.assign(returnToGarage);};
   mode.querySelector("#rm-prev").onclick=()=>{for(let i=current-1;i>=0;i--){if(repairStepCanOpen(steps,states,i)){current=i;persist();render();return;}}};
   mode.querySelector("#rm-next").onclick=()=>{for(let i=current+1;i<steps.length;i++){if(repairStepCanOpen(steps,states,i)){current=i;break;}}persist();render();};
   mode.querySelector("#rm-complete").onclick=()=>{states[step.id]={status:"done",completedAt:new Date().toISOString()};for(let i=current+1;i<steps.length;i++){if(repairStepCanOpen(steps,states,i)){current=i;break;}}persist();render();};
   mode.querySelector("#rm-skip").onclick=()=>{const reason=mode.querySelector("#rm-skip-reason").value.trim();if(!reason){alert("Enter a reason before skipping this step.");return;}states[step.id]={status:"skipped",skipReason:reason,skippedAt:new Date().toISOString()};persist();render();};
-  mode.querySelector("#rm-finish").onclick=()=>{const final=progress();if(!final.canFinish){alert("Complete every step. A skipped safety-critical step must be completed before this repair can be finalized.");return;}const completedAt=new Date().toISOString(),execution={status:"completed",completedAt,steps:steps.map(step=>({id:step.id,number:step.number,title:step.title,safetyCritical:step.safetyCritical,requiresPrevious:step.requiresPrevious,...states[step.id]}))};sessions[sessionKey]={...sessions[sessionKey],status:"completed",completedAt,states};try{localStorage.setItem(sessionStore,JSON.stringify(sessions));all[key]={...snapshot(),execution};save(all);}catch(error){alert("Could not save completion: "+error.message);return;}alert("Repair marked complete and linked to its Garage repair cart on this device.");mode.classList.remove("open");};
+  mode.querySelector("#rm-finish").onclick=()=>{const final=progress();if(!final.canFinish){alert("Complete every step. A skipped safety-critical step must be completed before this repair can be finalized.");return;}const completedAt=new Date().toISOString(),execution={status:"completed",completedAt,steps:steps.map(step=>({id:step.id,number:step.number,title:step.title,safetyCritical:step.safetyCritical,requiresPrevious:step.requiresPrevious,...states[step.id]}))};sessions[sessionKey]={...sessions[sessionKey],status:"completed",completedAt,states};try{localStorage.setItem(sessionStore,JSON.stringify(sessions));all[key]={...snapshot(),execution};save(all);}catch(error){alert("Could not save completion: "+error.message);return;}alert("Repair marked complete and saved to its repair cart on this device.");mode.classList.remove("open");if(returnToGarage)location.assign(returnToGarage);};
  };
  persist();render();mode.classList.add("open");
 };
-content.querySelector("#rw-start-mode").onclick=startRepairMode;
+content.querySelector("#rw-start-mode").onclick=()=>{const status=content.querySelector("#rw-mode-status");status.textContent="";try{startRepairMode();}catch(error){status.textContent="Could not start guided repair: "+error.message;console.error(error);}};
 snapshot();
 const projectSelect=content.querySelector("#rw-project");
 const refreshProjects=()=>{const selectedId=projectSelect.value,latest=loadProjects().filter(p=>garageVehicleId&&String(p.vehicleId)===garageVehicleId);projectSelect.innerHTML='<option value="">Not linked to a project</option>'+latest.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.title||"Repair Project")+' · '+esc(p.status||"Planned")+'</option>').join("");if(latest.some(p=>String(p.id)===String(selectedId)))projectSelect.value=selectedId;};
@@ -395,7 +523,19 @@ content.querySelector("#rw-save").onclick=()=>{all[key]=snapshot();save(all);ale
 content.querySelector("#rw-export").onclick=()=>{const blob=new Blob([JSON.stringify(snapshot(),null,2)],{type:"application/json"}),url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="repair-cart.json";a.click();URL.revokeObjectURL(url);};
 content.querySelector("#rw-clear").onclick=()=>{content.querySelectorAll("[data-part],[data-tool],[data-torque]").forEach(x=>x.checked=false);snapshot();};
 shell.classList.add("open");
+if(returnToGarage){const back=document.createElement("a");back.href=returnToGarage;back.textContent=options.repairId?"← Return to Garage repair record":"← Return to Garage project";back.style.cssText="display:block;color:#ffb066;padding:10px 0;text-decoration:underline";content.prepend(back);}
+if(options.guided)content.querySelector("#rw-start-mode").click();
 }
 document.addEventListener("click",e=>{const b=e.target.closest("[data-repair-workspace]");if(b){e.preventDefault();openWorkspace();}});
+function launchGuidedRepair(){
+ const url=new URL(location.href);
+ if(url.searchParams.get("guided")!=="1"||!/^#\/v\/\d+\/\d+\/\d+$/.test(location.hash)||!document.getElementById("fr"))return;
+ const projectId=url.searchParams.get("projectId"),repairId=url.searchParams.get("repairId");
+ url.searchParams.delete("guided");url.searchParams.delete("projectId");url.searchParams.delete("repairId");
+ history.replaceState(history.state,"",url.pathname+url.search+url.hash);
+ openWorkspace({guided:true,projectId,repairId}).catch(error=>alert("Could not start guided repair: "+error.message));
+}
+document.addEventListener("manual-viewer-ready",launchGuidedRepair);
+launchGuidedRepair();
 }
 })(typeof globalThis!=="undefined"?globalThis:this);

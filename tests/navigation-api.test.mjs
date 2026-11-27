@@ -75,3 +75,31 @@ test("navigation API does not expose arbitrary R2 keys", async () => {
   assert.equal(response.status, 404);
   assert.equal(readCount, 0);
 });
+
+test("manual content and navigation endpoints reject non-read methods before touching storage",async()=>{
+ let reads=0;
+ const env={MANUALS:{get:async()=>{reads++;return null}},ASSETS:{fetch:async()=>{reads++;return new Response("unexpected")}}};
+ for(const path of ["/api/navigation/scion-repair.json","/m/scion-service-manual/example/pages/1.html"]){
+  for(const method of ["POST","PUT","PATCH","DELETE"]){
+   const response=await worker.fetch(new Request("https://manual.example"+path,{method}),env);
+   assert.equal(response.status,405);
+   assert.equal(response.headers.get("Allow"),"GET, HEAD");
+  }
+ }
+ assert.equal(reads,0);
+});
+
+test("manual documents retain no-store and deny executable content even when opened directly",async()=>{
+ const env={MANUALS:{get:async()=>({body:"fixture",httpEtag:'"fixture"',writeHttpMetadata(headers){headers.set("content-type","text/html");}})}};
+ for(const ext of ["html","htm","txt"]){
+  const r=await worker.fetch(new Request("https://manual.example/m/fixture/pages/1."+ext,{method:"HEAD"}),env);
+  assert.equal(r.status,200);
+  assert.equal(r.headers.get("cache-control"),"no-store");
+  assert.equal(r.headers.get("x-content-type-options"),"nosniff");
+  const csp=r.headers.get("content-security-policy");
+  assert.match(csp,/sandbox allow-same-origin/);
+  assert.match(csp,/script-src 'none'/);
+  assert.match(csp,/form-action 'none'/);
+  assert.doesNotMatch(csp,/allow-scripts/);
+ }
+});

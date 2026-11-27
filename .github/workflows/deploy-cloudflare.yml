@@ -37,6 +37,22 @@ jobs:
       - name: Run tests
         run: npm test
 
+      - name: Install pinned browser test runtime
+        run: |
+          npm install --prefix .browser-tests --no-save --package-lock=false playwright@1.51.1
+          .browser-tests/node_modules/.bin/playwright install --with-deps chromium webkit
+
+      - name: Run isolated mobile browser lifecycle
+        run: node scripts/garage-browser-smoke.mjs
+
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: garage-browser-diagnostics
+          path: browser-diagnostics/
+          if-no-files-found: ignore
+
       - name: Validate Wrangler deployment bundle
         run: npx --yes wrangler@4 deploy --dry-run --outdir .wrangler/deploy-check
 

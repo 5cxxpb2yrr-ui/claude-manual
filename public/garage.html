@@ -4,7 +4,7 @@
 		<meta charset="UTF-8" />
 		<meta
 			name="viewport"
-			content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+			content="width=device-width, initial-scale=1.0, viewport-fit=cover"
 		/>
 		<title>
 			MotorNote Pro Ultimate - Commercial Fleet & Personal Garage
@@ -92,7 +92,26 @@
 					box-shadow: none !important;
 				}
 			}
-		</style>
+		
+ [x-cloak]{display:none!important}
+ .garage-header{padding-top:max(.625rem,env(safe-area-inset-top));background:#09090b}
+ .garage-main{padding-bottom:calc(5rem + env(safe-area-inset-bottom));}
+ .garage-section>summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;list-style:none;}
+ .garage-section>summary::-webkit-details-marker{display:none}
+ .garage-section>summary::after{content:'+';color:#fbbf24;font-size:1rem}
+ .garage-section[open]>summary::after{content:'−'}
+ .garage-detail-heading{position:sticky;top:0;background:#18181b;z-index:2;padding:8px 0;}
+ .garage-close,.garage-tap{min-width:44px;min-height:44px;}
+ @media(max-width:639px){
+ .glass-panel,.glass-card-subtle{backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:0 3px 12px rgba(0,0,0,.25)}
+ .garage-detail-overlay{padding:0!important;align-items:stretch!important;background:#18181b!important;backdrop-filter:none!important;}
+ .garage-detail-panel{max-width:none!important;max-height:100dvh!important;width:100%;height:100dvh;border:0!important;border-radius:0!important;padding:max(12px,env(safe-area-inset-top)) 12px max(16px,env(safe-area-inset-bottom))!important;overscroll-behavior:contain;}
+ .garage-header select{max-width:100%;min-height:44px;}
+ .garage-main{padding-left:12px;padding-right:12px;padding-top:12px;}
+ .garage-ambient{display:none!important;}
+ }
+ @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+ </style>
 	</head>
 	<body
 		class="bg-zinc-950 text-zinc-100 antialiased min-h-screen flex flex-col selection:bg-amber-500 selection:text-zinc-950"
@@ -106,15 +125,15 @@
 		>
 			<!-- Ambient Dynamic Background Lighting -->
 			<div
-				class="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-64 bg-amber-500/10 blur-[140px] pointer-events-none z-0"
+				class="garage-ambient fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-64 bg-amber-500/10 blur-[140px] pointer-events-none z-0"
 			></div>
 			<div
-				class="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-64 bg-emerald-500/5 blur-[140px] pointer-events-none z-0"
+				class="garage-ambient fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-64 bg-emerald-500/5 blur-[140px] pointer-events-none z-0"
 			></div>
 
 	<!-- ================= TOP APPLICATION HEADER ================= -->
 <header
-	class="sticky top-0 z-40 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-800/80 px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 overflow-hidden"
+	class="garage-header sticky top-0 z-40 bg-zinc-950 border-b border-zinc-800/80 px-3 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-2 overflow-hidden"
 >
 	<div class="flex items-center space-x-2 sm:space-x-4 min-w-0 flex-1">
 		<div
@@ -122,7 +141,7 @@
 			@click="currentTab = 'dashboard'"
 		>
 			<span
-				x-text="activeVehicle.name.includes('Scion') ? 'xB' : 'SUB'"
+				x-text="activeVehicle?.name?.includes('Scion') ? 'xB' : 'MN'"
 			></span>
 		</div>
 		<div class="flex flex-col min-w-0 flex-1">
@@ -149,7 +168,7 @@
 				class="text-[11px] text-amber-400 font-medium mt-0.5 tracking-tight flex items-center space-x-1 truncate"
 			>
 				<span
-					x-text="activeVehicle.odometer.toLocaleString() + ' mi'"
+					x-text="Number(activeVehicle?.odometer||0).toLocaleString() + ' mi'"
 					class="shrink-0"
 				></span>
 				<span>•</span>
@@ -158,83 +177,15 @@
 		</div>
 	</div>
 
-	<!-- Quick Search & Action Bar -->
-	<div class="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
-		<button
-			@click="modals.smartSearch = true"
-			class="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-zinc-900/90 border border-zinc-700/80 hover:border-amber-500/50 text-zinc-300 text-xs font-semibold flex items-center space-x-2 transition shadow-inner active:scale-95"
-			title="Smart Garage Search (⌘K)"
-		>
-			<svg
-				class="w-3.5 h-3.5 text-amber-400"
-				fill="none"
-				stroke="currentColor"
-				viewBox="0 0 24 24"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2.5"
-					d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-				></path>
-			</svg>
-			<span class="hidden md:inline">Search Garage...</span>
-			<kbd
-				class="hidden md:inline px-1.5 py-0.5 text-[10px] bg-zinc-800 text-zinc-400 rounded font-mono"
-				>⌘K</kbd
-			>
-		</button>
-
-		<button
-			@click="currentTab = 'advisor'"
-			class="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-300 hover:bg-purple-500/20 text-xs font-bold transition flex items-center space-x-1.5 active:scale-95"
-			title="AI Garage Advisor"
-		>
-			<span class="text-sm">🤖</span>
-			<span class="hidden sm:inline">AI Advisor</span>
-		</button>
-
-		<a
-			:href="dockUrl"
-			class="p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-amber-500/40 transition active:scale-95"
-			title="System Deck"
-			aria-label="Back to System Deck"
-		>
-			<span class="text-sm leading-none">&#8962;</span>
-		</a>
-
-		<button
-			@click="modals.importExport = true"
-			class="p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-zinc-300 hover:text-white hover:border-amber-500/40 transition active:scale-95"
-			title="Backup & Export"
-		>
-			<svg
-				class="w-4 h-4"
-				fill="none"
-				stroke="currentColor"
-				viewBox="0 0 24 24"
-			>
-				<path
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					stroke-width="2"
-					d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-				></path>
-			</svg>
-		</button>
-
-		<button
-			@click="openNewRepairModal()"
-			class="p-2 sm:px-3 sm:py-1.5 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 text-zinc-950 text-xs font-black hover:brightness-110 transition shadow-lg shadow-amber-500/25 active:scale-95 border border-amber-400/40 flex items-center space-x-1 shrink-0"
-		>
-			<span class="text-base font-bold leading-none">+</span>
-			<span class="hidden sm:inline">Log Service</span>
-		</button>
-	</div>
-</header>
+	<!-- Quick Search & Capture -->
+ <div class="flex items-center gap-2 shrink-0">
+ <button type="button" @click="modals.smartSearch=true" class="garage-tap flex items-center justify-center rounded-xl border border-zinc-700 text-amber-300 px-2" aria-label="Search Garage"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-width="2" d="m21 21-6-6m2-5a7 7 0 1 1-14 0 7 7 0 0 1 14 0z"/></svg></button>
+ <button type="button" @click="modals.captureMenu=true" class="garage-tap rounded-xl bg-amber-500 text-zinc-950 px-3 text-sm font-bold" aria-label="Capture">+ Capture</button>
+ </div>
+ </header>
 			<!-- ================= BOTTOM TAB BAR (PRIMARY MOBILE NAVIGATION) ================= -->
 <nav
-	class="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950/95 backdrop-blur-xl border-t border-zinc-800/80 flex items-stretch"
+	class="fixed bottom-0 left-0 right-0 z-50 bg-zinc-950 border-t border-zinc-800/80 flex items-stretch"
 	style="padding-bottom: env(safe-area-inset-bottom);"
 >
 	<template x-for="tab in primaryNavTabs" :key="'primary-'+tab.id">
@@ -286,29 +237,16 @@
 		<button @click="modals.navMenu = false" class="text-zinc-500 hover:text-white p-2.5 -m-1 rounded-lg leading-none">✕</button>
 	</div>
 
-	<div class="grid grid-cols-2 gap-2 p-4">
-		<template x-for="tab in moreNavTabs" :key="'more-'+tab.id">
-			<button
-				@click="currentTab = tab.id; modals.navMenu = false"
-				class="text-left px-3 py-3 rounded-xl text-xs font-bold transition flex items-center space-x-2.5"
-				:class="currentTab === tab.id ? 'bg-amber-500 text-zinc-950 shadow-md shadow-amber-500/20' : 'bg-zinc-950/60 text-zinc-300 hover:bg-zinc-800/70'"
-			>
-				<span class="text-base" x-text="tab.icon"></span>
-				<span x-text="tab.label"></span>
-			</button>
-		</template>
-		<a
-			:href="dockUrl"
-			class="text-left px-3 py-3 rounded-xl text-xs font-bold transition flex items-center space-x-2.5 bg-zinc-950/60 text-zinc-300 hover:bg-zinc-800/70"
-		>
-			<span class="text-base">&#8962;</span>
-			<span>System Deck</span>
-		</a>
-	</div>
-</div>
-
-			<!-- ================= MAIN CONTENT AREA ================= -->
-			<main class="flex-1 px-4 sm:px-6 pt-5 pb-24 z-10">
+	<div class="p-3 space-y-3">
+ <template x-for="group in groupedMoreTabs" :key="group.name"><section><h3 class="text-[10px] uppercase tracking-wide text-zinc-400 font-bold mb-1" x-text="group.name"></h3><div class="grid grid-cols-2 gap-2"><template x-for="tab in group.tabs" :key="tab.id"><button type="button" @click="currentTab=tab.id;modals.navMenu=false" class="garage-tap text-left px-3 py-2 rounded-lg text-xs font-bold bg-zinc-950 text-zinc-200 flex gap-2 items-center" :aria-current="currentTab===tab.id?'page':null"><span x-text="tab.icon"></span><span x-text="tab.label"></span></button></template></div></section></template>
+ <div class="grid grid-cols-2 gap-2"><button type="button" @click="modals.navMenu=false;modals.importExport=true" class="garage-tap rounded-lg bg-zinc-950 text-xs font-bold text-zinc-200">Backup & export</button><a :href="dockUrl" class="garage-tap rounded-lg bg-zinc-950 flex items-center justify-center text-xs font-bold text-zinc-200">System Deck</a></div>
+ </div></div>
+ <template x-if="modals.captureMenu"><div class="fixed inset-0 z-[60] bg-black/75 flex items-end justify-center" @click.self="modals.captureMenu=false" @keydown.escape.window="modals.captureMenu=false" role="dialog" aria-modal="true" aria-label="Capture menu"><div class="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-800 p-3 space-y-2 overflow-y-auto max-h-[85dvh]" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
+ <div class="flex items-center justify-between"><h2 class="text-base font-bold text-amber-300">Capture</h2><button type="button" @click="modals.captureMenu=false" class="garage-close text-zinc-300" aria-label="Close capture">✕</button></div>
+ <template x-for="entry in [{id:'service',label:'Log service / repair'},{id:'project',label:'New repair project'},{id:'part',label:'Add inventory part'},{id:'mileage',label:'Update odometer'},{id:'search',label:'Search Garage'}]" :key="entry.id"><button type="button" @click="openCaptureDestination(entry.id)" class="garage-tap w-full text-left flex items-center justify-between rounded-lg border border-zinc-800 px-3 text-sm font-semibold"><span x-text="entry.label"></span><span class="text-amber-300">→</span></button></template>
+ </div></div></template>
+ <!-- ================= MAIN CONTENT AREA ================= -->
+			<main class="garage-main flex-1 px-4 sm:px-6 pt-5 pb-24 z-10">
 				<!-- 1. DASHBOARD TAB -->
 				<template x-if="currentTab === 'dashboard'"><div class="space-y-6" data-garage-tab="dashboard">
 					<div class="space-y-3"><template x-for="mission in [garageMission]" :key="'garage-mission'"><section class="space-y-3">
@@ -1113,7 +1051,8 @@
 							</button>
 						</template>
 					</div>
-					<button type="button" @click="inventoryView='storage';storageDraft=null;storageError=''" class="glass-panel w-full text-left px-3 py-2 flex justify-between text-xs font-bold text-amber-300"><span>Storage locations & reorder</span><span>→</span></button><button type="button" @click="inventoryView='reconcile';reconcileDraft=null;reconcileError=''" class="glass-panel w-full text-left px-3 py-2 flex justify-between text-xs font-bold text-amber-300"><span>Inventory integrity & physical counts</span><span>→</span></button><button type="button" @click="inventoryView='prices'" class="glass-panel w-full text-left px-3 py-2 flex justify-between text-xs font-bold text-amber-300"><span>Price & supplier intelligence</span><span>→</span></button>
+					<details class="garage-section glass-panel px-3 py-1"><summary class="text-sm font-bold text-white">Inventory management</summary><div class="space-y-1"><button type="button" @click="inventoryView='storage';storageDraft=null;storageError=''" class="glass-panel w-full text-left px-3 py-2 flex justify-between text-xs font-bold text-amber-300"><span>Storage locations & reorder</span><span>→</span></button><button type="button" @click="inventoryView='reconcile';reconcileDraft=null;reconcileError=''" class="glass-panel w-full text-left px-3 py-2 flex justify-between text-xs font-bold text-amber-300"><span>Inventory integrity & physical counts</span><span>→</span></button><button type="button" @click="inventoryView='prices'" class="glass-panel w-full text-left px-3 py-2 flex justify-between text-xs font-bold text-amber-300"><span>Price & supplier intelligence</span><span>→</span></button>
+</div></details>
 <template x-if="inventoryCommandNext"><button type="button" @click="inventoryView=inventoryCommandNext.view" class="glass-panel w-full text-left px-3 py-2 flex justify-between items-center gap-2"><div class="min-w-0"><p class="text-[9px] font-bold uppercase text-amber-400">Next best action</p><p class="text-xs font-semibold text-white" x-text="inventoryCommandNext.title"></p><p class="text-[10px] text-zinc-400" x-text="inventoryCommandNext.detail"></p></div><span class="text-amber-300">→</span></button></template>
 					<div class="glass-panel p-3 space-y-3">
 						<div class="flex items-center justify-between gap-2"><h3 class="text-sm text-white font-bold" x-text="inventoryViewTitle"></h3><button type="button" x-show="inventoryView!=='stock'" @click="inventoryView='stock'" class="text-xs text-amber-300">Stock →</button><button type="button" x-show="inventoryView==='stock'" @click="inventoryView='history'" class="text-xs text-amber-300">History →</button></div>
@@ -2019,16 +1958,16 @@
 			<!-- 2. REPAIR WORKSPACE 2.0 MODAL (3-PANEL DESKTOP LAYOUT) -->
 			<div
 				x-show="modals.repairDetail"
-				class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
+				class="garage-detail-overlay fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Service record" x-cloak
 				x-transition.opacity
 			>
 				<div
-					class="w-full max-w-5xl bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 shadow-2xl max-h-[92vh] overflow-y-auto flex flex-col space-y-4"
+					class="garage-detail-panel w-full max-w-5xl bg-zinc-900 border border-amber-500/30 rounded-2xl p-5 shadow-2xl max-h-[92vh] overflow-y-auto flex flex-col space-y-4"
 					@click.away="closeRepairWorkspace()"
 				>
 					<!-- Header Bar -->
 					<div
-						class="flex justify-between items-center pb-3 border-b border-zinc-800"
+						class="garage-detail-heading flex justify-between items-center gap-2 pb-3 border-b border-zinc-800"
 					>
 						<div class="flex items-center space-x-3">
 							<div
@@ -2036,7 +1975,7 @@
 							></div>
 							<h3
 								class="text-base font-bold text-white"
-								x-text="isEditingRepair ? 'Editing Repair Record' : 'Maintenance Workspace 2.0'"
+								x-text="isEditingRepair ? 'Edit service record' : 'Service record'"
 							></h3>
 							<span
 								class="text-[10px] font-mono px-2 py-0.5 rounded bg-zinc-950 text-zinc-400 border border-zinc-800"
@@ -2745,21 +2684,21 @@
 			<!-- 8. PROJECT DETAIL MODAL -->
 			<div
 				x-show="modals.projectDetail"
-				class="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-start sm:items-center justify-center overflow-y-auto p-4"
+				class="garage-detail-overlay fixed inset-0 z-50 bg-black/80 flex items-start sm:items-center justify-center overflow-y-auto p-4" role="dialog" aria-modal="true" aria-label="Project detail" x-cloak
 				x-transition.opacity
 			>
 				<div
-					class="w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-zinc-900 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-3 text-xs"
+					class="garage-detail-panel w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain bg-zinc-900 border border-purple-500/30 rounded-2xl p-6 shadow-2xl space-y-3 text-xs"
 					@click.away="modals.projectDetail = false"
 				>
-					<div class="flex justify-between items-center">
+					<div class="garage-detail-heading flex justify-between items-center">
 						<h3
 							class="text-base font-bold text-white"
 							x-text="selectedProject.title"
 						></h3>
 						<button
 							@click="modals.projectDetail = false"
-							class="text-zinc-400 hover:text-white p-2.5 -m-1 rounded-lg leading-none"
+							class="garage-close text-zinc-400 hover:text-white rounded-lg leading-none" aria-label="Close project"
 						>
 							✕
 						</button>
@@ -2825,8 +2764,7 @@
 							></span>
 						</div>
 					</div>
-					<div class="border-t border-zinc-800 pt-3 space-y-3">
-						<h4 class="text-sm font-bold text-white">Project workspace</h4>
+					<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Project workspace</summary>
 						<div class="grid grid-cols-2 gap-2">
 							<label class="text-zinc-400">Target date<input type="date" x-model="selectedProject.dueDate" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></label>
 							<label class="text-zinc-400">Priority<select x-model="selectedProject.priority" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></label>
@@ -2837,7 +2775,7 @@
 						<div class="flex gap-2"><input x-model="projectTaskDraft" @keydown.enter.prevent="addProjectTask(selectedProject)" placeholder="Add a task…" class="min-w-0 flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><button @click="addProjectTask(selectedProject)" class="px-3 rounded-lg bg-purple-600 text-white font-bold">Add</button></div><div class="flex justify-between text-xs text-zinc-400"><span>Estimated labor</span><strong class="text-amber-300" x-text="String.fromCharCode(36)+projectLaborEstimate(selectedProject).toFixed(2)"></strong></div>
 						<div class="flex gap-2"><input x-model="projectMilestoneDraft" @keydown.enter.prevent="addProjectMilestone(selectedProject)" placeholder="Add a milestone…" class="min-w-0 flex-1 bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><button @click="addProjectMilestone(selectedProject)" class="px-3 rounded-lg border border-zinc-700 text-white">Milestone</button></div>
 						<template x-for="(milestone,index) in (selectedProject.milestones||[])" :key="milestone.id || index"><div class="flex justify-between text-zinc-300 border-b border-zinc-800 py-1"><span x-text="milestone.title"></span><button @click="removeProjectMilestone(selectedProject,index)" class="text-rose-400">Remove</button></div></template>
-					</div>
+					</details>
 					<div class="border-t border-zinc-800 pt-3 space-y-2">
 						<template x-if="(selectedProject.procedures||[]).length">
 							<div class="space-y-2">
@@ -2859,15 +2797,13 @@
 							</details>
 						</div>
 					</div>
-					<div class="border-t border-zinc-800 pt-3 space-y-3">
-						<h4 class="text-sm font-bold text-white">Parts & procurement</h4>
+					<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Parts & procurement</summary>
 						<p class="text-zinc-500">Select stocked parts. Inventory is reserved only when requested and deducted only when marked used.</p>
 						<button @click="openProjectPartsPicker(selectedProject)" class="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-purple-500/50 bg-purple-500/10 text-purple-200 font-semibold"><span class="text-lg">＋</span> Browse & add inventory parts</button>
 						<template x-for="part in (selectedProject.partRequirements||[])" :key="part.id"><div class="bg-zinc-950 rounded-lg p-2"><div class="flex justify-between gap-2"><span class="text-white" x-text="part.description+' × '+part.quantity+' · '+String.fromCharCode(36)+Number(part.unitCost||0).toFixed(2)"></span><button @click="removeProjectPart(selectedProject,part.id)" class="text-rose-400">Remove</button></div><div class="flex justify-between mt-2"><span class="text-amber-300" x-text="part.status+(part.consumedQuantity?' · Used '+part.consumedQuantity+'/'+part.quantity:'')"></span><div class="flex gap-2"><button x-show="part.inventoryId&&!part.reserved&&part.status!=='Used'&&(!part.purchaseOrderId||part.inventoryAddedAt)" @click="reserveProjectPart(selectedProject,part.id)" class="text-amber-300">Reserve</button><button x-show="part.reserved&&part.inventoryId" @click="useProjectPart(selectedProject,part.id)" class="text-emerald-300" :disabled="projectStockBusy">Record use</button><button x-show="part.reserved" @click="releaseProjectPart(selectedProject,part.id)" :disabled="projectStockBusy" class="text-zinc-300">Release</button></div></div><template x-if="!part.inventoryId&&part.status!=='Used'"><div class="mt-2 space-y-1"><template x-for="received in projectReceiptCandidates(selectedProject,part)" :key="received.id"><button type="button" @click="linkProjectReceipt(selectedProject,part.id,received.id)" :disabled="projectStockBusy||inventorySaving||vendorBusy" class="block w-full text-left text-xs text-emerald-300 border border-emerald-500/30 rounded p-2" x-text="'Link received stock: '+received.description+' · '+projectAvailableInventory(received)+' available'"></button></template></div></template></div></template>
 						<div class="flex justify-between text-zinc-300"><span>Parts estimate</span><strong x-text="String.fromCharCode(36)+projectPartsEstimate(selectedProject).toFixed(2)"></strong></div>
-					</div>
-					<div class="border-t border-zinc-800 pt-3 space-y-3">
-						<h4 class="text-sm font-bold text-white">Supplier purchasing</h4>
+					</details>
+					<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Supplier purchasing</summary>
 						<p class="text-zinc-500">Create supplier orders from this project's required parts. Orders do not reserve or deduct inventory; receiving is handled separately.</p>
 						<div class="rounded-xl border border-zinc-800 bg-zinc-950 p-3 space-y-2">
 							<strong class="text-zinc-200">Add a non-stock part requirement</strong>
@@ -2895,24 +2831,22 @@
 								<p x-show="order.notes" class="text-[10px] text-zinc-500" x-text="order.notes"></p>
 							</div></template>
 						</div>
-					</div>
-						<div class="border-t border-zinc-800 pt-3 space-y-3">
-							<h4 class="text-sm font-bold text-white">Receipts & project evidence</h4>
+					</details>
+						<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Receipts & project evidence</summary>
 							<p class="text-xs text-zinc-500">Attach receipt photos or PDFs to keep proof with this project. Receipt amounts are reference-only and do not automatically create expenses.</p>
 							<input x-model="projectAttachmentDraft.description" placeholder="Description (optional)" class="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white">
 							<div class="grid grid-cols-2 gap-2"><label class="text-[10px] text-zinc-500">Receipt date<input type="date" x-model="projectAttachmentDraft.date" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></label><label class="text-[10px] text-zinc-500">Amount (optional)<input type="number" min="0" step="0.01" x-model="projectAttachmentDraft.amount" placeholder="$0.00" class="mt-1 w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></label></div>
 							<label class="block w-full py-3 rounded-xl border border-dashed border-amber-500/40 bg-amber-500/5 text-center text-amber-200 font-semibold cursor-pointer">＋ Attach receipt photo or PDF<input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple @change="addProjectAttachments(selectedProject,$event)" class="hidden"></label>
 							<template x-if="!(selectedProject.attachments||[]).length"><p class="text-xs text-zinc-500">No project attachments yet.</p></template>
 							<template x-for="attachment in (selectedProject.attachments||[])" :key="attachment.id"><div class="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3"><button x-show="attachment.type?.startsWith('image/') && attachment.data" @click="openLightbox(attachment.data)" class="w-12 h-12 rounded-lg overflow-hidden bg-zinc-900 shrink-0"><img :src="attachment.data" class="w-full h-full object-cover" :alt="attachment.name"></button><div class="min-w-0 flex-1"><a :href="attachment.data || attachment.dataUrl || '#'+attachment.id" target="_blank" rel="noopener" class="text-sm text-white underline break-all" x-text="attachment.name"></a><p class="text-[10px] text-zinc-500" x-text="(attachment.description||'Project attachment')+' · '+(attachment.receiptDate||'No date')+(attachment.amount!=null&&attachment.amount!==''?' · $'+Number(attachment.amount).toFixed(2):'')"></p></div><button @click="removeProjectAttachment(selectedProject,attachment.id)" class="text-rose-400 text-xs">Remove</button></div></template>
-						</div>
-						<div class="border-t border-zinc-800 pt-3 space-y-2">
-							<h4 class="text-sm font-bold text-white">Actual expenses</h4>
+						</details>
+						<details class="garage-section border-t border-zinc-800 pt-2 space-y-2"><summary class="text-sm font-bold text-white">Actual expenses</summary>
 						<div class="grid grid-cols-2 gap-2"><input x-model="projectCostDraft.description" placeholder="Expense description" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><input type="number" min="0.01" step="0.01" x-model.number="projectCostDraft.amount" placeholder="Amount $" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></div>
 						<div class="grid grid-cols-2 gap-2"><select x-model="projectCostDraft.category" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"><option>Labor</option><option>Parts</option><option>Shop supplies</option><option>Other</option></select><input type="date" x-model="projectCostDraft.date" class="bg-zinc-950 border border-zinc-800 rounded-lg p-2 text-white"></div>
 						<button @click="addProjectCostEntry(selectedProject)" class="w-full py-2 border border-emerald-500/40 text-emerald-300 rounded-lg">Record expense</button>
 						<template x-for="entry in (selectedProject.costEntries||[])" :key="entry.id"><div class="flex justify-between border-b border-zinc-800 py-1"><span class="text-zinc-300" x-text="entry.description+' · '+entry.category"></span><strong class="text-emerald-300" x-text="String.fromCharCode(36)+Number(entry.amount).toFixed(2)"></strong></div></template>
 						<div class="flex justify-between text-zinc-400"><span>Material consumed (not additional cash expense)</span><strong x-text="String.fromCharCode(36)+projectMaterialCost(selectedProject).toFixed(2)"></strong></div><div class="flex justify-between text-white"><span>Actual total</span><strong x-text="String.fromCharCode(36)+projectActualCost(selectedProject).toFixed(2)"></strong></div>
-					</div>
+					</details>
 					<div x-show="selectedProject.status !== 'Completed'" class="border-t border-emerald-500/20 pt-3 space-y-2"><p class="text-[11px] text-zinc-500">Finish every project task, then record the completed work in this vehicle's service history. Existing expenses and inventory usage are not added again.</p><p x-show="(selectedProject.tasks||[]).some(task=>!task.done)" class="text-[11px] text-amber-300">Complete all remaining tasks before closing this project.</p><button @click="openProjectCompletion(selectedProject)" :disabled="!projectReadyToComplete(selectedProject)" class="w-full py-3 bg-emerald-500 text-zinc-950 font-black rounded-xl disabled:opacity-40 disabled:cursor-not-allowed">✓ Complete Project & Record Service</button></div>
 					<div x-show="selectedProject.status === 'Completed'" class="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-3 text-emerald-300"><strong>Project completed</strong><p class="text-[11px] text-zinc-400 mt-1">A service-history record has been created for this project.</p></div>
 					<button @click="saveProjectWorkspace(selectedProject)" class="w-full py-3 bg-purple-600 text-white font-bold rounded-xl">Save Project Workspace</button>
@@ -3084,12 +3018,12 @@
 
 					// Navigation Registry
 					navTabs: [
-						{ id: 'dashboard', label: 'Dashboard', icon: '📊' },
+						{ id: 'dashboard', label: 'Home', icon: '📊' },
 						{ id: 'analytics', label: 'Analytics', icon: '📈' },
 						{ id: 'predictive', label: 'Predictive', icon: '🔮' },
 						{ id: 'timeline', label: 'Timeline', icon: '⏳' },
 						{ id: 'repairs', label: 'Repairs', icon: '🛠️' },
-						{ id: 'projects', label: 'Kanban', icon: '📋' },
+						{ id: 'projects', label: 'Projects', icon: '📋' },
 						{ id: 'inventory', label: 'Inventory', icon: '📦' },
 						{ id: 'attachments', label: 'Receipts', icon: '📎' },
 						{ id: 'advisor', label: 'AI Advisor', icon: '🤖' },
@@ -3102,23 +3036,35 @@
 
 					// The 4 most-used destinations get a persistent bottom tab;
 					// everything else lives behind the "More" bottom sheet.
-					primaryTabIds: ['dashboard', 'timeline', 'repairs', 'maintenance'],
+					primaryTabIds: ['dashboard', 'projects', 'inventory', 'maintenance'],
 
 					// Mobile Kanban view: which status column the filter chips are showing
 					kanbanStatusFilter: 'Planned',
 					get primaryNavTabs() {
-						return this.navTabs.filter(t => this.primaryTabIds.includes(t.id));
+						return this.primaryTabIds.map(id=>this.navTabs.find(t=>t.id===id)).filter(Boolean);
 					},
 					get moreNavTabs() {
 						return this.navTabs.filter(t => !this.primaryTabIds.includes(t.id));
 					},
-					get moreTabActive() {
+					get groupedMoreTabs(){
+ const groups=[{name:"History",ids:["timeline","repairs","attachments"]},{name:"Reference",ids:["predictive","kb","profile","advisor"]},{name:"Reports & data",ids:["analytics","reports","database"]}];
+ return groups.map(g=>({name:g.name,tabs:g.ids.map(id=>this.moreNavTabs.find(t=>t.id===id)).filter(Boolean)}));
+ },
+ openCaptureDestination(kind){
+ this.modals.captureMenu=false;
+ if(kind==="search")this.modals.smartSearch=true;
+ if(kind==="service")this.openNewRepairModal();
+ if(kind==="project"){this.currentTab="projects";this.modals.newProject=true;}
+ if(kind==="part"){this.currentTab="inventory";this.openNewPartModal();}
+ if(kind==="mileage")this.modals.updateMileage=true;
+ },
+ get moreTabActive() {
 						return !this.primaryTabIds.includes(this.currentTab);
 					},
 
 					// Modals
 					modals: {
-				mobileSearch:false,
+				mobileSearch:false,navMenu:false,captureMenu:false,
 						smartSearch: false,
 						newRepair: false,
 						repairDetail: false,
@@ -3959,7 +3905,7 @@
  },
  openGarageMission(item){
  const target=item?.target;if(!target)return;
- if(target.vehicleId!=null&&this.vehicles.some(v=>String(v.id)===String(target.vehicleId)))this.activeVehicleId=this.vehicles.find(v=>String(v.id)===String(target.vehicleId)).id;
+ if(target.vehicleId!=null&&this.vehicles.some(v=>String(v.id)===String(target.vehicleId)))this.switchVehicle(this.vehicles.find(v=>String(v.id)===String(target.vehicleId)).id);
  if(target.tab==="inventory"&&target.view){this.inventoryView=target.view;if(target.view==="shopping")this.inventoryForecastHorizon=20;}
  this.currentTab=target.tab;
  if(target.projectId!=null){const project=(this.projects||[]).find(p=>String(p.id)===String(target.projectId));if(project)this.openProjectDetail(project);}

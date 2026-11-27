@@ -96,6 +96,23 @@ async function run(name,launcher){
  page.setDefaultTimeout(15000);
  const runtimeDetails=[],consoleDetails=[];
  let phase="startup";
+ // WebKit can intermittently reject navigation during service-worker
+ // transport transitions. Retry only the exact engine navigation error,
+ // never assertions, saves, lifecycle waits or runtime exceptions.
+ const navigationRetries=[];
+ const navigate=async(label,action)=>{
+  for(let attempt=1;attempt<=3;attempt++){
+   try{return await action();}
+   catch(error){
+    if(name!=="webkit"||!/^page\.(?:goto|reload): WebKit encountered an internal error(?:\n|$)/.test(error.message)||attempt===3)throw error;
+    const detail={phase,label,attempt,message:error.message,url:page.url(),networkBlocked,rollbackMode};
+    navigationRetries.push(detail);
+    console.warn(name,"navigation retry",JSON.stringify(detail));
+    await new Promise(resolve=>setTimeout(resolve,250*attempt));
+   }
+  }
+ };
+
  page.on("pageerror",e=>{errors.push(e.message);const detail={phase,url:page.url(),name:e.name,message:e.message,stack:e.stack};runtimeDetails.push(detail);console.error(name,"pageerror",JSON.stringify(detail));});
  page.on("console",msg=>{if(["error","warning"].includes(msg.type())){const detail={phase,type:msg.type(),text:msg.text(),location:msg.location()};consoleDetails.push(detail);console.error(name,"browser console",JSON.stringify(detail));}});
  await page.exposeBinding("__garageRuntimeDiagnostic",(_source,detail)=>{runtimeDetails.push({phase,...detail});console.error(name,"browser diagnostic",JSON.stringify({phase,...detail}));});
@@ -236,7 +253,14 @@ async function run(name,launcher){
   assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="OFFLINE-1")?.quantity),1);
   assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
   assert.equal(await app(page,async a=>{a.openNewPartModal();Object.assign(a.newPartForm,{description:"Cold offline fixture",partNumber:"COLD-OFFLINE-1",quantity:1,unitCost:4,vehicleCompatibility:"Universal"});return await a.saveNewPart();}),true);
-  await saved(page);await page.reload();await saved(page);
+  await saved(page);
+  const beforeReload=await page.evaluate(()=>performance.timeOrigin);
+  const reloadResponse=await navigate("offline durable save reload",()=>page.reload());
+  assert.equal(reloadResponse?.status(),200,"Offline reload must return cached HTML");
+  assert.equal(await page.evaluate(()=>!!navigator.serviceWorker.controller),true,"Offline reload must remain controlled");
+  assert.notEqual(await page.evaluate(()=>performance.timeOrigin),beforeReload,"Offline reload must replace the document");
+  await saved(page);
+  assert.deepEqual(await page.evaluate(()=>[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline"))),pinned,"Reload must preserve the coherent cached shell");
   assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="COLD-OFFLINE-1")?.quantity),1);
   assert.ok(blockedRequests>blockedBefore,"Actual origin transport failure verified");
  } finally {networkBlocked=false;}
@@ -390,16 +414,20 @@ async function run(name,launcher){
   await checkOfflineShell(recoveryShell,url);
  }finally{rollbackMode=false;}
  const currentUrl=origin+"/garage?recovery-fixture=return#specs";
- await page.goto(currentUrl);await saved(page);await tab(page,"profile");
+ const returnResponse=await navigate("return from recovery build",()=>page.goto(currentUrl));
+ assert.equal(returnResponse?.status(),200,"Return navigation must load a successful document");
+ assert.equal(returnResponse?.headers()["x-test-recovery-commit"],undefined,"Return must not load recovery fixture");
+ await saved(page);await tab(page,"profile");
  await awaitInstalled(currentShell);await activate(currentShell,currentUrl);
  assert.equal(await page.locator("[data-common-specs]").count(),1);
  assert.deepEqual(await snapshot(),beforeRollback,"Returning to current release must preserve the V9 data");
  await checkOfflineShell(currentShell,currentUrl);
  console.log(name,"same-origin V9 full asset and offline shell rollback and return preserved all persisted collections and attachment bytes");
+ console.log(name,"navigation retry summary",JSON.stringify(navigationRetries));
 
  assert.deepEqual(external,[],"Unexpected external requests");assert.deepEqual(errors,[],"Browser runtime errors");assert.deepEqual(runtimeDetails,[],"Browser runtime diagnostics");
  await verifyManualIsolation(browser,name);
- }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,runtimeDetails,consoleDetails,dialogs,external,url:page.url(),state:await app(page,a=>({saveState:a.saveState,lastSaveError:a.lastSaveError,projects:a.projects.map(p=>({id:p.id,title:p.title,attachments:(p.attachments||[]).map(x=>({id:x.id,storageKey:x.storageKey,name:x.name,hydrated:!!x.data}))}))})).catch(()=>null)},null,2));throw e;}
+ }catch(e){await mkdir("browser-diagnostics",{recursive:true});await page.screenshot({path:"browser-diagnostics/"+name+".png",fullPage:true}).catch(()=>{});await writeFile("browser-diagnostics/"+name+".json",JSON.stringify({error:String(e),errors,runtimeDetails,consoleDetails,navigationRetries,dialogs,external,url:page.url(),state:await app(page,a=>({saveState:a.saveState,lastSaveError:a.lastSaveError,projects:a.projects.map(p=>({id:p.id,title:p.title,attachments:(p.attachments||[]).map(x=>({id:x.id,storageKey:x.storageKey,name:x.name,hydrated:!!x.data}))}))})).catch(()=>null)},null,2));throw e;}
  finally{await context.close();await browser.close();}
 }
 try{const failures=[];for(const [name,launcher] of [["chromium",chromium],["webkit",webkit]]){try{await run(name,launcher)}catch(e){console.error(name,e);failures.push(name);}}if(failures.length)throw Error("Failed browsers: "+failures.join(", "));}finally{server.close();}

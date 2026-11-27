@@ -30,3 +30,10 @@ test("Manual Explorer inline JavaScript remains syntactically valid", () => {
   const result = spawnSync(process.execPath, ["--check", "-"], { input: inline, encoding: "utf8" });
   assert.equal(result.status, 0, result.stderr || result.stdout);
 });
+
+test("Manual zoom defaults to fit-width without enlarging narrow pages",()=>{
+ const source=inline.match(/function fitScale\(viewport,content\)\{[^}]+\}/)?.[0];assert.ok(source);
+ const fit=new Function(source+";return fitScale")();
+ assert.equal(fit(390,1000),.39);assert.equal(fit(390,300),1);assert.equal(fit(390,390),1);assert.equal(fit(320,10000),.1);
+ assert.match(html,/let zoom=1,fitMode=true/);assert.match(html,/stepZoom\(-\.1\)/);assert.match(html,/aria-label="Fit page to width"/);assert.match(html,/resize\.observe\(fr\)/);
+});

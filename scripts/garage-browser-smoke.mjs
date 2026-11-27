@@ -19,6 +19,13 @@ const server=createServer(async(req,res)=>{
  if(req.url==="/m/scion-service-manual/2006%20Scion%20xB%20Standard/pages/3368.html"){
   res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP,"Cache-Control":"no-store"}).end('<h1>Unrelated fixture</h1>');return;
  }
+ if(req.url==="/api/navigation/scion-repair.json"){
+  res.writeHead(200,{"Content-Type":types[".json"]}).end(JSON.stringify({c:[{n:"Fixture",c:[{p:381,n:"Quick Lookups: Fluids"},{p:999001,n:"Wide fixture"},{p:999002,n:"Narrow fixture"}]}]}));return;
+ }
+ if(req.url==="/api/navigation/scion-parts.json"){res.writeHead(200,{"Content-Type":types[".json"]}).end('{"c":[]}');return;}
+ if(/\/pages\/99900[12]\.html$/.test(req.url)){
+  const wide=req.url.endsWith("999001.html");res.writeHead(200,{"Content-Type":types[".html"],"Content-Security-Policy":MANUAL_DOCUMENT_CSP}).end('<div class="main"><h1>'+ (wide?'Wide fixture':'Narrow fixture')+'</h1><div style="width:'+(wide?'960px':'150px')+'">Fixture content</div></div>');return;
+ }
  if(req.url==="/__manual-isolation"){
   res.writeHead(200,{"Content-Type":types[".html"]}).end('<iframe id="manual" sandbox="'+manualSandbox+'" src="'+isolationPath+'1.html"></iframe>');return;
  }
@@ -54,6 +61,17 @@ async function verifyManualIsolation(browser,name){
   assert.equal(await p.evaluate(()=>window.manualScriptExecuted||false),false,"Direct manual page must not run scripts");
   assert.equal(await p.evaluate(()=>localStorage.getItem("manual-script-ran")),null);
   console.log(name,"manual content isolation and same-origin navigation passed");
+  await p.setViewportSize({width:390,height:844});
+  await p.goto(origin+"/manuals.html#/v/1/0/999001");
+  const zoom=p.locator("#zoomlevel");
+  await p.waitForFunction(()=>document.querySelector("#fr")?.style.visibility==="visible"&&document.querySelector("#zoomlevel")?.textContent.startsWith("Fit "));
+  const fit=Number((await zoom.textContent()).match(/(\d+)%/)[1]);assert.ok(fit>20&&fit<60,"Wide page must fit mobile width");
+  await p.getByRole("button",{name:"Zoom in",exact:true}).click();
+  assert.equal(await zoom.textContent(),(fit+10)+"%");
+  await p.getByRole("button",{name:"Fit page to width"}).click();assert.equal(await zoom.textContent(),"Fit "+fit+"%");
+  await p.getByRole("link",{name:"Next",exact:true}).click();
+  await p.waitForFunction(()=>document.querySelector("#fr")?.style.visibility==="visible"&&document.querySelector("#zoomlevel")?.textContent==="Fit 100%");
+  console.log(name,"manual default fit-width, incremental zoom, reset and next-page fit passed");
  }finally{await ctx.close();}
 }
 async function run(name,launcher){

@@ -1141,13 +1141,23 @@
 							<div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
 								<template x-for="tool in toolInventory" :key="tool.id">
 									<div class="min-w-0 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-2">
-										<div class="text-xs font-bold text-emerald-300 break-words" x-text="tool.name"></div>
+										<div class="text-xs font-bold text-white break-words" x-text="tool.name"></div><p class="text-[10px]" :class="toolAvailability(tool).available?'text-emerald-300':'text-amber-300'" x-text="toolAvailability(tool).label"></p><p class="text-[10px] text-zinc-400" x-text="(tool.storageLocation||'Unassigned')+' · '+(tool.ownership==='borrowed'?'Borrowed':'Owned')"></p><p x-show="tool.custody?.holder" class="text-[10px] text-zinc-400" x-text="tool.custody?.holder||''"></p><p x-show="tool.calibrationDue" class="text-[10px] text-zinc-400" x-text="'Calibration due '+(tool.calibrationDue||'')"></p><p x-show="tool.specialToolNumber" class="text-[10px] text-zinc-400" x-text="'SST '+(tool.specialToolNumber||'')"></p><button type="button" @click="openToolAction(tool)" :disabled="toolInventoryBusy" class="block text-xs text-amber-300 font-bold mt-2">Manage tool →</button>
 										<p class="text-[10px] text-zinc-400 break-words" x-text="tool.notes"></p>
 										<button type="button" @click="editOwnedTool(tool)" :disabled="toolInventoryBusy" class="text-xs text-amber-300 mt-2 mr-3 underline">Edit</button><button type="button" @click="removeOwnedTool(tool.id)" :disabled="toolInventoryBusy" class="text-[10px] text-zinc-400 mt-1 underline">Remove</button>
 									</div>
 								</template>
 							</div>
-							<p x-show="!toolInventory.length" class="text-xs text-zinc-400">Record the tools you own so repair plans can suggest matching equipment.</p>
+							<p x-show="!toolInventory.length" class="text-xs text-zinc-400">Record owned or borrowed tools so repair plans can suggest available equipment.</p>
+<template x-if="toolActionDraft"><div class="border border-amber-500/40 rounded-lg p-3 space-y-2">
+ <p class="text-sm font-bold" x-text="toolActionDraft.name"></p>
+ <label class="text-xs text-zinc-400">Action<select x-model="toolActionDraft.action" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2 text-white"><option value="details">Location & identification</option><option value="checkout">Check out to repair project</option><option value="loan">Loan to someone</option><option value="return">Return to storage</option><option value="calibrate">Record calibration</option><option value="return-borrowed">Return borrowed tool to owner</option></select></label>
+ <div x-show="toolActionDraft.action==='details'" class="space-y-2"><label class="text-xs">Storage location<input x-model="toolActionDraft.location" maxlength="80" placeholder="GARAGE/TOOLBOX/A" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><label class="text-xs">Factory special tool number<input x-model="toolActionDraft.specialToolNumber" maxlength="80" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><label class="text-xs">Ownership<select x-model="toolActionDraft.ownership" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"><option value="owned">Owned</option><option value="borrowed">Borrowed</option></select></label><label x-show="toolActionDraft.ownership==='borrowed'" class="text-xs">Lender<input x-model="toolActionDraft.lender" maxlength="120" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><label x-show="toolActionDraft.ownership==='borrowed'" class="text-xs">Return due (optional)<input type="date" x-model="toolActionDraft.borrowDue" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label></div>
+ <label x-show="toolActionDraft.action==='checkout'" class="text-xs">Project<select x-model="toolActionDraft.projectId" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"><option value="">Select project</option><template x-for="project in activeToolProjects()" :key="project.id"><option :value="String(project.id)" x-text="project.title"></option></template></select></label>
+ <div x-show="toolActionDraft.action==='loan'" class="space-y-2"><label class="text-xs">Borrower<input x-model="toolActionDraft.holder" maxlength="120" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><label class="text-xs">Return due (optional)<input type="date" x-model="toolActionDraft.due" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label></div>
+ <div x-show="toolActionDraft.action==='calibrate'" class="space-y-2"><p class="text-[10px] text-zinc-400">Record an actual calibration; use the interval on the certificate or manufacturer guidance.</p><label class="text-xs">Calibrated on<input type="date" x-model="toolActionDraft.calibratedOn" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><label class="text-xs">Next due<input type="date" x-model="toolActionDraft.calibrationDue" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><label class="text-xs">Certificate / reference<input x-model="toolActionDraft.certificate" maxlength="200" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label></div>
+ <label class="text-xs">Reason / note<input x-model="toolActionDraft.reason" maxlength="300" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><button type="button" @click="commitToolAction()" :disabled="toolInventoryBusy" class="w-full bg-amber-500 text-zinc-950 rounded py-2 text-xs font-bold">Save tool action</button><button type="button" @click="toolActionDraft=null" :disabled="toolInventoryBusy" class="text-xs text-zinc-400">Cancel</button>
+ <details><summary class="text-xs text-zinc-400">Tool activity history</summary><template x-for="(entry,i) in selectedToolHistory()" :key="i"><div class="border-t border-zinc-800 py-1 text-xs"><p x-text="entry.action+' · '+entry.reason"></p><p class="text-zinc-400" x-text="entry.timestamp"></p></div></template></details>
+ </div></template>
 							<input x-model="toolDraftName" placeholder="Tool name (e.g. torque wrench)" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-sm text-white">
 							<input x-model="toolDraftNotes" placeholder="Size, range, condition (optional)" class="w-full rounded-lg bg-zinc-950 border border-zinc-800 p-2 text-xs text-white">
 							<button type="button" @click="saveOwnedTool()" :disabled="toolInventoryBusy||!toolDraftName.trim()" class="w-full rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2 disabled:opacity-40" x-text="toolEditId!==null?'Save tool changes':'Add owned tool'"></button><button type="button" x-show="toolEditId!==null" @click="cancelToolEdit()" :disabled="toolInventoryBusy" class="w-full text-xs text-zinc-400 py-2">Cancel edit</button>
@@ -3187,7 +3197,7 @@
 					archivedMaintenance: [],
 					maintenanceSetupVersion: 0,
 
-					toolInventory: [], toolDraftName:"",toolDraftNotes:"",toolEditId:null,toolInventoryBusy:false,toolInventoryError:"",
+					toolInventory: [], toolActionDraft:null, toolDraftName:"",toolDraftNotes:"",toolEditId:null,toolInventoryBusy:false,toolInventoryError:"",
 					inventory: [
 						{ id: 301, partNumber: '90915-YZZF2', description: 'Toyota OEM Oil Filter', vendor: 'Toyota Direct', quantity: 4, unitCost: 6.50, purchaseDate: '2026-01-10', vehicleCompatibility: '2006 Scion xB' },
 						{ id: 302, partNumber: '15208AA15A', description: 'Subaru OEM Oil Filter', vendor: 'Subaru Parts Direct', quantity: 1, unitCost: 8.20, purchaseDate: '2026-02-05', vehicleCompatibility: '2019 Subaru Crosstrek' }
@@ -3626,9 +3636,68 @@
 						return this.manualLibrary.base+'/manuals.html?'+params.toString()+'#/search'+(q?'/'+encodeURIComponent(q):'');
 					},
 					inventoryMatchKey(value) {return String(value||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim();},
-					planToolMatches(name) {
+					toolToday(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");},
+ toolDateValid(value){if(!/^\d{4}-\d{2}-\d{2}$/.test(value||""))return false;const d=new Date(value+"T00:00:00Z");return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===value;},
+ activeToolProjects(){return (this.projects||[]).filter(p=>!/^(completed|cancelled|canceled|archived)$/i.test(p.status||""));},
+ toolAvailability(tool,projectId=null,today=this.toolToday()){
+ const custody=tool.custody||{},status=custody.status||"available";
+ if(status==="returned")return {available:false,label:"Returned to owner"};
+ if(status==="loaned")return {available:false,label:"Loaned out"+(custody.due&&custody.due<today?" · overdue":"")};
+ if(status==="checked-out"&&(projectId==null||String(custody.projectId)!==String(projectId)))return {available:false,label:"Checked out to "+(custody.holder||"another project")};
+ if(tool.ownership==="borrowed"&&tool.borrowDue&&tool.borrowDue<today)return {available:false,label:"Borrowed · return overdue"};
+ if(tool.calibrationDue&&(!this.toolDateValid(tool.calibrationDue)||tool.calibrationDue<=today))return {available:false,label:"Calibration due / overdue"};
+ const needsCalibration=/\btorque\s+wrench\b/i.test(tool.name||"")&&!tool.calibrationDue;
+ return {available:true,label:(status==="checked-out"?"Checked out to this project":"Available")+(needsCalibration?" · verify calibration":"")};
+ },
+ openToolAction(tool){this.toolInventoryError="";this.toolActionDraft={id:tool.id,name:tool.name,expectedHistory:(tool.activity||[]).length,action:"details",location:tool.storageLocation||"",specialToolNumber:tool.specialToolNumber||"",ownership:tool.ownership||"owned",lender:tool.lender||"",borrowDue:tool.borrowDue||"",projectId:"",holder:"",due:"",calibratedOn:"",calibrationDue:"",certificate:"",reason:""};},
+ selectedToolHistory(){return ((this.toolInventory||[]).find(t=>String(t.id)===String(this.toolActionDraft?.id))?.activity||[]).slice().reverse();},
+ applyToolAction(tool,d,today=this.toolToday()){
+ if(!tool||String(tool.id)!==String(d.id)||(tool.activity||[]).length!==d.expectedHistory)throw Error("Tool record changed. Reopen it.");
+ const reason=String(d.reason||"").trim();if(!reason||reason.length>300)throw Error("Enter a reason (up to 300 characters).");
+ const txt=(v,n)=>{const x=String(v||"").trim();if(x.length>n)throw Error("Field is too long.");return x;};
+ const optionalDate=v=>{if(v&&!this.toolDateValid(v))throw Error("Enter a valid date.");return v||"";};
+ const before=JSON.parse(JSON.stringify(tool)),next={...before},state=before.custody?.status||"available",time=new Date().toISOString();
+ switch(d.action){
+ case "details":{
+  const loc=txt(d.location,80).toUpperCase();if(loc&&!/^[A-Z0-9][A-Z0-9 ._/-]*$/.test(loc))throw Error("Invalid location code.");
+  if(!["owned","borrowed"].includes(d.ownership))throw Error("Choose ownership.");
+  if(state!=="available")throw Error("Return the tool to storage before changing location or ownership.");
+  if(d.ownership==="borrowed"&&!txt(d.lender,120))throw Error("Enter the lender.");
+  Object.assign(next,{storageLocation:loc,specialToolNumber:txt(d.specialToolNumber,80),ownership:d.ownership,lender:d.ownership==="borrowed"?txt(d.lender,120):"",borrowDue:d.ownership==="borrowed"?optionalDate(d.borrowDue):""});break;}
+ case "checkout":{
+  if(state!=="available"||!this.toolAvailability(before,null,today).available)throw Error("Tool is not available for checkout.");
+  const project=this.activeToolProjects().find(p=>String(p.id)===String(d.projectId));if(!project)throw Error("Select an active repair project.");
+  next.custody={status:"checked-out",projectId:project.id,holder:project.title||"Repair project",since:time};break;}
+ case "loan":{
+  if(state!=="available"||before.ownership==="borrowed")throw Error("Only available owned tools can be loaned.");
+  const holder=txt(d.holder,120),due=optionalDate(d.due);if(!holder||due&&due<today)throw Error("Enter borrower and a valid future return date.");
+  next.custody={status:"loaned",holder,due,since:time};break;}
+ case "return":
+  if(!["checked-out","loaned"].includes(state))throw Error("Tool is not checked out or loaned.");
+  next.custody={status:"available",since:time};break;
+ case "return-borrowed":
+  if(before.ownership!=="borrowed"||state!=="available")throw Error("Return the borrowed tool to storage first.");
+  next.custody={status:"returned",holder:before.lender||"",since:time};break;
+ case "calibrate":{
+  if(state!=="available")throw Error("Return the tool before recording calibration.");
+  const on=optionalDate(d.calibratedOn),due=optionalDate(d.calibrationDue),certificate=txt(d.certificate,200);
+  if(!on||!due||on>today||due<=on||!certificate)throw Error("Enter actual calibration date, later due date and certificate/reference.");
+  Object.assign(next,{calibratedOn:on,calibrationDue:due,calibrationCertificate:certificate});break;}
+ default:throw Error("Unknown tool action.");
+ }
+ const snapshot=t=>({storageLocation:t.storageLocation||"",ownership:t.ownership||"owned",lender:t.lender||"",borrowDue:t.borrowDue||"",specialToolNumber:t.specialToolNumber||"",custody:t.custody||null,calibratedOn:t.calibratedOn||"",calibrationDue:t.calibrationDue||"",calibrationCertificate:t.calibrationCertificate||""});
+ next.activity=[...(before.activity||[]),{action:d.action,reason,timestamp:time,before:snapshot(before),after:snapshot(next)}];return next;
+ },
+ async commitToolAction(){
+ if(this.toolInventoryBusy||!this.toolActionDraft)return false;
+ const prior=this.toolInventory||[],draft=this.toolActionDraft;this.toolInventoryBusy=true;this.toolInventoryError="";
+ try{const tool=prior.find(t=>String(t.id)===String(draft.id)),next=this.applyToolAction(tool,draft);this.toolInventory=prior.map(t=>String(t.id)===String(draft.id)?next:t);
+ if(!await this.saveToStorage("Tool "+draft.action,{toolId:tool.id}))throw Error(this.lastSaveError||"Tool action could not be saved.");
+ this.toolActionDraft=null;return true;}catch(e){this.toolInventory=prior;this.toolInventoryError=e.message;return false;}finally{this.toolInventoryBusy=false;}
+ },
+ planToolMatches(name) {
 						const key=this.inventoryMatchKey(String(name||"").replace(/\([^)]*\)/g,""));
-						return (this.toolInventory||[]).filter(t=>{const n=this.inventoryMatchKey(t.name);return key&&n&&(n===key||(n.length>=5&&(" "+key+" ").includes(" "+n+" "))||(key.length>=5&&(" "+n+" ").includes(" "+key+" ")));});
+						return (this.toolInventory||[]).filter(t=>{const n=this.inventoryMatchKey(t.name),sst=this.inventoryMatchKey(t.specialToolNumber);return !!(sst&&key&&(" "+key+" ").includes(" "+sst+" "))||key&&n&&(n===key||(n.length>=5&&(" "+key+" ").includes(" "+n+" "))||(key.length>=5&&(" "+n+" ").includes(" "+key+" ")));});
 					},
 					planPartMatches(project,part,index) {
 						const req=(project?.partRequirements||[]).find(r=>r.id===project.id+"-plan-part-"+index),key=this.inventoryMatchKey(part.name),pn=this.inventoryMatchKey(req?.partNumber);
@@ -3666,7 +3735,9 @@
 					},
 					async removeOwnedTool(id) {
 						if(this.toolInventoryBusy)return;
-						const prior=this.toolInventory||[];this.toolInventoryBusy=true;this.toolInventoryError="";
+						const prior=this.toolInventory||[],tool=prior.find(t=>String(t.id)===String(id));
+						if(tool?.activity?.length||tool?.custody&&tool.custody.status!=="available"){this.toolInventoryError="Tool has custody or activity history; retain the record.";return;}
+						this.toolInventoryBusy=true;this.toolInventoryError="";
 						this.toolInventory=prior.filter(t=>String(t.id)!==String(id));
 						try{if(!await this.saveToStorage())throw Error("Tool could not be removed.");}
 						catch(e){this.toolInventory=prior;this.toolInventoryError=e.message;}
@@ -3683,9 +3754,9 @@
 							Object.assign(items.at(-1),{kind:"part",inventoryMatch:available,quantity:qty,matches});
 						}
 						for(const [i,tool] of (plan.tools||[]).entries()){
-							const matches=this.planToolMatches(tool.name);
-							add("tool-"+i,tool.name,matches.length?"Possible owned tool: "+matches.map(t=>t.name+(t.notes?" ("+t.notes+")":"")).join(", ")+". Verify size, range and condition.":"Not recorded in tool inventory; confirm access.");
-							Object.assign(items.at(-1),{kind:"tool",inventoryMatch:matches.length>0,matches});
+							const matches=this.planToolMatches(tool.name),available=matches.filter(t=>this.toolAvailability(t,project.id).available);
+							add("tool-"+i,tool.name,available.length?"Possible available tool: "+available.map(t=>t.name+" ("+this.toolAvailability(t,project.id).label+")").join(", ")+". Verify size, range and condition.":matches.length?"Matching tools unavailable: "+matches.map(t=>t.name+" ("+this.toolAvailability(t,project.id).label+")").join(", ")+". Confirm access to a suitable alternative.":"Not recorded in tool inventory; confirm access.");
+							Object.assign(items.at(-1),{kind:"tool",inventoryMatch:available.length>0,matches});
 						}
 						add("sources","Factory procedures and precautions reviewed",plan.unavailable?.length?"Missing source documents — regenerate or obtain a complete plan.":"Review diagrams, torque assignments and safe access.",!!plan.unavailable?.length);
 						const done=items.filter(i=>i.done).length,ready=items.length>0&&done===items.length;

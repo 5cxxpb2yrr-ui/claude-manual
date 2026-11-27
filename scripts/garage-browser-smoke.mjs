@@ -169,6 +169,41 @@ async function run(name,launcher){
  assert.equal(await app(page,a=>window.MotorNoteInventoryEngine.audit(a.inventoryLedger,a.inventory).length),0);
  assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
  console.log(name,"reload, attachment backup and restore passed");
+ phase="service history import";
+ // Use synthetic records only; never commit personal service histories.
+ await app(page,async a=>{a.vehicles.push({id:"subaru-crosstrek",name:"2019 Subaru Crosstrek",odometer:80000});if(!await a.saveToStorage())throw Error("Second vehicle fixture failed");});
+ const historyFixture={records:[
+ {vehicle:"xB",date:"2024-01-15",mileage:71000,services:["Oil and filter changed"],cost:25},
+ {vehicle:"xB",date:"2024-01-15",mileage:71000,services:["Oil and filter changed"],cost:25},
+ {vehicle:"Crosstrek",date:"2024-02-15",mileage:72000,services:["Tires rotated"]},
+ {vehicle:"Crosstrek",date:"2024-03-15",mileage:73000,services:["Oil leak checked"],reviewRequired:true},
+ {vehicle:"xB",date:"2024-04-15",kind:"administrative",services:["Registration issued"]}
+ ]};
+ const untouched=async()=>await app(page,a=>{const s=a.getPersistableState();delete s.logs;delete s.savedAt;return s;});
+ const beforeHistory=await untouched();
+ const initialLogCount=await app(page,a=>a.logs.length);
+ await app(page,a=>{a.modals.serviceImport=true;});
+ const importer=page.getByRole("dialog",{name:"Import Service History"});
+ await importer.waitFor({state:"visible"});
+ const uploadHistory=async()=>{await importer.locator('input[type="file"]').setInputFiles({name:"fixture-history.json",mimeType:"application/json",buffer:Buffer.from(JSON.stringify(historyFixture))});await page.waitForFunction(sel=>window.Alpine.$data(document.querySelector(sel)).serviceImportRows.length===4,selector);};
+ await uploadHistory();
+ assert.deepEqual(await app(page,a=>a.serviceImportRows.map(r=>[r.selected,r.duplicate,r.review])),[[true,false,false],[false,true,false],[true,false,false],[false,false,true]]);
+ await importer.getByRole("button",{name:"Merge selected service records"}).click();
+ await page.waitForFunction(sel=>window.Alpine.$data(document.querySelector(sel)).serviceImportSummary.startsWith("2 service records imported"),selector);
+ await saved(page);
+ assert.equal(await app(page,a=>a.logs.length),initialLogCount+2);
+ assert.deepEqual(await untouched(),beforeHistory,"Import must preserve all non-log collections");
+ assert.equal(await app(page,a=>a.logs.find(l=>l.importedHistory&&l.vehicleId==="subaru-crosstrek").cost),null);
+ assert.equal(await app(page,async a=>{const tx=a.garageDB.transaction("backups","readonly");return await new Promise((resolve,reject)=>{const q=tx.objectStore("backups").getAll();q.onsuccess=()=>resolve(q.result.some(b=>b.reason==="pre-service-history-import"&&b.state.logs.length===a.logs.length-2));q.onerror=()=>reject(q.error);});}),true,"Pre-import safety snapshot");
+ await uploadHistory();
+ assert.equal(await app(page,a=>a.serviceImportRows.filter(r=>r.selected).length),0,"Repeat import must not select duplicates");
+ await importer.getByRole("button",{name:"Close",exact:true}).click();
+ await page.reload();await saved(page);
+ assert.equal(await app(page,a=>a.logs.filter(l=>l.importedHistory).length),2);
+ assert.deepEqual(await untouched(),beforeHistory,"Reload preserves non-log collections");
+ assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
+ console.log(name,"service history import, duplicate prevention, safety snapshot and persistence passed");
+
  // Already-open Garage must be able to save a local transaction without network.
  phase="offline transaction";
  await context.setOffline(true);

@@ -22,7 +22,8 @@ function reconcile(ledger,inventory,options={}){
   const before=prior?.after||zero(),delta={onHand:after.onHand-before.onHand,reserved:after.reserved-before.reserved};
   const count=options.reference?.action==="physical-count"&&String(options.reference.itemId)===key&&present;
   const merge=options.reference?.action==="stock-merge"&&(String(options.reference.itemId)===key||String(options.reference.sourceId)===key);
-  if(prior&&same(before,after)&&prior.present===present&&!count&&!merge)return;
+  const storage=present&&["storage-transfer","reorder-settings"].includes(options.reference?.action)&&String(options.reference.itemId)===key;
+  if(prior&&same(before,after)&&prior.present===present&&!count&&!merge&&!storage)return;
   let type;
   if(!prior)type=old.length?"stock-added":"opening-balance";
   else if(!present)type="stock-removed";
@@ -32,7 +33,8 @@ function reconcile(ledger,inventory,options={}){
   else type="stock-adjustment";
   if(count)type="physical-count";
   if(merge)type=present?"merge-in":"merge-out";
-  next.push({id:"inventory-movement-"+(next.length+1),itemId:key,name:String(part?.description||prior?.name||"Inventory item"),partNumber:String(part?.partNumber||prior?.partNumber||""),timestamp,type,reason:!prior&&!old.length&&!count&&!merge?"Existing stock at ledger initialization":String(options.reason||"Saved inventory change"),reference:options.reference||null,before:{...before},after:{...after},delta,present});
+  if(storage)type=options.reference.action;
+  next.push({id:"inventory-movement-"+(next.length+1),itemId:key,name:String(part?.description||prior?.name||"Inventory item"),partNumber:String(part?.partNumber||prior?.partNumber||""),timestamp,type,reason:!prior&&!old.length&&!count&&!merge&&!storage?"Existing stock at ledger initialization":String(options.reason||"Saved inventory change"),reference:options.reference||null,before:{...before},after:{...after},delta,present});
  };
  for(const part of inventory||[]){
   if(part?.id==null)throw Error("Inventory item has no ID.");
@@ -116,6 +118,8 @@ function physicalCount(inventory,request,context={}){
 function mergeStock(inventory,request,context={}){
  const target=inventory.find(p=>idIs(p.id,request.targetId)),source=inventory.find(p=>idIs(p.id,request.sourceId));
  if(!target||!source||idIs(target.id,source.id)||inventory.filter(p=>idIs(p.id,target.id)||idIs(p.id,source.id)).length!==2)throw Error("Choose two distinct, unambiguous records.");
+ if(locationCode(target.storageLocation)!==locationCode(source.storageLocation))throw Error("Move both records to the same storage location before merging.");
+ if((target.reorderMinimum??null)!==(source.reorderMinimum??null)||(target.reorderTarget??null)!==(source.reorderTarget??null))throw Error("Reorder settings differ; review before merging.");
  const reason=String(request.reason||"").trim();
  if(!reason||reason.length>300)throw Error("Enter a merge reason (up to 300 characters).");
  if(!identity(target.partNumber)||identity(target.partNumber)!==identity(source.partNumber)||key(target.unit||"each")!==key(source.unit||"each")||key(target.vehicleCompatibility)!==key(source.vehicleCompatibility)||!key(target.vehicleCompatibility)||key(target.vehicleCompatibility)==="not verified")throw Error("Merge requires matching manufacturer number, unit and verified fitment.");
@@ -132,5 +136,47 @@ function mergeStock(inventory,request,context={}){
  return {inventory:inventory.filter(p=>!idIs(p.id,source.id)).map(p=>idIs(p.id,target.id)?merged:p),reference:{action:"stock-merge",itemId:target.id,sourceId:source.id,targetBefore:copy(target),sourceBefore:copy(source),reason}};
 }
 
-const api={balance,project,reconcile,audit,inspectInventory,physicalCount,mergeStock,reservationFloor};root.MotorNoteInventoryEngine=api;if(typeof module!=="undefined")module.exports=api;
+
+function locationCode(value){
+ const raw=String(value??"").trim().toUpperCase();
+ if(!raw)return "";
+ if(!/^[A-Z0-9][A-Z0-9 ._/-]{0,79}$/.test(raw))throw Error("Location code must be 1–80 letters, numbers, spaces or . _ / -.");
+ return raw;
+}
+function storageSummary(inventory=[],context={}){
+ const groups=new Map(),reorder=[],issues=[];
+ for(const p of inventory){
+  let code="",floor=0;
+  try{code=locationCode(p.storageLocation);floor=reservationFloor(p,context);if(!validNumber(p.quantity))throw Error("Invalid stock quantity.");}catch(err){issues.push({id:p.id,message:(p.description||p.id)+": "+err.message});continue;}
+  const available=Math.max(0,Number(p.quantity)-floor),row={id:p.id,description:p.description,partNumber:p.partNumber||"",quantity:Number(p.quantity),available,unit:p.unit||"each",location:code,minimum:p.reorderMinimum??null,target:p.reorderTarget??null};
+  if(!groups.has(code))groups.set(code,{code,label:code||"Unassigned",items:[]});
+  groups.get(code).items.push(row);
+  if(row.minimum===null&&row.target===null)continue;
+  if(!validNumber(row.minimum)||!validNumber(row.target)||Number(row.target)<=Number(row.minimum)){issues.push({id:p.id,message:(p.description||p.id)+": invalid reorder settings"});continue;}
+  if(available<=Number(row.minimum)){
+   // Only credit incoming order lines explicitly linked to this stock record.
+   const incoming=(context.vendorOrders||[]).filter(o=>["Ordered","Partially received"].includes(o.status)).flatMap(o=>o.lines||[]).filter(l=>idIs(l.inventoryId,p.id)&&key(l.unit||"each")===key(p.unit||"each")&&key(l.vehicleCompatibility||"Not verified")===key(p.vehicleCompatibility||"Not verified")&&(!identity(p.partNumber)||identity(l.partNumber)===identity(p.partNumber))).reduce((sum,l)=>sum+Math.max(0,Number(l.quantity||0)-Number(l.receivedQuantity||0)),0);
+   const suggested=Math.max(0,Number(row.target)-available-incoming);
+   reorder.push({...row,incoming,suggested});
+  }
+ }
+ return {groups:[...groups.values()].sort((a,b)=>a.code.localeCompare(b.code)),reorder,issues};
+}
+function updateStorage(inventory,request){
+ const p=inventory.find(x=>idIs(x.id,request.id));
+ if(!p||inventory.filter(x=>idIs(x.id,request.id)).length!==1)throw Error("Stock record is missing or ambiguous.");
+ const before=locationCode(p.storageLocation),after=locationCode(request.location),reason=String(request.reason||"").trim();
+ if(!validNumber(p.quantity)||!validNumber(request.expectedQuantity)||Number(p.quantity)!==Number(request.expectedQuantity)||before!==locationCode(request.expectedLocation)||(p.reorderMinimum??null)!==(request.expectedMinimum??null)||(p.reorderTarget??null)!==(request.expectedTarget??null))throw Error("Stock or settings changed; reopen the record.");
+ if(!reason||reason.length>300)throw Error("Enter a reason (up to 300 characters).");
+ const blank=v=>v==null||String(v).trim()==="";
+ let minimum=null,target=null;
+ if(!blank(request.minimum)||!blank(request.target)){
+  if(!validNumber(request.minimum)||!validNumber(request.target)||Number(request.target)<=Number(request.minimum))throw Error("Enter a nonnegative minimum and a target greater than the minimum, or leave both blank.");
+  minimum=Number(request.minimum);target=Number(request.target);
+ }
+ if(before===after&&minimum===(p.reorderMinimum??null)&&target===(p.reorderTarget??null))throw Error("No storage or reorder settings changed.");
+ return {inventory:inventory.map(x=>idIs(x.id,p.id)?{...x,storageLocation:after,reorderMinimum:minimum,reorderTarget:target}:x),reference:{action:before===after?"reorder-settings":"storage-transfer",itemId:p.id,quantity:Number(p.quantity),from:before,to:after,minimumBefore:p.reorderMinimum??null,targetBefore:p.reorderTarget??null,minimumAfter:minimum,targetAfter:target,reason}};
+}
+
+const api={balance,project,reconcile,audit,inspectInventory,physicalCount,mergeStock,reservationFloor,locationCode,storageSummary,updateStorage};root.MotorNoteInventoryEngine=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

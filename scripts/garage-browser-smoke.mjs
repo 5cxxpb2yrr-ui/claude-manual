@@ -312,7 +312,7 @@ async function run(name,launcher){
  await saved(page);
  const ragsItem=async()=>app(page,a=>a.inventoryShoppingList.items.find(i=>i.partNumber==="RAGS-FIXTURE"));
  const initial=await ragsItem();assert.equal(initial.required,6);assert.equal(initial.quantity,5);assert.equal(initial.sources.length,1);
- await page.getByText("Fixture shop rags",{exact:true}).last().waitFor({state:"visible"});
+ await page.locator("div[x-show=\"inventoryView==='shopping'\"]").getByText("Fixture shop rags",{exact:true}).waitFor({state:"visible"});
  await app(page,a=>a.openVendorDraft(a.inventoryShoppingList.items.find(i=>i.partNumber==="RAGS-FIXTURE")));
  assert.equal(await app(page,a=>a.vendorDraft.lines[0].inventoryId),initial.stockId);
  await app(page,async a=>{Object.assign(a.vendorDraft,{vendor:"Fixture supplies",orderNumber:"RAGS-ORDER"});Object.assign(a.vendorDraft.lines[0],{quantity:6,unitCost:3});await a.saveVendorDraft();});

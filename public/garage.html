@@ -271,7 +271,7 @@
  </div></div>
  <template x-if="modals.captureMenu"><div class="fixed inset-0 z-[60] bg-black/75 flex items-end justify-center" @click.self="modals.captureMenu=false" @keydown.escape.window="modals.captureMenu=false" role="dialog" aria-modal="true" aria-label="Capture menu"><div class="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-800 p-3 space-y-2 overflow-y-auto max-h-[85dvh]" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
  <div class="flex items-center justify-between"><h2 class="text-base font-bold text-amber-300">Capture</h2><button type="button" @click="modals.captureMenu=false" class="garage-close text-zinc-300" aria-label="Close capture">✕</button></div>
- <template x-for="entry in [{id:'service',label:'Log service / repair'},{id:'project',label:'New repair project'},{id:'part',label:'Add inventory part'},{id:'consumable',label:'Report low / empty consumable'},{id:'mileage',label:'Update odometer'},{id:'search',label:'Search Garage'}]" :key="entry.id"><button type="button" @click="openCaptureDestination(entry.id)" class="garage-tap w-full text-left flex items-center justify-between rounded-lg border border-zinc-800 px-3 text-sm font-semibold"><span x-text="entry.label"></span><span class="text-amber-300">→</span></button></template>
+ <template x-for="entry in [{id:'service',label:'Log service / repair'},{id:'project',label:'New repair project'},{id:'part',label:'Add inventory part'},{id:'consumable',label:'Report low / empty consumable'},{id:'usage',label:'Record stock used'},{id:'mileage',label:'Update odometer'},{id:'search',label:'Search Garage'}]" :key="entry.id"><button type="button" @click="openCaptureDestination(entry.id)" class="garage-tap w-full text-left flex items-center justify-between rounded-lg border border-zinc-800 px-3 text-sm font-semibold"><span x-text="entry.label"></span><span class="text-amber-300">→</span></button></template>
  </div></div></template>
  <template x-if="modals.consumables && consumableDraft"><div class="fixed inset-0 z-[60] bg-black/75 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Consumable replenishment"><div class="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-800 p-4 space-y-3 max-h-[85dvh] overflow-y-auto" style="padding-bottom:max(16px,env(safe-area-inset-bottom))">
  <div class="flex items-center justify-between"><h2 class="font-bold text-amber-300">Consumable replenishment</h2><button type="button" class="garage-close" :disabled="consumableBusy" @click="modals.consumables=false" aria-label="Close consumable">✕</button></div>
@@ -285,6 +285,14 @@
  <button type="button" :disabled="consumableBusy" @click="saveConsumableReport()" class="garage-tap w-full rounded-lg bg-amber-500 text-zinc-950 font-bold">Save report</button>
  <template x-if="consumableDraft.id"><div class="border-t border-zinc-700 pt-3 space-y-2"><button type="button" :disabled="consumableBusy" @click="orderConsumable()" class="garage-tap w-full rounded-lg border border-amber-500/50 text-amber-300 font-bold">Review / record purchase</button><p class="text-xs text-zinc-400">For a vehicle refill from linked stock, enter actual quantity in the recorded stock unit. Leave blank only if no inventory deduction is known or needed.</p><label x-show="consumableDraft.scope==='vehicle'" class="block text-sm">Actual stock used (optional)<input x-model="consumableQuantity" type="number" min="0" step="any" inputmode="decimal" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"></label><button type="button" :disabled="consumableBusy" @click="resolveConsumable()" class="garage-tap w-full rounded-lg bg-emerald-800 text-white font-bold" x-text="consumableDraft.scope==='vehicle'?'Confirm actual refill':'Confirm sufficient stock'"></button></div></template>
  <p role="alert" x-show="consumableError" x-text="consumableError" class="text-sm text-rose-300"></p></div></div></template>
+ <template x-if="modals.usage && usageDraft"><div class="fixed inset-0 z-[60] bg-black/75 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Record stock used"><div class="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-800 p-4 space-y-3 max-h-[85dvh] overflow-y-auto" style="padding-bottom:max(16px,env(safe-area-inset-bottom))">
+ <div class="flex items-center justify-between"><h2 class="font-bold text-amber-300">Record stock used</h2><button type="button" :disabled="usageBusy" @click="modals.usage=false" class="garage-close" aria-label="Close stock usage">✕</button></div>
+ <label class="block text-sm">Stock item<select x-model="usageDraft.id" @change="selectUsageStock()" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"><option value="">Select stock</option><template x-for="p in inventory" :key="p.id"><option :value="String(p.id)" x-text="p.description+' · '+(p.unit||'each')"></option></template></select></label>
+ <p class="text-xs text-zinc-400" x-text="usageDraft.unit?'Recorded balance: '+usageDraft.expectedQuantity+' '+usageDraft.unit:''"></p>
+ <label class="block text-sm">Actual quantity used<input x-model="usageDraft.quantity" type="number" min="0" step="any" inputmode="decimal" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"></label>
+ <label class="block text-sm">Reason<input x-model="usageDraft.reason" maxlength="300" placeholder="Cleaned tools, wiped workbench…" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"></label>
+ <p class="text-xs text-zinc-400">Record actual unreserved stock consumed. Use physical count for corrections and the vehicle refill workflow for reservoir refills.</p>
+ <button type="button" :disabled="usageBusy" @click="saveUsage()" class="garage-tap w-full bg-amber-500 text-zinc-950 rounded-lg font-bold">Confirm stock used</button><p role="alert" x-show="usageError" x-text="usageError" class="text-xs text-rose-300"></p></div></div></template>
  <!-- ================= MAIN CONTENT AREA ================= -->
 			<main class="garage-main flex-1 px-4 sm:px-6 pt-5 pb-24 z-10">
 				<!-- 1. DASHBOARD TAB -->
@@ -1207,9 +1215,14 @@
  <label class="text-xs text-amber-300">Scan location label photo<input type="file" accept="image/*" capture="environment" :disabled="captureBusy||inventorySaving||vendorBusy" @change="scanStorageLabel($event)" class="block text-xs"></label>
  <p x-show="storageError" x-text="storageError" class="text-xs text-amber-300"></p>
  <template x-for="issue in inventoryStorage.issues" :key="issue.id"><p x-text="issue.message" class="text-xs text-rose-300"></p></template>
- <template x-for="group in visibleStorageGroups" :key="group.code"><details class="border border-zinc-800 rounded p-2"><summary class="text-xs font-bold text-white" x-text="group.label+' · '+group.items.length+' records'"></summary><template x-for="part in group.items" :key="part.id"><div class="border-t border-zinc-800 py-2 text-xs"><p class="font-bold" x-text="part.description"></p><p class="text-zinc-400" x-text="part.quantity+' '+part.unit+' on hand · '+part.available+' available'"></p><div class="flex gap-3"><button type="button" :disabled="inventorySaving||vendorBusy" @click="startStorageEdit(part.id)" class="text-amber-300">Move / settings</button><button type="button" :disabled="inventorySaving||vendorBusy" @click="inventoryView='reconcile';startPhysicalCount(inventory.find(p=>String(p.id)===String(part.id)))" class="text-amber-300">Count</button></div></div></template></details></template>
+ <template x-for="group in visibleStorageGroups" :key="group.code"><details class="border border-zinc-800 rounded p-2"><summary class="text-xs font-bold text-white" x-text="group.label+' · '+group.items.length+' records'"></summary><template x-for="part in group.items" :key="part.id"><div class="border-t border-zinc-800 py-2 text-xs"><p class="font-bold" x-text="part.description"></p><p class="text-zinc-400" x-text="part.quantity+' '+part.unit+' on hand · '+part.available+' available'"></p><div class="flex gap-3"><button type="button" :disabled="inventorySaving||vendorBusy" @click="startStorageEdit(part.id)" class="text-amber-300">Move / settings</button><button type="button" :disabled="inventorySaving||vendorBusy" @click="openUsage(part.id)" class="text-amber-300">Record use</button><button type="button" :disabled="inventorySaving||vendorBusy" @click="inventoryView='reconcile';startPhysicalCount(inventory.find(p=>String(p.id)===String(part.id)))" class="text-amber-300">Count</button></div></div></template></details></template>
  <p x-show="!visibleStorageGroups.length" class="text-xs text-zinc-400">No matching location.</p>
  <template x-if="storageDraft"><div class="border border-amber-500/40 rounded p-2 space-y-2"><p class="text-xs font-bold" x-text="storageDraft.name"></p><p class="text-xs text-zinc-400" x-text="'Moving '+storageDraft.expectedQuantity+' from '+(storageDraft.expectedLocation||'Unassigned')"></p><label class="text-xs">Location code<input x-model="storageDraft.location" maxlength="80" placeholder="GARAGE/A/03" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><div class="grid grid-cols-2 gap-2"><label class="text-xs">Low-stock minimum<input x-model="storageDraft.minimum" type="number" min="0" step="any" inputmode="decimal" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><label class="text-xs">Reorder target<input x-model="storageDraft.target" type="number" min="0" step="any" inputmode="decimal" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label></div><p class="text-[10px] text-zinc-400">Leave both reorder fields blank to disable. Use the location code as the label text or barcode payload.</p><label class="text-xs">Reason<input x-model="storageDraft.reason" maxlength="300" class="w-full bg-zinc-950 border border-zinc-800 rounded p-2"></label><button type="button" :disabled="inventorySaving||vendorBusy" @click="saveStorageEdit()" class="w-full bg-amber-500 text-zinc-950 rounded py-2 text-xs font-bold">Save location & settings</button><button type="button" :disabled="inventorySaving" @click="storageDraft=null" class="text-xs text-zinc-400">Cancel</button></div></template>
+ <details class="border border-zinc-800 rounded p-2" open><summary class="text-xs font-bold text-white">Usage forecast · <span x-text="consumptionForecast.items.length"></span></summary>
+ <p class="text-[10px] text-zinc-400">Based on confirmed usage over the last 90 days. Requires 3 separate usage dates spanning at least 14 days, with recent activity. Estimates, not guaranteed supply dates.</p>
+ <template x-for="issue in consumptionForecast.issues" :key="issue"><p class="text-xs text-rose-300" x-text="issue"></p></template>
+ <template x-for="row in consumptionForecast.items" :key="row.id"><div class="border-t border-zinc-800 py-2 space-y-1 text-xs"><p class="font-bold" x-text="row.name"></p><p class="text-zinc-400" x-text="row.events+' confirmed uses · '+row.consumed+' '+row.unit+' recorded'"></p><p x-show="row.status==='insufficient-history'" class="text-zinc-400">Not enough recent history to estimate depletion.</p><template x-if="row.status==='estimated'"><div><p :class="row.review?'text-amber-300':'text-zinc-300'" x-text="'Estimated '+Math.floor(row.daysRemaining)+' days of available stock · '+row.rate.toFixed(2)+' '+row.unit+'/day'"></p><p class="text-zinc-400" x-text="'Consider a 30-day stock target of '+row.suggestedTarget+' '+row.unit+'; review incoming orders first.'"></p><button type="button" @click="startStorageEdit(row.id)" class="text-amber-300 py-2">Review reorder settings →</button></div></template></div></template>
+ <p x-show="!consumptionForecast.items.length&&!consumptionForecast.issues.length" class="text-xs text-zinc-400">No verified usage history yet. Record actual stock use to start.</p></details>
  <details class="border border-zinc-800 rounded p-2" open><summary class="text-xs font-bold text-white">Low-stock review · <span x-text="inventoryStorage.reorder.length"></span></summary><template x-for="row in inventoryStorage.reorder" :key="row.id"><div class="border-t border-zinc-800 py-2 text-xs"><p class="font-bold" x-text="row.description"></p><p class="text-zinc-400" x-text="row.available+' available · '+row.incoming+' linked incoming · target '+row.target"></p><p class="text-amber-300" x-text="row.suggested>0?'Consider ordering '+row.suggested+' '+row.unit:'Covered by linked incoming stock'"></p></div></template><p x-show="!inventoryStorage.reorder.length" class="text-xs text-zinc-400">No configured items at or below minimum.</p><p class="text-[10px] text-zinc-400">Review demand forecast and unlinked orders before buying. Recommendations do not create orders.</p></details>
  </div></template>
 <template x-if="inventoryView==='reconcile'"><div class="space-y-3">
@@ -3083,7 +3096,7 @@
 					isEditingRepair: false,
 					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",captureBusy:false,vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",reconcileDraft:null,reconcileError:"",storageDraft:null,storageError:"",storageFilter:"",priceSearch:"",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
 					garageDB: null,
-					consumableDraft:null,consumableError:'',consumableBusy:false,consumableQuantity:'',
+					usageDraft:null,usageError:'',usageBusy:false,consumableDraft:null,consumableError:'',consumableBusy:false,consumableQuantity:'',
                     serviceImportRows: [], serviceImportError: '', serviceImportBusy: false, serviceImportSummary: '',
                     saveState: 'saved', lastSaveError:'', backupBusy:false, startupReadFailed:false,
 					lastSavedAt: null,
@@ -3131,6 +3144,7 @@
  if(kind==="part"){this.currentTab="inventory";this.openNewPartModal();}
  if(kind==="mileage")this.modals.updateMileage=true;
  if(kind==="consumable")this.openConsumable();
+ if(kind==="usage")this.openUsage();
  },
  get moreTabActive() {
 						return !this.primaryTabIds.includes(this.currentTab);
@@ -3138,7 +3152,7 @@
 
 					// Modals
 					modals: {
-				mobileSearch:false,navMenu:false,captureMenu:false,consumables:false,
+				mobileSearch:false,navMenu:false,captureMenu:false,consumables:false,usage:false,
 						smartSearch: false,
 						newRepair: false,
 						repairDetail: false,
@@ -4417,7 +4431,7 @@ async saveVendorDraft(){
 					get inventoryShoppingList(){
  const forecast=this.inventoryForecast(this.inventoryForecastHorizon||20),vehicles=this.vehicles||[],demand=window.MotorNoteDemandEngine;
  try{const engine=window.MotorNoteConsumables,reports=engine.readVehicles(vehicles),consumables=engine.project({reports,inventory:this.inventory,orders:this.vendorOrders,vehicles,today:this.toolToday()});
- return demand.unifiedShoppingList(forecast,vehicles,{inventory:this.inventory,storage:this.inventoryStorage,reports,consumables,orders:this.vendorOrders});
+ return demand.unifiedShoppingList(forecast,vehicles,{inventory:this.inventory,storage:this.inventoryStorage,reports,consumables,orders:this.vendorOrders,consumption:this.consumptionForecast});
  }catch(e){const list=demand.shoppingList(forecast,vehicles);list.reviews.push({key:"replenishment-error",name:"Replenishment unavailable",source:"Data review",reason:"Check consumable and storage data before buying."});return list;}
  },
  validateReplenishmentDraft(lines){
@@ -4452,6 +4466,23 @@ async saveVendorDraft(){
 					get inventoryPriceReport(){return window.MotorNotePriceIntelligence.analyze({orders:this.vendorOrders||[],inventory:this.inventory||[],shopping:this.inventoryShoppingList.items});},
 get inventoryPriceRows(){const q=this.priceSearch.trim().toLowerCase();return this.inventoryPriceReport.products.filter(p=>!q||[p.name,p.partNumber,p.fitment,...p.suppliers.map(s=>s.name)].join(" ").toLowerCase().includes(q));},
 get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(this.inventory||[],this.reconcileContext());},
+ get consumptionForecast(){return window.MotorNoteInventoryEngine.consumptionForecast(this.inventory||[],this.inventoryLedger||[],this.reconcileContext());},
+ openUsage(id=null){
+ this.usageError="";this.usageDraft={id:id==null?"":String(id),expectedQuantity:null,unit:"",quantity:"",reason:""};this.selectUsageStock();this.modals.usage=true;
+ },
+ selectUsageStock(){
+ const d=this.usageDraft,p=(this.inventory||[]).find(x=>String(x.id)===String(d.id));
+ d.expectedQuantity=p?Number(p.quantity):null;d.unit=p?(p.unit||"each"):"";d.quantity="";
+ },
+ async saveUsage(){
+ if(this.usageBusy||this.inventorySaving||this.vendorBusy||this.backupBusy||this.startupReadFailed)return false;
+ this.usageBusy=true;this.inventorySaving=true;this.usageError="";let prior=null;
+ try{await this.inventorySaveTail;prior=this.inventory;if(this.inventoryIntegrity.ledgerIssues.length)throw Error("Resolve inventory integrity issues first.");
+ const result=window.MotorNoteInventoryEngine.recordConsumption(prior,this.usageDraft,this.reconcileContext());this.inventory=result.inventory;
+ if(!await this.saveToStorage("Consumable stock used",result.reference))throw Error(this.lastSaveError||"Usage could not be saved.");
+ this.modals.usage=false;return true;
+ }catch(e){if(prior)this.inventory=prior;this.usageError=e.message;return false;}finally{this.usageBusy=false;this.inventorySaving=false;}
+ },
  get visibleStorageGroups(){const q=String(this.storageFilter||"").trim().toUpperCase();return this.inventoryStorage.groups.filter(group=>!q||group.label.toUpperCase().includes(q));},
  async scanStorageLabel(event){const file=event.target.files?.[0];event.target.value="";if(!file||this.captureBusy||this.inventorySaving||this.vendorBusy)return;this.captureBusy=true;this.storageError="";try{const code=await window.MotorNoteCapture.scanImage(file);this.storageFilter=window.MotorNoteInventoryEngine.locationCode(code);}catch(err){this.storageError=err.message;}finally{this.captureBusy=false;}},
  startStorageEdit(id){const p=(this.inventory||[]).find(x=>String(x.id)===String(id));if(!p)return;this.storageError="";this.storageDraft={id:p.id,name:p.description,expectedQuantity:Number(p.quantity),expectedLocation:p.storageLocation||"",expectedMinimum:p.reorderMinimum??null,expectedTarget:p.reorderTarget??null,location:p.storageLocation||"",minimum:p.reorderMinimum??"",target:p.reorderTarget??"",reason:""};},

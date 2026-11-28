@@ -287,7 +287,7 @@ async function run(name,launcher){
   if(name==="chromium")assert.equal(response.fromServiceWorker(),true,"Chromium cold response must come from the service worker");
   await saved(page);
   const pinned=await page.evaluate(()=>[...document.querySelectorAll('script[src],link[rel="stylesheet"][href]')].map(el=>new URL(el.src||el.href,location.href).searchParams.get("garage-offline")));
-  assert.equal(pinned.length,12,"All essential Garage resources must be version pinned");
+  assert.equal(pinned.length,13,"All essential Garage resources must be version pinned");
   assert.ok(pinned.every(version=>/^[a-f0-9]{64}$/.test(version||"")&&version===pinned[0]),"Offline document must load a single coherent version");
   assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="OFFLINE-1")?.quantity),1);
   assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
@@ -445,8 +445,9 @@ async function run(name,launcher){
    assert.equal(diagnostic.controlled,true);
    assert.equal(diagnostic.activeController,true,"Offline probe must use the fully activated controller");
    assert.deepEqual(diagnostic.caches,[prefix+version]);
-   assert.equal(diagnostic.pinned.length,12);
-   assert.deepEqual(diagnostic.pinned,Array(12).fill(version),"Offline resources must all use the selected build");
+   const expectedAssets=version===recoveryShell?12:13;
+   assert.equal(diagnostic.pinned.length,expectedAssets);
+   assert.deepEqual(diagnostic.pinned,Array(expectedAssets).fill(version),"Offline resources must all use the selected build");
    if(name==="chromium")assert.equal(response.fromServiceWorker(),true);
    assert.deepEqual(await snapshot(),beforeRollback,"Offline startup must preserve the full V9 state");
   }finally{networkBlocked=false;}

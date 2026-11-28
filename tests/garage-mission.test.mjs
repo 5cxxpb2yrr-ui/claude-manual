@@ -27,3 +27,12 @@ test("empty consumables outrank routine actions but not existing findings or int
  const w=M.build({consumables:[{...c,state:"waiting",rank:81,group:"Waiting",overdue:true}]});
  assert.match(w.next.detail,/Delivery overdue/);assert.equal(w.groups.find(g=>g.name==="Waiting").rows.length,1);
 });
+
+test("only fully represented vendor orders are deduplicated from mission waiting rows",()=>{
+ const c={id:"r",name:"Washer fluid",location:"Scion",level:"empty",state:"waiting",rank:81,group:"Waiting",overdue:true,incoming:[{orderId:"o",lineId:"l",explicit:true}]};
+ const o={id:"o",key:"vendor:o",vendor:"Fixture",expectedDate:"2026-11-25",lines:[{id:"l",quantity:2,receivedQuantity:0,consumableReportId:"r"}]};
+ const rows=(order,consumable=c)=>M.build({today:"2026-11-27",consumables:[consumable],orders:[order]}).groups.find(g=>g.name==="Waiting").rows;
+ assert.deepEqual(rows(o).map(x=>x.id),["consumable:r"]);
+ assert.ok(rows({...o,lines:[...o.lines,{id:"other",quantity:1}]}).some(x=>x.id==="order:vendor:o"));
+ assert.ok(rows(o,{...c,state:"refill",group:"Execute"}).some(x=>x.id==="order:vendor:o"));
+});

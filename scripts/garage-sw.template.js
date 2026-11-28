@@ -12,6 +12,7 @@ const ASSETS = [
   "/inventory-engine.js",
   "/repair-history.js",
   "/garage-mission.js",
+  "/garage-consumables.js",
   "/garage-backup.js",
   "/inventory-demand.js",
   "/inventory-purchasing.js",

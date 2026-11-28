@@ -17,3 +17,13 @@ test("source failures and unsaved changes outrank routine actions",()=>{
 test("informational custody and historical repeats are never the next action",()=>{
  const r=M.build({today:"2026-11-26",tools:[{id:"t",name:"Puller",custody:{status:"loaned"}}],history:[{vehicleId:"s",repeatCount:1}]});assert.equal(r.next,null);assert.equal(r.actionCount,0);
 });
+
+test("empty consumables outrank routine actions but not existing findings or integrity errors",()=>{
+ const c={id:"r",name:"Washer fluid",location:"Scion",level:"empty",state:"replenish",available:0,unit:"gal",rank:83,group:"Execute"};
+ const r=M.build({consumables:[c],projects:[{id:"p",title:"Routine",status:"Planned"}]});
+ assert.equal(r.next.id,"consumable:r");assert.equal(r.consumables.length,1);assert.equal(r.next.target.consumableId,"r");
+ assert.equal(M.build({...fixture(),consumables:[c]}).next.id,"finding:p");
+ assert.equal(M.build({consumables:[c],saveError:true}).next.id,"save-error");
+ const w=M.build({consumables:[{...c,state:"waiting",rank:81,group:"Waiting",overdue:true}]});
+ assert.match(w.next.detail,/Delivery overdue/);assert.equal(w.groups.find(g=>g.name==="Waiting").rows.length,1);
+});

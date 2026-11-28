@@ -27,6 +27,10 @@ function build(input={}){
   if(!["Red","Orange","Yellow"].includes(p.status))continue;
   add("maintenance:"+p.vehicleId+":"+p.id,"Execute",p.status==="Red"?90:p.status==="Orange"?70:55,p.serviceName,(p.vehicleName||"Vehicle")+" · "+(p.status==="Red"?"Overdue": "Due soon")+(date(p.dueDateISO)?" · projected "+p.dueDateISO:""),{tab:"predictive",vehicleId:p.vehicleId});
  }
+ for(const c of list(input.consumables)){
+  const verb={refill:"Refill",replenish:"Replenish","verify-stock":"Check stock for","confirm-stock":"Confirm sufficient","waiting":"Check delivery for"}[c.state]||"Review";
+  add("consumable:"+c.id,c.group,c.rank,verb+" "+c.name,c.location+" · "+(c.level==="empty"?"Empty":"Low")+" · "+(c.state==="waiting"?(c.overdue?"Delivery overdue":"Awaiting delivery"):c.available===null?"Stock unknown":c.available+" "+(c.unit||"")+" available"),{consumableId:c.id});
+ }
  for(const o of list(input.orders)){
   const due=date(o.expectedDate),overdue=due&&due<today,now=due===today;
   add("order:"+o.key,"Waiting",overdue?86:now?72:40,"Check delivery: "+(o.vendor||"Supplier"),[o.orderNumber&&"#"+o.orderNumber,o.vehicleName,o.status,overdue?"Expected "+due+" · overdue":due?"Expected "+due:"No delivery date"].filter(Boolean).join(" · "),o.target||{tab:"inventory",view:"orders"});
@@ -47,7 +51,7 @@ function build(input={}){
  for(const h of list(input.history))if(h.repeatCount>0)add("history:"+h.vehicleId,"History",10,"Review repeat service records",(h.vehicleName||"Vehicle")+" · "+h.repeatCount+" repeated service titles; not a failure diagnosis",{tab:"repairs",vehicleId:h.vehicleId},false);
  rows.sort((a,b)=>b.rank-a.rank||a.id.localeCompare(b.id));
  const groups=["Execute","Review","Waiting","History"].map(name=>({name,rows:rows.filter(r=>r.group===name)}));
- return {next:rows.find(r=>r.actionable)||null,groups,actionCount:rows.filter(r=>r.actionable).length,incomplete:list(input.errors).length>0};
+ return {next:rows.find(r=>r.actionable)||null,groups,consumables:rows.filter(r=>r.id.startsWith("consumable:")),actionCount:rows.filter(r=>r.actionable).length,incomplete:list(input.errors).length>0};
 }
 const api={build};root.MotorNoteMission=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

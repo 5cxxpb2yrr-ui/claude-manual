@@ -271,8 +271,20 @@
  </div></div>
  <template x-if="modals.captureMenu"><div class="fixed inset-0 z-[60] bg-black/75 flex items-end justify-center" @click.self="modals.captureMenu=false" @keydown.escape.window="modals.captureMenu=false" role="dialog" aria-modal="true" aria-label="Capture menu"><div class="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-800 p-3 space-y-2 overflow-y-auto max-h-[85dvh]" style="padding-bottom:max(12px,env(safe-area-inset-bottom))">
  <div class="flex items-center justify-between"><h2 class="text-base font-bold text-amber-300">Capture</h2><button type="button" @click="modals.captureMenu=false" class="garage-close text-zinc-300" aria-label="Close capture">✕</button></div>
- <template x-for="entry in [{id:'service',label:'Log service / repair'},{id:'project',label:'New repair project'},{id:'part',label:'Add inventory part'},{id:'mileage',label:'Update odometer'},{id:'search',label:'Search Garage'}]" :key="entry.id"><button type="button" @click="openCaptureDestination(entry.id)" class="garage-tap w-full text-left flex items-center justify-between rounded-lg border border-zinc-800 px-3 text-sm font-semibold"><span x-text="entry.label"></span><span class="text-amber-300">→</span></button></template>
+ <template x-for="entry in [{id:'service',label:'Log service / repair'},{id:'project',label:'New repair project'},{id:'part',label:'Add inventory part'},{id:'consumable',label:'Report low / empty consumable'},{id:'mileage',label:'Update odometer'},{id:'search',label:'Search Garage'}]" :key="entry.id"><button type="button" @click="openCaptureDestination(entry.id)" class="garage-tap w-full text-left flex items-center justify-between rounded-lg border border-zinc-800 px-3 text-sm font-semibold"><span x-text="entry.label"></span><span class="text-amber-300">→</span></button></template>
  </div></div></template>
+ <template x-if="modals.consumables && consumableDraft"><div class="fixed inset-0 z-[60] bg-black/75 flex items-end justify-center" role="dialog" aria-modal="true" aria-label="Consumable replenishment"><div class="w-full max-w-md bg-zinc-900 rounded-t-2xl border border-zinc-800 p-4 space-y-3 max-h-[85dvh] overflow-y-auto" style="padding-bottom:max(16px,env(safe-area-inset-bottom))">
+ <div class="flex items-center justify-between"><h2 class="font-bold text-amber-300">Consumable replenishment</h2><button type="button" class="garage-close" :disabled="consumableBusy" @click="modals.consumables=false" aria-label="Close consumable">✕</button></div>
+ <label class="block text-sm">Name<input aria-label="Consumable name" x-model="consumableDraft.name" :disabled="!!consumableDraft.id||consumableBusy" maxlength="120" placeholder="Washer fluid, shop rags…" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"></label>
+ <label class="block text-sm">Location<select x-model="consumableDraft.scope" :disabled="!!consumableDraft.id||consumableBusy" @change="consumableDraft.inventoryId=''" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"><option value="vehicle">Vehicle reservoir / supply</option><option value="garage">Shared garage supply</option></select></label>
+ <label x-show="consumableDraft.scope==='vehicle'" class="block text-sm">Vehicle<select x-model="consumableDraft.vehicleId" :disabled="!!consumableDraft.id||consumableBusy" @change="consumableDraft.inventoryId=''" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"><template x-for="v in vehicles" :key="v.id"><option :value="String(v.id)" x-text="v.name"></option></template></select></label>
+ <label class="block text-sm">Reported level<select x-model="consumableDraft.level" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"><option value="low">Low</option><option value="empty">Empty</option></select></label>
+ <label class="block text-sm">Verified stock link<select x-model="consumableDraft.inventoryId" @change="consumableDraft.targetQuantity=''" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"><option value="">Unknown / not linked</option><template x-for="p in consumableStockChoices" :key="p.id"><option :value="String(p.id)" x-text="p.description+' · '+(p.unit||'each')+' · '+(Number(p.quantity)-Number(p.reservedQuantity||0))+' available'"></option></template></select></label>
+ <label x-show="consumableDraft.scope==='garage' && consumableDraft.inventoryId" class="block text-sm">Desired available stock (optional)<input x-model="consumableDraft.targetQuantity" type="number" min="0" step="any" inputmode="decimal" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"></label>
+ <p class="text-xs text-zinc-400">Unknown stock is not zero. A purchase or receipt alone never confirms a vehicle refill.</p>
+ <button type="button" :disabled="consumableBusy" @click="saveConsumableReport()" class="garage-tap w-full rounded-lg bg-amber-500 text-zinc-950 font-bold">Save report</button>
+ <template x-if="consumableDraft.id"><div class="border-t border-zinc-700 pt-3 space-y-2"><button type="button" :disabled="consumableBusy" @click="orderConsumable()" class="garage-tap w-full rounded-lg border border-amber-500/50 text-amber-300 font-bold">Review / record purchase</button><p class="text-xs text-zinc-400">For a vehicle refill from linked stock, enter actual quantity in the recorded stock unit. Leave blank only if no inventory deduction is known or needed.</p><label x-show="consumableDraft.scope==='vehicle'" class="block text-sm">Actual stock used (optional)<input x-model="consumableQuantity" type="number" min="0" step="any" inputmode="decimal" class="block w-full bg-zinc-950 border border-zinc-700 rounded-lg p-2"></label><button type="button" :disabled="consumableBusy" @click="resolveConsumable()" class="garage-tap w-full rounded-lg bg-emerald-800 text-white font-bold" x-text="consumableDraft.scope==='vehicle'?'Confirm actual refill':'Confirm sufficient stock'"></button></div></template>
+ <p role="alert" x-show="consumableError" x-text="consumableError" class="text-sm text-rose-300"></p></div></div></template>
  <!-- ================= MAIN CONTENT AREA ================= -->
 			<main class="garage-main flex-1 px-4 sm:px-6 pt-5 pb-24 z-10">
 				<!-- 1. DASHBOARD TAB -->
@@ -282,6 +294,7 @@
  <template x-if="mission.next"><button type="button" @click="openGarageMission(mission.next)" class="glass-panel mn-next w-full text-left px-4 py-3 flex items-center justify-between gap-3"><span class="min-w-0"><span class="block text-[10px] font-black uppercase tracking-wide text-amber-300">Next best action</span><span class="block font-bold text-white mt-1" x-text="mission.next.title"></span><span class="block text-xs text-zinc-400 mt-1" x-text="mission.next.detail"></span></span><span class="text-amber-300 shrink-0">→</span></button></template>
  <template x-if="!mission.next"><div class="glass-panel p-3"><p class="text-[10px] font-bold uppercase text-amber-300">Next best action</p><p class="text-sm" x-text="mission.incomplete?'Some data unavailable':'No actionable items in the current records'"></p><p class="text-xs text-zinc-400">This is a record-based review, not a mechanical safety assessment.</p></div></template>
  <p x-show="mission.incomplete" class="text-xs text-amber-300">Some source data could not be evaluated. Review the listed data issues.</p>
+ <section x-show="mission.consumables?.length" class="glass-panel p-3 space-y-2" aria-label="Consumables needing attention"><div class="flex justify-between items-center"><h2 class="font-bold text-sm">Consumables</h2><span class="text-xs text-amber-300" x-text="(mission.consumables||[]).length+' open'"></span></div><template x-for="item in (mission.consumables||[]).filter(row=>row.id!==mission.next?.id)" :key="item.id"><button type="button" class="mn-mission-row" @click="openGarageMission(item)"><span><strong x-text="item.title"></strong><small x-text="item.detail"></small></span><span>→</span></button></template><p x-show="mission.next?.id?.startsWith('consumable:') && mission.consumables.length===1" class="text-xs text-zinc-400">Shown in Next Best Action above.</p><button type="button" @click="openConsumable()" class="garage-tap w-full text-left text-xs text-amber-300">+ Report consumable</button></section>
  <div class="mn-mission-grid" aria-label="Mission Control summaries">
  <template x-for="group in mission.groups" :key="group.name"><button type="button" class="mn-mission-tile" :data-group="group.name" @click="missionGroup=group.name;$refs.missionDialog.showModal()" :aria-label="group.name+': '+group.rows.length+' recorded items'"><span class="mn-tile-value" x-text="group.rows.length"></span><span class="mn-tile-label" x-text="group.name==='Execute'?'Execute now':group.name==='Review'?'Needs review':group.name==='Waiting'?'Waiting':'History'"></span><span class="mn-tile-arrow" aria-hidden="true">→</span></button></template>
  </div>
@@ -3033,6 +3046,7 @@
 		<script src="/inventory-engine.js"></script>
 <script src="/repair-history.js"></script>
 <script src="/garage-mission.js"></script>
+<script src="/garage-consumables.js"></script>
 <script src="/garage-backup.js"></script>
 		<script src="/inventory-demand.js"></script>
 		<script src="/inventory-purchasing.js"></script>
@@ -3069,7 +3083,8 @@
 					isEditingRepair: false,
 					appSchemaVersion: 9, vendorOrders:[], vendorDraft:null,vendorPaste:"",captureBusy:false,vendorError:"",vendorBusy:false,vendorReceiveId:null,vendorReceiveAmounts:{}, inventoryLedger:[], inventorySaveTail:null, inventoryView:"stock",reconcileDraft:null,reconcileError:"",storageDraft:null,storageError:"",storageFilter:"",priceSearch:"",inventorySearch:"",inventoryForecastHorizon:20, inventoryShoppingMessage:"",
 					garageDB: null,
-					serviceImportRows: [], serviceImportError: '', serviceImportBusy: false, serviceImportSummary: '',
+					consumableDraft:null,consumableError:'',consumableBusy:false,consumableQuantity:'',
+                    serviceImportRows: [], serviceImportError: '', serviceImportBusy: false, serviceImportSummary: '',
                     saveState: 'saved', lastSaveError:'', backupBusy:false, startupReadFailed:false,
 					lastSavedAt: null,
 					databaseHealth: { status: 'checking', issues: [], warnings: [], counts: {}, indexedDB: false, schemaVersion: 0, lastCheckedAt: null },
@@ -3115,6 +3130,7 @@
  if(kind==="project"){this.currentTab="projects";this.modals.newProject=true;}
  if(kind==="part"){this.currentTab="inventory";this.openNewPartModal();}
  if(kind==="mileage")this.modals.updateMileage=true;
+ if(kind==="consumable")this.openConsumable();
  },
  get moreTabActive() {
 						return !this.primaryTabIds.includes(this.currentTab);
@@ -3122,7 +3138,7 @@
 
 					// Modals
 					modals: {
-				mobileSearch:false,navMenu:false,captureMenu:false,
+				mobileSearch:false,navMenu:false,captureMenu:false,consumables:false,
 						smartSearch: false,
 						newRepair: false,
 						repairDetail: false,
@@ -4182,7 +4198,58 @@
 						window.open(this.manualLibrary.base + '/manuals.html' + back + vehicleParam + '#/search' + (t ? '/' + encodeURIComponent(t) : ''), '_blank', 'noopener');
 					},
 
-					get garageMission(){
+					get consumableStockChoices(){
+ const d=this.consumableDraft;if(!d)return [];
+ const v=this.vehicles.find(v=>String(v.id)===String(d.vehicleId));
+ return (this.inventory||[]).filter(p=>p.vehicleCompatibility==="Universal"||d.scope==="vehicle"&&v&&p.vehicleCompatibility===v.name);
+ },
+ openConsumable(id=null){
+ this.consumableError="";this.consumableQuantity="";
+ try{const existing=id==null?null:window.MotorNoteConsumables.readVehicles(this.vehicles).find(r=>r.id===id&&r.status==="open");
+ if(id!=null&&!existing)throw Error("Report no longer open.");
+ this.consumableDraft=existing?{...existing,inventoryId:existing.inventoryId||"",targetQuantity:existing.targetQuantity??""}:{name:"",scope:"vehicle",vehicleId:String(this.activeVehicleId||this.vehicles[0]?.id||""),level:"low",inventoryId:"",targetQuantity:""};
+ this.modals.consumables=true;
+ }catch(e){alert(e.message);}
+ },
+ consumableFields(){
+ const d=this.consumableDraft,p=this.consumableStockChoices.find(x=>String(x.id)===String(d.inventoryId));
+ if(d.inventoryId&&!p)throw Error("Stock link is no longer valid.");
+ return {...d,inventoryId:p?String(p.id):null,unit:p?(p.unit||"each"):null,targetQuantity:d.scope==="garage"&&d.targetQuantity!==""&&d.targetQuantity!=null?Number(d.targetQuantity):null};
+ },
+ async saveConsumableReport(){
+ if(this.consumableBusy||this.inventorySaving||this.vendorBusy||this.backupBusy||this.startupReadFailed)return false;
+ this.consumableBusy=true;this.inventorySaving=true;this.consumableError="";let prior=null;
+ try{await this.inventorySaveTail;prior=this.vehicles;const fields=this.consumableFields(),engine=window.MotorNoteConsumables;
+ const rows=engine.report(engine.readVehicles(prior),fields,prior,"consumable-"+Date.now()+"-"+Math.random().toString(36).slice(2,9),new Date().toISOString());
+ this.vehicles=engine.writeVehicles(prior,rows);
+ if(!await this.saveToStorage("Consumable level reported"))throw Error(this.lastSaveError||"Report could not be saved.");
+ this.modals.consumables=false;return true;
+ }catch(e){if(prior)this.vehicles=prior;this.consumableError=e.message;return false;}finally{this.consumableBusy=false;this.inventorySaving=false;}
+ },
+ orderConsumable(){
+ if(this.consumableBusy||this.vendorBusy||this.inventorySaving||this.vendorDraft)return;
+ try{const r=window.MotorNoteConsumables.readVehicles(this.vehicles).find(x=>x.id===this.consumableDraft.id&&x.status==="open");if(!r)throw Error("Save the report first.");
+ const match=window.MotorNoteConsumables.verifiedStock(r,this.inventory,this.vehicles),p=match?.part;
+ this.currentTab="inventory";this.openVendorDraft();
+ Object.assign(this.vendorDraft.lines[0],{description:p?.description||r.name,partNumber:p?.partNumber||"",quantity:"",unit:p?.unit||r.unit||"",vehicleCompatibility:p?.vehicleCompatibility||"Not verified",inventoryId:p?String(p.id):""});
+ this.modals.consumables=false;
+ }catch(e){this.consumableError=e.message;}
+ },
+ async resolveConsumable(){
+ if(this.consumableBusy||this.inventorySaving||this.vendorBusy||this.backupBusy||this.startupReadFailed)return false;
+ this.consumableBusy=true;this.inventorySaving=true;this.consumableError="";let prior=null,stock=null;
+ try{await this.inventorySaveTail;prior=this.vehicles;stock=this.inventory;const engine=window.MotorNoteConsumables,rows=engine.readVehicles(prior),r=rows.find(x=>x.id===this.consumableDraft.id&&x.status==="open");if(!r)throw Error("Report no longer open.");
+ const quantity=this.consumableQuantity===""?null:Number(this.consumableQuantity);
+ if(quantity!==null){const match=engine.verifiedStock(r,stock,prior);if(r.scope!=="vehicle"||!match||!Number.isFinite(quantity)||quantity<=0||quantity>match.available)throw Error("Confirm a positive amount of linked, unreserved stock in its recorded unit.");}
+ if(!confirm(r.scope==="vehicle"?(quantity===null?"Confirm the actual vehicle refill? No inventory quantity will be deducted.":"Confirm actual refill and deduct "+quantity+" "+r.unit+" from linked stock?"):"Confirm sufficient garage stock?"))return false;
+ const next=engine.resolve(rows,r.id,{kind:r.scope==="vehicle"?"refilled":"sufficient-stock",confirmed:true},{inventory:stock,vehicles:prior},new Date().toISOString()).map(x=>x.id===r.id&&quantity!==null?{...x,consumedQuantity:quantity,consumedUnit:r.unit}:x);
+ if(quantity!==null)this.inventory=stock.map(p=>String(p.id)===String(r.inventoryId)?{...p,quantity:Number(p.quantity)-quantity}:p);
+ this.vehicles=engine.writeVehicles(prior,next);
+ if(!await this.saveToStorage("Consumable replenishment confirmed",{reportId:r.id,itemId:r.inventoryId,quantity,unit:r.unit}))throw Error(this.lastSaveError||"Replenishment could not be saved.");
+ this.modals.consumables=false;return true;
+ }catch(e){if(prior)this.vehicles=prior;if(stock)this.inventory=stock;this.consumableError=e.message;return false;}finally{this.consumableBusy=false;this.inventorySaving=false;}
+ },
+ get garageMission(){
  const errors=[],safe=(section,fn,fallback)=>{try{return fn();}catch(err){errors.push({section});return fallback;}},vehicles=this.vehicles||[],name=id=>vehicles.find(v=>String(v.id)===String(id))?.name||"Vehicle not recorded";
  const predictions=safe("maintenance schedules",()=>vehicles.flatMap(v=>this.predictiveForVehicle(v).map(p=>({...p,vehicleId:v.id,vehicleName:v.name}))),[]);
  const projects=safe("repair readiness",()=>(this.projects||[]).filter(p=>!/^(completed|cancelled|canceled|archived)$/i.test(p.status||"")).map(p=>{
@@ -4195,10 +4262,12 @@
  ],[]);
  const forecast=safe("inventory demand",()=>this.inventoryForecast(20),null),storage=safe("storage and reorder",()=>this.inventoryStorage,null),integrity=safe("inventory integrity",()=>this.inventoryIntegrity,null);
  const history=safe("repair history",()=>vehicles.map(v=>({vehicleId:v.id,vehicleName:v.name,repeatCount:window.MotorNoteHistory.history({logs:this.logs||[],vehicle:v,vehicles}).repeat.length})),[]);
- return window.MotorNoteMission.build({today:this.toolToday(),predictions,projects,orders,forecast,storage,integrity,history,tools:this.toolInventory||[],saveError:this.saveState==="error",errors});
+ const consumables=safe("consumable reports",()=>window.MotorNoteConsumables.project({reports:window.MotorNoteConsumables.readVehicles(vehicles),inventory:this.inventory,orders:this.vendorOrders,vehicles,today:this.toolToday()}),[]);
+ return window.MotorNoteMission.build({today:this.toolToday(),predictions,projects,orders,forecast,storage,integrity,history,consumables,tools:this.toolInventory||[],saveError:this.saveState==="error",errors});
  },
  openGarageMission(item){
  const target=item?.target;if(!target)return;
+ if(target.consumableId!=null){this.openConsumable(target.consumableId);return;}
  if(target.vehicleId!=null&&this.vehicles.some(v=>String(v.id)===String(target.vehicleId)))this.switchVehicle(this.vehicles.find(v=>String(v.id)===String(target.vehicleId)).id);
  if(target.tab==="inventory"&&target.view){this.inventoryView=target.view;if(target.view==="shopping")this.inventoryForecastHorizon=20;}
  this.currentTab=target.tab;
@@ -4875,6 +4944,7 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 
 					applyState(saved) {
 						if (!saved || typeof saved !== 'object') return;
+ if(Array.isArray(saved.vehicles))window.MotorNoteConsumables.readVehicles(saved.vehicles);
 						if (Array.isArray(saved.vehicles)) this.vehicles = saved.vehicles;
 						if (Array.isArray(saved.logs)) this.logs = saved.logs;
 						if (Array.isArray(saved.projects)) this.projects = saved.projects;
@@ -4905,6 +4975,7 @@ get inventoryStorage(){return window.MotorNoteInventoryEngine.storageSummary(thi
 				},
 
 				getPersistableState() {
+ window.MotorNoteConsumables.readVehicles(this.vehicles);
 					const strip = value => JSON.parse(JSON.stringify(value, (key, val) => key === 'data' ? (typeof val==='string'&&val.startsWith('data:')?val:undefined) : val));
 					return { schemaVersion: this.appSchemaVersion, savedAt: new Date().toISOString(), vehicles: strip(this.vehicles), logs: strip(this.logs), projects: strip(this.projects), inventory: strip(this.inventory), inventoryLedger:strip(this.inventoryLedger||[]), vendorOrders:strip(this.vendorOrders||[]), toolInventory:strip(this.toolInventory||[]), maintenancePlans: strip(this.maintenancePlans), archivedMaintenance: strip(this.archivedMaintenance), maintenanceSetupVersion: this.maintenanceSetupVersion };
 				},
@@ -5724,7 +5795,9 @@ projectRemainingPart(req) {return req?.status==='Used'||req?.used?0:Math.max(0,N
  this.backupBusy=true;let prior=null,applied=false;
  try{
  await this.inventorySaveTail;prior=this.getPersistableState();
- const next=await this.portableGarageState(window.MotorNoteBackup.candidate(prior,input,window.MotorNoteInventoryEngine.audit));
+ const candidate=window.MotorNoteBackup.candidate(prior,input,window.MotorNoteInventoryEngine.audit);
+ window.MotorNoteConsumables.readVehicles(candidate.vehicles);
+ const next=await this.portableGarageState(candidate);
  if(!await this.createSafetySnapshot(prior,reason))throw Error("Current data could not be backed up; no changes made.");
  this.applyState(next);applied=true;
  if(!await this.saveToStorage("Backup recovery"))throw Error(this.lastSaveError||"Restore write failed.");

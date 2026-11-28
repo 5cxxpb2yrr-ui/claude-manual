@@ -32,10 +32,47 @@ function verifiedStock(r,inventory,vehicles){
  if(!Number.isFinite(q)||!Number.isFinite(reserved)||q<0||reserved<0||reserved>q)return null;
  return {part:p,available:q-reserved};
 }
+function compatible(r,fitment,vehicles){
+ const v=list(vehicles).find(v=>same(v.id,r.vehicleId));
+ return fitment==="Universal"||r.scope==="vehicle"&&!!v&&fitment===v.name;
+}
+function lineMatches(r,l,inventory,vehicles){
+ const stock=verifiedStock(r,inventory,vehicles);
+ if(stock)return same(l.inventoryId,stock.part.id)&&norm(l.unit)===norm(r.unit)&&l.vehicleCompatibility===stock.part.vehicleCompatibility;
+ // No name-only association: an explicit report link is required.
+ if(r.inventoryId||!same(l.consumableReportId,r.id)||norm(l.description)!==norm(r.name)||!str(l.unit)||r.unit&&norm(l.unit)!==norm(r.unit)||!compatible(r,l.vehicleCompatibility,vehicles))return false;
+ if(l.inventoryId){const p=list(inventory).find(p=>same(p.id,l.inventoryId));return !!p&&norm(p.unit||"each")===norm(l.unit)&&p.vehicleCompatibility===l.vehicleCompatibility;}
+ return true;
+}
+function incomingFor(r,inventory,orders,vehicles){
+ return list(orders).filter(o=>["Ordered","Partially received"].includes(o.status)).flatMap(o=>list(o.lines).filter(l=>lineMatches(r,l,inventory,vehicles)&&positive(Number(l.quantity)-Number(l.receivedQuantity||0))).map(l=>({orderId:o.id,lineId:l.id,remaining:Number(l.quantity)-Number(l.receivedQuantity||0),expectedDate:o.expectedDate||null,explicit:same(l.consumableReportId,r.id)})));
+}
+function validateOrderLinks(lines,reports,inventory,orders,vehicles){
+ const seen=new Set();
+ for(const l of list(lines)){
+  if(!l.consumableReportId)continue;
+  const r=list(reports).find(r=>same(r.id,l.consumableReportId)&&r.status==="open");
+  if(!r||!lineMatches(r,l,inventory,vehicles))throw Error("Confirm the consumable report, product identity, unit and fitment before recording the linked purchase.");
+  if(l.demandKey)throw Error("One order line cannot be allocated to both repair demand and a consumable report.");
+  if(seen.has(r.id))throw Error("Use one linked line per consumable report; record extra stock separately.");
+  seen.add(r.id);
+  if(incomingFor(r,inventory,orders,vehicles).length)throw Error("A matching purchase is already incoming. Review the existing order before recording another linked purchase.");
+ }
+}
+function linkReceived(reports,result,vehicles,now){
+ const changed=new Set(list(result.changed).map(x=>String(x.lineId)));
+ return list(reports).map(r=>{
+  if(r.status!=="open"||r.inventoryId)return r;
+  const lines=list(result.order?.lines).filter(l=>changed.has(String(l.id))&&same(l.consumableReportId,r.id)&&lineMatches(r,l,result.inventory,vehicles)&&l.inventoryId);
+  if(lines.length!==1)return r;
+  const l=lines[0],next={...r,inventoryId:String(l.inventoryId),unit:l.unit,updatedAt:now};
+  return verifiedStock(next,result.inventory,vehicles)?next:r;
+ });
+}
 function project({reports,inventory,orders,vehicles,today}={}){
  return list(reports).filter(r=>r.status==="open").map(r=>{
   const stock=verifiedStock(r,inventory,vehicles),available=stock?.available??null;
-  const incoming=stock?list(orders).filter(o=>["Ordered","Partially received"].includes(o.status)).flatMap(o=>list(o.lines).filter(l=>same(l.inventoryId,stock.part.id)&&norm(l.unit)===norm(r.unit)&&l.vehicleCompatibility===stock.part.vehicleCompatibility&&positive(Number(l.quantity)-Number(l.receivedQuantity||0))).map(l=>({orderId:o.id,lineId:l.id,remaining:Number(l.quantity)-Number(l.receivedQuantity||0),expectedDate:o.expectedDate||null}))):[];
+  const incoming=incomingFor(r,inventory,orders,vehicles);
   const due=incoming.some(o=>o.expectedDate&&today&&o.expectedDate<today),enough=r.targetQuantity==null?available>0:available!==null&&available>=r.targetQuantity;
   const state=enough?(r.scope==="vehicle"?"refill":"confirm-stock"):incoming.length?"waiting":available===null?"verify-stock":"replenish";
   const rank=state==="waiting"?(due?81:44):r.scope==="vehicle"&&r.level==="empty"?83:r.level==="empty"?74:66;
@@ -85,5 +122,5 @@ function writeVehicles(vehicles,rows){
  if(readVehicles(next).length!==rows.length)throw Error("Consumable record could not be assigned.");
  return next;
 }
-const api={validateReport,report,project,resolve,verifiedStock,readVehicles,writeVehicles};root.MotorNoteConsumables=api;if(typeof module!=="undefined")module.exports=api;
+const api={validateReport,report,project,resolve,verifiedStock,readVehicles,writeVehicles,validateOrderLinks,linkReceived,incomingFor};root.MotorNoteConsumables=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

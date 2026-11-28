@@ -97,7 +97,7 @@ jobs:
   deploy-preview:
     name: Deploy isolated preview Worker
     needs: validate
-    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125' || github.ref == 'refs/heads/preview/scion-torque-sibling-fix-20261125')) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'preview/repair-cart-scion-dedupe-20261125' || github.event.pull_request.head.ref == 'preview/scion-torque-sibling-fix-20261125' || github.event.pull_request.head.ref == 'feat/v20-1-service-history-import' || github.event.pull_request.head.ref == 'feat/v20-1-consolidated-interface' || github.event.pull_request.head.ref == 'feat/v20-2-consumables-replenishment' || github.event.pull_request.head.ref == 'feat/v20-3-purchasing-replenishment'))
+    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125' || github.ref == 'refs/heads/preview/scion-torque-sibling-fix-20261125')) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'preview/repair-cart-scion-dedupe-20261125' || github.event.pull_request.head.ref == 'preview/scion-torque-sibling-fix-20261125' || github.event.pull_request.head.ref == 'feat/v20-1-service-history-import' || github.event.pull_request.head.ref == 'feat/v20-1-consolidated-interface' || github.event.pull_request.head.ref == 'feat/v20-2-consumables-replenishment' || github.event.pull_request.head.ref == 'feat/v20-3-purchasing-replenishment' || github.event.pull_request.head.ref == 'feat/v20-3-unified-shopping'))
     runs-on: ubuntu-latest
     environment: preview
     steps:
@@ -146,6 +146,7 @@ jobs:
             feat/v20-1-consolidated-interface) ALIAS=preview-v20-1-consolidated ;;
             feat/v20-2-consumables-replenishment) ALIAS=preview-v20-2-consumables ;;
             feat/v20-3-purchasing-replenishment) ALIAS=preview-v20-3-purchasing ;;
+            feat/v20-3-unified-shopping) ALIAS=preview-v20-3-shopping ;;
             *) echo "Unexpected preview branch"; exit 1 ;;
           esac
           test -s node_modules/pdfjs-dist/legacy/build/pdf.mjs

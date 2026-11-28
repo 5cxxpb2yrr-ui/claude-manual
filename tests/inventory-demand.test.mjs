@@ -49,3 +49,37 @@ test("shopping list consolidates only same vehicle, part identity and unit, pres
  assert.equal(list.items.filter(x=>!x.partNumber).length,2);
  assert.match(engine.shoppingText(list),/Confirm before buying/);
 });
+
+const rags={id:"rags",description:"Shop rags",partNumber:"RAGS",unit:"pack",vehicleCompatibility:"Universal",quantity:3,reservedQuantity:1};
+const report={id:"r",name:"Shop rags",scope:"garage",vehicleId:null,inventoryId:"rags",unit:"pack",targetQuantity:6,status:"open"};
+const ctx=(extra={})=>({inventory:[rags],reports:[report],consumables:[{id:"r",state:"waiting"}],storage:{groups:[{items:[{id:"rags",available:2}]}],reorder:[{id:"rags",target:5}]},orders:[{status:"Partially received",lines:[{inventoryId:"rags",partNumber:"RAGS",unit:"pack",vehicleCompatibility:"Universal",quantity:3,receivedQuantity:1,consumableReportId:"r"}]}],...extra});
+test("unified shopping counts the highest shared stock target once and credits only outstanding compatible receipts",()=>{
+ const f={rows:[],reviews:[],horizon:20},c=ctx(),before=JSON.stringify(c),list=engine.unifiedShoppingList(f,[v,other],c);
+ assert.equal(list.items.length,1);const item=list.items[0];assert.equal(item.required,6);assert.equal(item.stock,2);assert.equal(item.incoming,2);assert.equal(item.quantity,2);assert.equal(item.stockId,"rags");
+ assert.deepEqual(item.reportIds,["r"]);assert.equal(JSON.stringify(c),before);
+ assert.match(engine.shoppingText(list),/2 pack — Shop rags/);
+ const sufficient=ctx({orders:[{status:"Ordered",lines:[{inventoryId:"rags",partNumber:"RAGS",unit:"pack",vehicleCompatibility:"Universal",quantity:4,receivedQuantity:0}]}]});
+ assert.equal(engine.unifiedShoppingList(f,[v,other],sufficient).items.length,0);
+});
+test("unified shopping leaves repair allocations intact and asks for review of overlapping stock targets",()=>{
+ const f=engine.forecast({inventory:[rags],vehicles:[v],projects:[project("repair",[{id:"a",description:"Shop rags",partNumber:"RAGS",inventoryId:"rags",unit:"pack",quantity:4}])]});
+ const list=engine.unifiedShoppingList(f,[v],ctx());
+ assert.equal(list.items.length,1);assert.equal(list.items[0].quantity,2);assert.equal(list.items[0].sources[0].kind,"project");
+ assert.match(list.reviews.find(r=>r.stockId==="rags").reason,/Overlaps/);
+ const c=ctx({reports:[report,{id:"fluid",name:"Shop rags",scope:"vehicle",vehicleId:"s",inventoryId:"rags",unit:"pack",status:"open"}]});
+ assert.equal(engine.unifiedShoppingList({rows:[],reviews:[]},[v],c).items.length,0);
+});
+test("qualitative shortages stay reviews, waiting and refill states do not become purchase lines",()=>{
+ const reports=[{id:"a",name:"Washer fluid",scope:"vehicle",vehicleId:"s",status:"open"},{id:"b",name:"Towels",scope:"garage",status:"open"},{id:"c",name:"Cleaner",scope:"garage",status:"open"}];
+ const f={rows:[],reviews:[]},c=ctx({reports,consumables:[{id:"a",state:"verify-stock"},{id:"b",state:"waiting"},{id:"c",state:"confirm-stock"}],storage:{groups:[],reorder:[]},inventory:[],orders:[]});
+ const list=engine.unifiedShoppingList(f,[v],c);assert.equal(list.items.length,0);assert.deepEqual(list.reviews.map(r=>r.consumableId),["a"]);assert.match(engine.shoppingText(list),/Washer fluid/);
+});
+test("stock targets do not credit incoming orders allocated to repair work, incompatible products or other vehicle reports",()=>{
+ const f={rows:[],reviews:[]},c=ctx({orders:[{status:"Ordered",lines:[
+ {inventoryId:"rags",partNumber:"RAGS",unit:"pack",vehicleCompatibility:"Universal",quantity:4,demandKey:"project:p:r"},
+ {inventoryId:"rags",partNumber:"RAGS",unit:"each",vehicleCompatibility:"Universal",quantity:4},
+ {inventoryId:"rags",partNumber:"OTHER",unit:"pack",vehicleCompatibility:"Universal",quantity:4},
+ {inventoryId:"rags",partNumber:"RAGS",unit:"pack",vehicleCompatibility:"Universal",quantity:4,consumableReportId:"vehicle-other"}
+ ]}]});
+ const item=engine.unifiedShoppingList(f,[v],c).items[0];assert.equal(item.incoming,0);assert.equal(item.quantity,4);
+});

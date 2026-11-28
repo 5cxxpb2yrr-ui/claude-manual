@@ -110,3 +110,19 @@ test("owned tool editing keeps its ID and rejects duplicate names",async()=>{
  assert.equal(await mock.saveOwnedTool(),false);
  assert.equal(mock.toolInventory[0].notes,"5–50 N·m");
 });
+
+ test("Scion rear brakes resolve actual operation documents and numbered headings, not ABS diagnostic pages",async()=>{
+ const engineModule={exports:{}};new Function("module",readFileSync(new URL("../public/repair-workspace.js",import.meta.url),"utf8"))(engineModule);
+ const engine=engineModule.exports,component="Rear Brake Shoe, Wheel Cylinder & Brake Drum",makePage=(title,headings,extra="")=>'<div class="main"><h1>'+title+'</h1><ol class="ARABICNUM">'+headings.map(h=>'<li><span class="clsEmphBOLD">'+h+'</span><ol class="LOWERALPHA"><li>Review source instruction.</li></ol></li>').join("")+'</ol>'+extra+'</div>';
+ const fixture={c:[{n:"Brakes",c:[{n:"DTC rear brake",c:[{p:99,n:"Inspection Procedure"}]},{n:component,c:["Components","Disassembly","Inspection","Reassembly"].map((name,i)=>({p:1269+i,n:component+": "+name}))}]}]};
+ const html={1269:makePage(component+": Components",[]),1270:makePage(component+": Disassembly",["REMOVE REAR WHEEL","REMOVE REAR BRAKE SHOE"]),1271:makePage(component+": Inspection",["CHECK BRAKE SHOE LINING THICKNESS"]),1272:makePage(component+": Reassembly",["TEMPORARILY TIGHTEN BLEEDER PLUG","INSTALL REAR BRAKE SHOE"],'<a href="../pages/7711.html#Brake%20Fluid/">BLEEDING</a><a href="../pages/7732.html">ADJUSTMENT</a>'),7711:makePage("Brake Fluid: Bleeding",["BLEED AIR FROM BRAKE LINE"]),7732:makePage("Parking Brake System: Adjustment",["ADJUST PARKING BRAKE LEVER TRAVEL"])};
+ const fetcher=async url=>url.startsWith("/api/navigation/")?{ok:true,json:async()=>fixture}:{ok:!!html[Number(url.match(/(\d+)\.html$/)?.[1])],text:async()=>html[Number(url.match(/(\d+)\.html$/)?.[1])]};
+ const result=await planner.generate({vehicleId:"scion-xb",scope:"Replace rear brakes",fetcher,engine});
+ assert.deepEqual(result.documents.map(d=>d.sourceLabel),[1269,1270,1271,1272,7711,7732].map(p=>"Factory manual #"+p));
+ assert.equal(result.documents[3].steps.length,2);assert.equal(result.documents[3].steps[0].title,"TEMPORARILY TIGHTEN BLEEDER PLUG");
+ assert.ok(result.tasks.some(t=>/Disassembly/.test(t.name)));assert.ok(result.tasks.some(t=>/Reassembly/.test(t.name)));assert.equal(result.unavailable.length,0);
+ assert.ok(result.parts.some(p=>p.name==="Rear brake shoe set"&&p.relationship==="candidate"));assert.ok(!result.parts.some(p=>p.relationship==="required"));assert.match(result.limitations[0],/shoe-only/);
+ assert.ok(planner.buildGuidedPhases(result).some(p=>p.id==="manual-work"));
+ html[1272]=makePage(component+": Reassembly",["UNRECOGNIZED STEP"]);
+ const incomplete=await planner.generate({vehicleId:"scion-xb",scope:"Replace rear brakes",fetcher,engine});assert.ok(incomplete.unavailable.some(x=>x.page===1272));
+ });

@@ -97,7 +97,7 @@ jobs:
   deploy-preview:
     name: Deploy isolated preview Worker
     needs: validate
-    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125' || github.ref == 'refs/heads/preview/scion-torque-sibling-fix-20261125')) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'preview/repair-cart-scion-dedupe-20261125' || github.event.pull_request.head.ref == 'preview/scion-torque-sibling-fix-20261125' || github.event.pull_request.head.ref == 'feat/v20-1-service-history-import'))
+    if: ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/preview/repair-cart-scion-dedupe-20261125' || github.ref == 'refs/heads/preview/scion-torque-sibling-fix-20261125')) || (github.event_name == 'pull_request' && (github.event.pull_request.head.ref == 'preview/repair-cart-scion-dedupe-20261125' || github.event.pull_request.head.ref == 'preview/scion-torque-sibling-fix-20261125' || github.event.pull_request.head.ref == 'feat/v20-1-service-history-import' || github.event.pull_request.head.ref == 'feat/v20-1-consolidated-interface'))
     runs-on: ubuntu-latest
     environment: preview
     steps:
@@ -143,6 +143,7 @@ jobs:
             preview/scion-torque-sibling-fix-20261125) ALIAS=preview-scion-torque-sibling-fix-20261125 ;;
             preview/repair-cart-scion-dedupe-20261125) ALIAS=preview-repair-cart-scion-dedupe-20261125 ;;
             feat/v20-1-service-history-import) ALIAS=preview-v20-1-service-history-import ;;
+            feat/v20-1-consolidated-interface) ALIAS=preview-v20-1-consolidated ;;
             *) echo "Unexpected preview branch"; exit 1 ;;
           esac
           test -s node_modules/pdfjs-dist/legacy/build/pdf.mjs

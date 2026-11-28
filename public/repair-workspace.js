@@ -375,7 +375,7 @@ function extractFactoryListSteps(html){
   // Heading must begin the item; do not mistake an inline torque value for a step.
   if(!heading||htmlToText(item.slice(0,heading.index)).trim())continue;
   const title=htmlToText(heading[1]).replace(/\s+/g," ").trim();
-  if(!/^(?:INSTALL|REMOVE|CHECK|INSPECT|DISCONNECT|CONNECT|ADJUST|TIGHTEN|LOOSEN|DRAIN|FILL|REPLACE|CLEAN|APPLY|SET|REPAIR|MEASURE|VERIFY|BLEED|REFILL|TORQUE|LUBRICATE|POSITION|SECURE|SUPPORT|LOWER|RAISE|ALIGN|SEPARATE|ATTACH|DETACH|PREPARE|RESET|INITIALIZE)\b/i.test(title))continue;
+  if(!/^(?:(?:TEMPORARILY\s+)?TIGHTEN|INSTALL|REMOVE|CHECK|INSPECT|DISCONNECT|CONNECT|ADJUST|LOOSEN|DRAIN|FILL|REPLACE|CLEAN|APPLY|SET|REPAIR|MEASURE|VERIFY|BLEED|REFILL|TORQUE|LUBRICATE|POSITION|SECURE|SUPPORT|LOWER|RAISE|ALIGN|SEPARATE|ATTACH|DETACH|PREPARE|RESET|INITIALIZE)\b/i.test(title))continue;
   const detail=htmlToText(item.slice(heading.index+heading[0].length));
   const number=steps.length+1;
   const safetyCritical=/\b(brake|airbag|srs|fuel|high pressure|spring|strut|suspension|steering|jack|support vehicle|lift vehicle|high voltage|hybrid battery|ev battery|coolant under pressure|hot coolant|flammable|fire|battery terminal|disconnect battery|torque.*wheel|wheel.*torque)\b/i.test(title+" "+detail);
@@ -410,7 +410,7 @@ function repairProgress(steps,states){
  const done=steps.filter(x=>states[x.id]?.status==="done").length,skipped=steps.filter(x=>states[x.id]?.status==="skipped").length,safetySkipped=steps.filter(x=>x.safetyCritical&&states[x.id]?.status==="skipped").length;
  return {total:steps.length,done,skipped,remaining:steps.length-done-skipped,percent:steps.length?Math.round(done/steps.length*100):0,safetySkipped,canFinish:steps.length>0&&done+skipped===steps.length&&safetySkipped===0};
 }
-const Engine={CATALOG,TOOLS,htmlToText,findRelatedProcedureLinks,findScionSiblingSpecificationPages,extractTorque,extractProcedure,extractRepairSteps,repairStepCanOpen,repairProgress,torqueAssignmentOptions,toRelationships,slugify};
+const Engine={CATALOG,TOOLS,htmlToText,extractFactoryListSteps,findRelatedProcedureLinks,findScionSiblingSpecificationPages,extractTorque,extractProcedure,extractRepairSteps,repairStepCanOpen,repairProgress,torqueAssignmentOptions,toRelationships,slugify};
 root.LifeOSRepairEngine=Engine;if(typeof module!=="undefined"&&module.exports)module.exports=Engine;
 
 if(typeof document!=="undefined"){

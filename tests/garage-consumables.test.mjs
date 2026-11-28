@@ -43,3 +43,18 @@ test("unlinked, cancelled, incompatible and fully received order lines do not su
  assert.equal(projection(rows,stock(2,2))[0].state,"replenish");
  assert.equal(projection(rows,stock(1))[0].rank,83);
 });
+
+test("vehicle extensions preserve unrelated fields, shared scope and records through legacy serialization",()=>{
+ const original=JSON.parse(JSON.stringify(vehicles)); original[0].odometer=224634;
+ const rows=C.report(report(),{scope:"garage",name:"Shop rags",level:"low"},vehicles,"shared",now);
+ const next=C.writeVehicles(original,rows);
+ assert.deepEqual(original[0],{id:"s",name:"Scion",odometer:224634});
+ assert.equal(next[0].odometer,224634);
+ const legacy=JSON.parse(JSON.stringify(next)).map(v=>({...v,id:v.id}));
+ assert.deepEqual(C.readVehicles(legacy),rows);
+ assert.equal(C.readVehicles(legacy).find(r=>r.id==="shared").vehicleId,null);
+ assert.deepEqual(C.writeVehicles(next,[]),original);
+ const malformed=JSON.parse(JSON.stringify(next));malformed[1].motorNoteConsumablesV1=[rows[0]];
+ assert.throws(()=>C.readVehicles(malformed));
+ assert.throws(()=>C.writeVehicles([original[1]],rows));
+});

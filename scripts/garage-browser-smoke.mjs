@@ -321,6 +321,27 @@ async function run(name,launcher){
  assert.equal((await ragsItem()).quantity,2);
  await page.reload();await saved(page);assert.equal((await ragsItem()).incoming,3);
  console.log(name,"unified shopping target deduplication, stale quantity rejection and incoming coverage passed");
+ phase="confirmed consumption";
+ await context.setOffline(true);
+ await page.getByRole("button",{name:"Capture",exact:true}).click();
+ await page.getByRole("button",{name:"Record stock used",exact:true}).click();
+ const usage=page.getByRole("dialog",{name:"Record stock used"});
+ const usageId=await app(page,a=>String(a.inventory.find(p=>p.partNumber==="RAGS-FIXTURE").id));
+ await usage.locator('[x-model="usageDraft.id"]').selectOption(usageId);
+ await usage.locator('[x-model="usageDraft.reason"]').fill("Fixture cleanup");
+ await usage.locator('[x-model="usageDraft.quantity"]').fill("2");
+ await usage.getByRole("button",{name:"Confirm stock used"}).click();
+ await usage.getByRole("alert").waitFor({state:"visible"});
+ assert.match(await usage.getByRole("alert").textContent(),/exceeds unreserved stock/);
+ await usage.locator('[x-model="usageDraft.quantity"]').fill("1");
+ await usage.getByRole("button",{name:"Confirm stock used"}).click();await usage.waitFor({state:"hidden"});await saved(page);
+ await context.setOffline(false);await page.reload();await saved(page);
+ assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="RAGS-FIXTURE").quantity),0);
+ assert.equal(await app(page,(a,id)=>a.consumptionForecast.items.find(i=>i.id===id)?.status,usageId),"insufficient-history");
+ assert.equal(await app(page,(a,id)=>a.inventoryLedger.filter(e=>String(e.itemId)===id&&e.reference?.action==="consumable-use").length,usageId),1);
+ assert.equal(await app(page,a=>window.MotorNoteInventoryEngine.audit(a.inventoryLedger,a.inventory).length),0);
+ console.log(name,"offline stock use, reservation protection, ledger evidence and insufficient history passed");
+
  
  // Already-open Garage must be able to save a local transaction without network.
  phase="offline transaction";

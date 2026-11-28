@@ -157,6 +157,15 @@ function unifiedShoppingList(result,vehicles=[],context={}){
   if(!shortage)continue;
   out.items.push({key:"stock-target:"+id,name,partNumber:p.partNumber||"",unit,vehicleId:null,vehicleName:p.vehicleCompatibility==="Universal"?"Shared stock":p.vehicleCompatibility,stockId:id,vehicleCompatibility:p.vehicleCompatibility,quantity:shortage,required:t.target,stock:row.available,incoming,received:0,days:0,needsReview:!p.partNumber,sources:[{key:"stock-target:"+id,name,source,kind:"stock-target",quantity:shortage,days:0}],reportIds:t.reportIds});
  }
+ // Forecasts are review prompts only, never additional order quantities.
+ for(const c of context.consumption?.items||[]){
+  if(!c.review||c.status!=="estimated"||targets.has(String(c.id)))continue;
+  const p=inventory.find(p=>same(p.id,c.id));if(!p)continue;
+  if(reports.some(r=>same(r.inventoryId,c.id)||norm(r.name)===norm(p.description)))continue;
+  if((result.rows||[]).some(r=>same(r.inventoryId,c.id)||(r.allocations||[]).some(a=>same(a.itemId,c.id))||norm(r.name)===norm(p.description)||norm(p.partNumber)&&norm(r.partNumber)===norm(p.partNumber)))continue;
+  if(orders.some(o=>["Ordered","Partially received"].includes(o.status)&&(o.lines||[]).some(l=>same(l.inventoryId,c.id)&&Number(l.quantity)>Number(l.receivedQuantity||0))))continue;
+  review("usage-forecast:"+c.id,c.name,"Observed stock usage","Estimated "+Math.floor(c.daysRemaining)+" days available; review reorder settings and upcoming work.",{stockId:String(c.id)});
+ }
  return out;
 }
 function shoppingText(list){

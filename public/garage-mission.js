@@ -32,6 +32,11 @@ function build(input={}){
   add("consumable:"+c.id,c.group,c.rank,verb+" "+c.name,c.location+" · "+(c.level==="empty"?"Empty":"Low")+" · "+(c.state==="waiting"?(c.overdue?"Delivery overdue":"Awaiting delivery"):c.available===null?"Stock unknown":c.available+" "+(c.unit||"")+" available"),{consumableId:c.id});
  }
  for(const o of list(input.orders)){
+  // Preserve mixed orders and orders with unrelated lines. Only a vendor
+  // order fully represented by explicit waiting consumable links is redundant.
+  const remaining=list(o.lines).filter(l=>Number(l.quantity)>Number(l.receivedQuantity||0));
+  const waiting=list(input.consumables).filter(c=>c.state==="waiting");
+  if(String(o.key).startsWith("vendor:")&&remaining.length&&remaining.every(l=>l.consumableReportId&&waiting.some(c=>String(c.id)===String(l.consumableReportId)&&list(c.incoming).some(i=>i.explicit&&String(i.orderId)===String(o.id)&&String(i.lineId)===String(l.id)))))continue;
   const due=date(o.expectedDate),overdue=due&&due<today,now=due===today;
   add("order:"+o.key,"Waiting",overdue?86:now?72:40,"Check delivery: "+(o.vendor||"Supplier"),[o.orderNumber&&"#"+o.orderNumber,o.vehicleName,o.status,overdue?"Expected "+due+" · overdue":due?"Expected "+due:"No delivery date"].filter(Boolean).join(" · "),o.target||{tab:"inventory",view:"orders"});
  }

@@ -58,3 +58,34 @@ test("vehicle extensions preserve unrelated fields, shared scope and records thr
  assert.throws(()=>C.readVehicles(malformed));
  assert.throws(()=>C.writeVehicles([original[1]],rows));
 });
+
+test("explicit unlinked purchase survives validation and receipt creates a verified stock link without resolving report",()=>{
+ const Pmodule={exports:{}};new Function("module",readFileSync(new URL("../public/inventory-purchasing.js",import.meta.url),"utf8"))(Pmodule);const P=Pmodule.exports;
+ const rows=C.report([],{scope:"vehicle",vehicleId:"s",name:"Washer fluid",level:"empty"},vehicles,"r",now);
+ const line={description:"Washer fluid",quantity:2,unitCost:4,unit:"gal",vehicleCompatibility:"Universal",consumableReportId:"r"};
+ const order={...P.validateDraft({vendor:"Fixture",orderNumber:"1",lines:[line]}),id:"purchase"};
+ assert.equal(order.lines[0].consumableReportId,"r");
+ C.validateOrderLinks(order.lines,rows,[],[],vehicles);
+ assert.equal(projection(rows,[],[order])[0].state,"waiting");
+ assert.throws(()=>C.validateOrderLinks(order.lines,rows,[],[order],vehicles),/already incoming/);
+ assert.throws(()=>C.validateOrderLinks([...order.lines,...order.lines],rows,[],[],vehicles),/one linked line/);
+ assert.throws(()=>C.validateOrderLinks([{...order.lines[0],vehicleCompatibility:"Not verified"}],rows,[],[],vehicles));
+ assert.throws(()=>C.validateOrderLinks([{...order.lines[0],description:"Oil"}],rows,[],[],vehicles));
+ assert.throws(()=>C.validateOrderLinks([{...order.lines[0],demandKey:"repair"}],rows,[],[],vehicles));
+ const unrelated={...order,lines:[{...order.lines[0],consumableReportId:null}]};
+ assert.equal(projection(rows,[],[unrelated])[0].state,"verify-stock");
+ const result=P.receive(order,[],{"line-1":1},now);
+ const linked=C.linkReceived(rows,result,vehicles,now);
+ assert.equal(linked[0].inventoryId,result.inventory[0].id);assert.equal(linked[0].unit,"gal");
+ assert.equal(linked[0].status,"open");assert.equal(result.order.status,"Partially received");
+ assert.equal(projection(linked,result.inventory,[result.order])[0].state,"refill");
+ assert.equal(rows[0].inventoryId,null);
+ assert.equal(C.linkReceived(linked,result,vehicles,now)[0],linked[0]);
+});
+test("stock linked to repair demand or another consumable does not suppress this shortage",()=>{
+ const rows=report(),base=order()[0];
+ for(const change of [{demandKey:"repair"},{consumableReportId:"other"}]){
+ const orders=[{...base,lines:[{...base.lines[0],...change}]}];
+ assert.equal(projection(rows,stock(0),orders)[0].state,"replenish");
+ }
+});

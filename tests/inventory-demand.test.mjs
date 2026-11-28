@@ -83,3 +83,9 @@ test("stock targets do not credit incoming orders allocated to repair work, inco
  ]}]});
  const item=engine.unifiedShoppingList(f,[v],c).items[0];assert.equal(item.incoming,0);assert.equal(item.quantity,4);
 });
+
+test("usage forecast adds a review only, never a speculative purchase or duplicate incoming order",()=>{
+ const input={rows:[],reviews:[]},c=ctx({reports:[],consumables:[],storage:{groups:[],reorder:[]},orders:[],consumption:{items:[{id:"rags",name:"Shop rags",status:"estimated",review:true,daysRemaining:7}]}});
+ const list=engine.unifiedShoppingList(input,[v],c);assert.equal(list.items.length,0);assert.equal(list.reviews[0].key,"usage-forecast:rags");
+ assert.equal(engine.unifiedShoppingList(input,[v],{...c,orders:[{status:"Ordered",lines:[{inventoryId:"rags",quantity:2}]}]}).reviews.length,0);
+});

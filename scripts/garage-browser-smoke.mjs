@@ -302,6 +302,26 @@ async function run(name,launcher){
  assert.equal(await app(page,a=>window.MotorNoteConsumables.readVehicles(a.vehicles).filter(r=>r.scope==="garage"&&r.status==="open").length),1);
  console.log(name,"consumable capture, stock deduction, ledger integrity and offline persistence passed");
  
+ phase="unified shopping";
+ await app(page,async a=>{
+ a.openNewPartModal();Object.assign(a.newPartForm,{description:"Fixture shop rags",partNumber:"RAGS-FIXTURE",quantity:1,unitCost:3,vehicleCompatibility:"Universal",unit:"pack"});if(!await a.saveNewPart())throw Error(a.inventoryError||"Rags fixture failed");
+ const p=a.inventory.find(p=>p.partNumber==="RAGS-FIXTURE");a.startStorageEdit(p.id);Object.assign(a.storageDraft,{minimum:2,target:5,reason:"Fixture reorder settings"});if(!await a.saveStorageEdit())throw Error(a.storageError);
+ const r=window.MotorNoteConsumables.readVehicles(a.vehicles).find(r=>r.scope==="garage");a.openConsumable(r.id);Object.assign(a.consumableDraft,{inventoryId:String(p.id),targetQuantity:"6"});if(!await a.saveConsumableReport())throw Error(a.consumableError);
+ a.currentTab="inventory";a.inventoryView="shopping";
+ });
+ await saved(page);
+ const ragsItem=async()=>app(page,a=>a.inventoryShoppingList.items.find(i=>i.partNumber==="RAGS-FIXTURE"));
+ const initial=await ragsItem();assert.equal(initial.required,6);assert.equal(initial.quantity,5);assert.equal(initial.sources.length,1);
+ await page.locator("div[x-show=\"inventoryView==='shopping'\"]").getByText("Fixture shop rags",{exact:true}).waitFor({state:"visible"});
+ await app(page,a=>a.openVendorDraft(a.inventoryShoppingList.items.find(i=>i.partNumber==="RAGS-FIXTURE")));
+ assert.equal(await app(page,a=>a.vendorDraft.lines[0].inventoryId),initial.stockId);
+ await app(page,async a=>{Object.assign(a.vendorDraft,{vendor:"Fixture supplies",orderNumber:"RAGS-ORDER"});Object.assign(a.vendorDraft.lines[0],{quantity:6,unitCost:3});await a.saveVendorDraft();});
+ assert.match(await app(page,a=>a.vendorError),/exceeds remaining stock target/);
+ await app(page,async a=>{a.vendorDraft.lines[0].quantity=3;await a.saveVendorDraft();if(a.vendorDraft)throw Error(a.vendorError);});await saved(page);
+ assert.equal((await ragsItem()).quantity,2);
+ await page.reload();await saved(page);assert.equal((await ragsItem()).incoming,3);
+ console.log(name,"unified shopping target deduplication, stale quantity rejection and incoming coverage passed");
+ 
  // Already-open Garage must be able to save a local transaction without network.
  phase="offline transaction";
  await context.setOffline(true);
@@ -419,7 +439,7 @@ async function run(name,launcher){
  assert.equal(beforeRollback.stored.schemaVersion,9);
  assert.equal(beforeRollback.stored.vehicles.flatMap(v=>v.motorNoteConsumablesV1||[]).length,2,"Both consumable reports must survive rollback");
  assert.ok(beforeRollback.stored.inventoryLedger.length>0);
- assert.equal(beforeRollback.stored.vendorOrders.length,2);
+ assert.equal(beforeRollback.stored.vendorOrders.length,3);
  assert.ok(beforeRollback.stored.toolInventory.some(t=>t.id==="rollback-tool"));
  assert.deepEqual(beforeRollback.bytes,Array.from(Buffer.from("rollback bytes")),"Newly uploaded rollback fixture must have exact committed bytes");
  const prefix="motornote-garage-shell-";

@@ -1181,9 +1181,9 @@
 							</div>
 							<div class="grid grid-cols-2 gap-2">
 								<div class="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2"><div class="font-mono text-xl font-black text-amber-300" x-text="inventoryShoppingList.items.length"></div><div class="text-[10px] text-zinc-400">Purchase lines</div></div>
-								<div class="rounded-lg border border-zinc-700 bg-zinc-950 p-2"><div class="font-mono text-xl font-black text-white" x-text="inventoryShoppingList.reviews.length"></div><div class="text-[10px] text-zinc-400">Unquantified reviews</div></div>
+								<div class="rounded-lg border border-zinc-700 bg-zinc-950 p-2"><div class="font-mono text-xl font-black text-white" x-text="inventoryShoppingList.reviews.length"></div><div class="text-[10px] text-zinc-400">Needs confirmation</div></div>
 							</div>
-							<p class="text-[10px] text-zinc-400">Only uncovered quantities. Identical recorded part numbers and units are grouped within a vehicle; uncertain items stay separate. Verify fitment and units before buying. No stock or orders are changed.</p>
+							<p class="text-[10px] text-zinc-400">Repairs, maintenance, consumables and reorder targets in one list. Overlapping or unknown quantities require confirmation; stock targets are not added together. Verify fitment and units before buying. No stock or orders are changed.</p>
 							<template x-for="item in inventoryShoppingList.items" :key="item.key">
 								<details class="rounded-lg border border-amber-500/30 bg-zinc-950 px-2 py-2">
 									<summary class="cursor-pointer list-none flex items-center justify-between gap-2">
@@ -1198,7 +1198,7 @@
 								</details>
 							</template>
 							<p x-show="!inventoryShoppingList.items.length" class="text-xs text-zinc-400">No uncovered quantified requirements.</p>
-							<template x-if="inventoryShoppingList.reviews.length"><details class="rounded-lg border border-zinc-800 p-2"><summary class="text-xs font-bold text-amber-300 cursor-pointer">Confirm before buying · <span x-text="inventoryShoppingList.reviews.length"></span></summary><template x-for="item in inventoryShoppingList.reviews" :key="item.key"><div class="border-t border-zinc-800 py-2 mt-1"><p class="text-xs font-semibold text-white" x-text="item.name"></p><p class="text-[10px] text-zinc-400" x-text="item.source+' · '+item.reason"></p></div></template></details></template>
+							<template x-if="inventoryShoppingList.reviews.length"><details class="rounded-lg border border-zinc-800 p-2"><summary class="text-xs font-bold text-amber-300 cursor-pointer">Confirm before buying · <span x-text="inventoryShoppingList.reviews.length"></span></summary><template x-for="item in inventoryShoppingList.reviews" :key="item.key"><div class="border-t border-zinc-800 py-2 mt-1"><p class="text-xs font-semibold text-white" x-text="item.name"></p><p class="text-[10px] text-zinc-400" x-text="item.source+' · '+item.reason"></p><button type="button" x-show="item.consumableId||item.stockId" @click="openShoppingReview(item)" class="text-xs text-amber-300 font-bold py-1">Review source →</button></div></template></details></template>
 							<details class="rounded-lg border border-zinc-800 p-2"><summary class="cursor-pointer text-xs font-bold text-amber-300">Copy shopping list</summary><textarea readonly :value="inventoryShoppingText" class="w-full bg-zinc-950 text-xs text-zinc-200 border border-zinc-800 rounded-lg mt-2 p-2" rows="6" @focus="$event.target.select()"></textarea><button type="button" @click="copyInventoryShopping()" class="w-full mt-1 rounded-lg bg-amber-500 text-zinc-950 font-bold text-xs py-2">Copy list</button><p class="text-[10px] text-zinc-400 mt-1" x-text="inventoryShoppingMessage"></p></details>
 						</div>
 						<template x-if="inventoryView==='storage'"><div class="space-y-3">
@@ -4231,6 +4231,8 @@
  if(this.vendorDraft){this.consumableError="Finish or close the existing order draft first.";return;}
  try{const r=window.MotorNoteConsumables.readVehicles(this.vehicles).find(x=>x.id===this.consumableDraft.id&&x.status==="open");if(!r)throw Error("Save the report first.");
  const engine=window.MotorNoteConsumables,match=engine.verifiedStock(r,this.inventory,this.vehicles),p=match?.part;
+ const target=this.inventoryShoppingList.items.find(item=>item.stockId&&item.reportIds?.includes(String(r.id)));
+ if(target){this.currentTab="inventory";this.openVendorDraft(target);this.modals.consumables=false;return;}
  if(engine.incomingFor(r,this.inventory,this.vendorOrders,this.vehicles).length){this.currentTab="inventory";this.inventoryView="orders";this.modals.consumables=false;return;}
  this.currentTab="inventory";this.openVendorDraft();
  Object.assign(this.vendorDraft.lines[0],{description:p?.description||r.name,partNumber:p?.partNumber||"",quantity:"",unit:p?.unit||r.unit||"",vehicleCompatibility:p?.vehicleCompatibility||"Not verified",inventoryId:p?String(p.id):"",consumableReportId:r.id});
@@ -4321,8 +4323,10 @@
 					},
 					newVendorLine(){return {barcode:"",description:"",partNumber:"",quantity:1,unitCost:"",unit:"each",vehicleCompatibility:"Not verified",demandKey:"",inventoryId:"",consumableReportId:""};},
 					openVendorDraft(item=null){
-						this.inventoryView="orders";this.vendorError="";this.vendorPaste="";
-						const lines=item?item.sources.map(src=>({...this.newVendorLine(),description:item.name,partNumber:item.partNumber,quantity:src.quantity,unit:item.unit==="recorded unit"?"each":item.unit,vehicleCompatibility:item.vehicleName==="Vehicle not recorded"?"Not verified":item.vehicleName,demandKey:src.key})):[this.newVendorLine()];
+ this.currentTab="inventory";this.inventoryView="orders";
+ if(this.vendorDraft){this.vendorError="Finish or close the existing order draft first.";return;}
+ this.vendorError="";this.vendorPaste="";
+						const lines=item?.stockId?[{...this.newVendorLine(),description:item.name,partNumber:item.partNumber,quantity:item.quantity,unit:item.unit,vehicleCompatibility:item.vehicleCompatibility,inventoryId:item.stockId,replenishmentStockId:item.stockId}]:item?item.sources.map(src=>({...this.newVendorLine(),description:item.name,partNumber:item.partNumber,quantity:src.quantity,unit:item.unit==="recorded unit"?"each":item.unit,vehicleCompatibility:item.vehicleName==="Vehicle not recorded"?"Not verified":item.vehicleName,demandKey:src.key})):[this.newVendorLine()];
 						this.vendorDraft={vendor:"",orderNumber:"",orderedDate:new Date().toISOString().slice(0,10),expectedDate:"",lines};
 					},
 					importVendorRows(){
@@ -4381,6 +4385,7 @@ async saveVendorDraft(){
 						try{
 							const order=window.MotorNotePurchasing.validateDraft(this.vendorDraft,prior,(this.projects||[]).flatMap(p=>p.purchaseOrders||[]));
  window.MotorNoteConsumables.validateOrderLinks(order.lines,window.MotorNoteConsumables.readVehicles(this.vehicles),this.inventory,prior,this.vehicles);
+ this.validateReplenishmentDraft(order.lines);
 							const demand=this.vendorDemandChoices,totals=new Map(),norm=v=>String(v||"").toLowerCase().replace(/[^a-z0-9]/g,"");
 							for(const l of order.lines){
 								if(l.inventoryId){const part=this.inventory.find(p=>String(p.id)===String(l.inventoryId));if(!part)throw Error("Selected inventory record does not exist.");if((part.vehicleCompatibility||"Not verified")!==l.vehicleCompatibility||norm(part.unit||"each")!==norm(l.unit)||(l.partNumber&&norm(part.partNumber)!==norm(l.partNumber)))throw Error("Stock identity, unit or compatibility differs.");}
@@ -4410,8 +4415,30 @@ async saveVendorDraft(){
 						}catch(e){this.inventory=stock;this.vendorOrders=prior;this.vehicles=priorVehicles;this.vendorError=e.message;}finally{this.vendorBusy=false;}
 					},
 					get inventoryShoppingList(){
-						return window.MotorNoteDemandEngine.shoppingList(this.inventoryForecast(this.inventoryForecastHorizon||20),this.vehicles||[]);
-					},
+ const forecast=this.inventoryForecast(this.inventoryForecastHorizon||20),vehicles=this.vehicles||[],demand=window.MotorNoteDemandEngine;
+ try{const engine=window.MotorNoteConsumables,reports=engine.readVehicles(vehicles),consumables=engine.project({reports,inventory:this.inventory,orders:this.vendorOrders,vehicles,today:this.toolToday()});
+ return demand.unifiedShoppingList(forecast,vehicles,{inventory:this.inventory,storage:this.inventoryStorage,reports,consumables,orders:this.vendorOrders});
+ }catch(e){const list=demand.shoppingList(forecast,vehicles);list.reviews.push({key:"replenishment-error",name:"Replenishment unavailable",source:"Data review",reason:"Check consumable and storage data before buying."});return list;}
+ },
+ validateReplenishmentDraft(lines){
+ const draft=this.vendorDraft?.lines||[],ids=new Set(draft.map(l=>l.replenishmentStockId).filter(Boolean).map(String));if(!ids.size)return;
+ const choices=this.inventoryShoppingList.items;
+ for(const id of ids){
+ const item=choices.find(i=>i.stockId===id);
+ if(!item)throw Error("Stock replenishment changed. Reopen the shopping list.");
+ let total=0;
+ for(let i=0;i<lines.length;i++){
+ const l=lines[i],tag=draft[i]?.replenishmentStockId;
+ if(String(tag||"")===id&&(String(l.inventoryId||"")!==id||l.demandKey||l.consumableReportId))throw Error("Replenishment line must retain its verified stock link and cannot also cover job demand.");
+ if(String(l.inventoryId||"")===id)total+=Number(l.quantity);
+ }
+ if(total>item.quantity)throw Error("Purchase exceeds remaining stock target. Review the shopping list.");
+ }
+ },
+ openShoppingReview(item){
+ if(item.consumableId){this.openConsumable(item.consumableId);return;}
+ if(item.stockId){this.currentTab="inventory";this.inventoryView="storage";}
+ },
 					get inventoryShoppingText(){return window.MotorNoteDemandEngine.shoppingText(this.inventoryShoppingList);},
 					async copyInventoryShopping(){
 						try{await navigator.clipboard.writeText(this.inventoryShoppingText);this.inventoryShoppingMessage="Shopping list copied.";}

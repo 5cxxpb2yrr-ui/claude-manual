@@ -259,6 +259,38 @@ async function run(name,launcher){
  assert.equal(await app(page,(a,id)=>a.projects.find(p=>p.id===id).attachments[0].dataUrl,ids.p),payload);
  console.log(name,"service history import, duplicate prevention, safety snapshot and persistence passed");
 
+ phase="consumable capture and refill";
+ await tab(page,"dashboard");
+ await page.getByRole("button",{name:"Capture",exact:true}).click();
+ await page.getByRole("button",{name:/Report low \/ empty consumable/}).click();
+ const consumable=page.getByRole("dialog",{name:"Consumable replenishment"});
+ await consumable.getByRole("textbox",{name:"Consumable name"}).fill("Fixture washer fluid");
+ await consumable.locator('[x-model="consumableDraft.level"]').selectOption("empty");
+ await consumable.getByRole("button",{name:"Save report",exact:true}).click();
+ await consumable.waitFor({state:"hidden"});await saved(page);
+ assert.equal(await app(page,a=>window.MotorNoteConsumables.readVehicles(a.vehicles).length),1);
+ const reportId=await app(page,a=>window.MotorNoteConsumables.readVehicles(a.vehicles)[0].id);
+ assert.ok(await page.getByRole("region",{name:"Consumables needing attention"}).isVisible());
+ await app(page,async a=>{a.openNewPartModal();Object.assign(a.newPartForm,{description:"Fixture washer fluid",partNumber:"FLUID-FIXTURE",quantity:2,unitCost:3,vehicleCompatibility:"Universal",unit:"each"});if(!await a.saveNewPart())throw Error("Consumable stock fixture failed");});
+ const stockId=await app(page,a=>String(a.inventory.find(p=>p.partNumber==="FLUID-FIXTURE").id));
+ await app(page,(a,id)=>a.openConsumable(id),reportId);
+ await consumable.locator('[x-model="consumableDraft.inventoryId"]').selectOption(stockId);
+ await consumable.getByRole("button",{name:"Save report",exact:true}).click();await consumable.waitFor({state:"hidden"});await saved(page);
+ assert.equal(await app(page,a=>window.MotorNoteConsumables.readVehicles(a.vehicles).length),1);
+ await app(page,(a,id)=>a.openConsumable(id),reportId);
+ await consumable.locator('[x-model="consumableQuantity"]').fill("1");
+ await consumable.getByRole("button",{name:"Confirm actual refill"}).click();await consumable.waitFor({state:"hidden"});await saved(page);
+ assert.equal(await app(page,a=>a.inventory.find(p=>p.partNumber==="FLUID-FIXTURE").quantity),1);
+ assert.equal(await app(page,a=>window.MotorNoteConsumables.readVehicles(a.vehicles)[0].status),"resolved");
+ assert.equal(await app(page,a=>window.MotorNoteInventoryEngine.audit(a.inventoryLedger,a.inventory).length),0);
+ await page.reload();await saved(page);
+ assert.equal(await app(page,a=>window.MotorNoteConsumables.readVehicles(a.vehicles)[0].consumedQuantity),1);
+ await context.setOffline(true);
+ await app(page,async a=>{a.openConsumable();Object.assign(a.consumableDraft,{scope:"garage",name:"Fixture shop rags",level:"low"});if(!await a.saveConsumableReport())throw Error("Offline consumable save failed");});
+ await context.setOffline(false);await page.reload();await saved(page);
+ assert.equal(await app(page,a=>window.MotorNoteConsumables.readVehicles(a.vehicles).filter(r=>r.scope==="garage"&&r.status==="open").length),1);
+ console.log(name,"consumable capture, stock deduction, ledger integrity and offline persistence passed");
+ 
  // Already-open Garage must be able to save a local transaction without network.
  phase="offline transaction";
  await context.setOffline(true);
@@ -374,6 +406,7 @@ async function run(name,launcher){
  },newAttachment);
  const beforeRollback=await snapshot();
  assert.equal(beforeRollback.stored.schemaVersion,9);
+ assert.equal(beforeRollback.stored.vehicles.flatMap(v=>v.motorNoteConsumablesV1||[]).length,2,"Both consumable reports must survive rollback");
  assert.ok(beforeRollback.stored.inventoryLedger.length>0);
  assert.equal(beforeRollback.stored.vendorOrders.length,1);
  assert.ok(beforeRollback.stored.toolInventory.some(t=>t.id==="rollback-tool"));

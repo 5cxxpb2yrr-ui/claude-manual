@@ -162,6 +162,49 @@ function storageSummary(inventory=[],context={}){
  }
  return {groups:[...groups.values()].sort((a,b)=>a.code.localeCompare(b.code)),reorder,issues};
 }
+// Explicit consumption is distinct from stock corrections and reservations.
+function recordConsumption(inventory,request,context={}){
+ const matches=inventory.filter(p=>idIs(p.id,request.id)),p=matches[0];
+ if(matches.length!==1)throw Error("Stock record is missing or ambiguous.");
+ const quantity=Number(request.quantity),reason=String(request.reason||"").trim();
+ if(!validNumber(request.quantity)||quantity<=0||!reason||reason.length>300)throw Error("Enter actual positive usage and a reason (up to 300 characters).");
+ if(!validNumber(p.quantity)||!validNumber(request.expectedQuantity)||Number(p.quantity)!==Number(request.expectedQuantity)||key(p.unit||"each")!==key(request.unit))throw Error("Stock or unit changed; reopen the record.");
+ const floor=reservationFloor(p,context);
+ if(quantity>Number(p.quantity)-floor)throw Error("Usage exceeds unreserved stock.");
+ return {inventory:inventory.map(x=>idIs(x.id,p.id)?{...x,quantity:Number(x.quantity)-quantity}:x),reference:{action:"consumable-use",itemId:p.id,quantity,unit:p.unit||"each",reason}};
+}
+// Forecast is advisory only. Count verified, unit-matched physical consumption;
+// never infer use from purchases, corrections, merges, reservation or removal.
+function consumptionForecast(inventory=[],ledger=[],context={},now=new Date().toISOString()){
+ const end=Date.parse(now),day=86400000,windowDays=90,reviewDays=14,coverageDays=30;
+ if(!Number.isFinite(end))throw Error("Invalid forecast date.");
+ if(!ledger.length)return {items:[],issues:[],windowDays,reviewDays,coverageDays};
+ const issues=audit(ledger,inventory);if(issues.length)return {items:[],issues,windowDays,reviewDays,coverageDays};
+ const items=[];
+ for(const p of inventory){
+  const unit=p.unit||"each",movements=ledger.filter(e=>idIs(e.itemId,p.id));let start=end-windowDays*day;
+  // A merge or record removal/recreation ends the comparable observation window.
+  for(const e of movements)if(["merge-in","merge-out","stock-removed","opening-balance","stock-added"].includes(e.type)&&Number.isFinite(Date.parse(e.timestamp)))start=Math.max(start,Date.parse(e.timestamp));
+  const events=movements.filter(e=>{
+   const t=Date.parse(e.timestamp),ref=e.reference||{},q=Number(ref.quantity);
+   const explicit=ref.action==="consumable-use"&&e.reason==="Consumable stock used"||e.reason==="Consumable replenishment confirmed"&&!!ref.reportId;
+   return explicit&&e.present!==false&&idIs(ref.itemId,p.id)&&key(ref.unit)===key(unit)&&key(e.name)===key(p.description)&&identity(e.partNumber)===identity(p.partNumber)&&Number.isFinite(q)&&q>0&&Math.abs(e.delta.onHand+q)<1e-8&&e.delta.reserved===0&&Number.isFinite(t)&&t>=start&&t<=end;
+  }).sort((a,b)=>Date.parse(a.timestamp)-Date.parse(b.timestamp));
+  if(!events.length)continue;
+  let available;try{const floor=reservationFloor(p,context);if(!validNumber(p.quantity)||floor>Number(p.quantity))throw Error("Invalid available balance");available=Number(p.quantity)-floor;}catch(e){continue;}
+  const first=Date.parse(events[0].timestamp),last=Date.parse(events.at(-1).timestamp),span=(last-first)/day,distinct=new Set(events.map(e=>new Date(e.timestamp).toISOString().slice(0,10))).size,total=events.reduce((n,e)=>n-e.delta.onHand,0);
+  const enough=distinct>=3&&span>=14&&(end-last)/day<=30;
+  const base={id:String(p.id),name:p.description||"Stock item",unit,events:events.length,distinctDays:distinct,observedDays:span,consumed:total,available,lastUsed:events.at(-1).timestamp};
+  if(!enough){items.push({...base,status:"insufficient-history",rate:null,daysRemaining:null,suggestedTarget:null,review:false});continue;}
+  // First event establishes the observation anchor; only subsequent events
+  // contribute to the rate. Include elapsed time since last usage.
+  const rate=(total+events[0].delta.onHand)/((end-first)/day);
+  if(!Number.isFinite(rate)||rate<=0)continue;
+  const daysRemaining=available/rate,suggestedTarget=Math.ceil(rate*coverageDays);
+  items.push({...base,status:"estimated",rate,daysRemaining,suggestedTarget,review:daysRemaining<=reviewDays});
+ }
+ return {items:items.sort((a,b)=>Number(b.review)-Number(a.review)||(a.daysRemaining??Infinity)-(b.daysRemaining??Infinity)||a.name.localeCompare(b.name)),issues,windowDays,reviewDays,coverageDays};
+}
 function updateStorage(inventory,request){
  const p=inventory.find(x=>idIs(x.id,request.id));
  if(!p||inventory.filter(x=>idIs(x.id,request.id)).length!==1)throw Error("Stock record is missing or ambiguous.");
@@ -178,5 +221,5 @@ function updateStorage(inventory,request){
  return {inventory:inventory.map(x=>idIs(x.id,p.id)?{...x,storageLocation:after,reorderMinimum:minimum,reorderTarget:target}:x),reference:{action:before===after?"reorder-settings":"storage-transfer",itemId:p.id,quantity:Number(p.quantity),from:before,to:after,minimumBefore:p.reorderMinimum??null,targetBefore:p.reorderTarget??null,minimumAfter:minimum,targetAfter:target,reason}};
 }
 
-const api={balance,project,reconcile,audit,inspectInventory,physicalCount,mergeStock,reservationFloor,locationCode,storageSummary,updateStorage};root.MotorNoteInventoryEngine=api;if(typeof module!=="undefined")module.exports=api;
+const api={balance,project,reconcile,audit,inspectInventory,physicalCount,mergeStock,reservationFloor,locationCode,storageSummary,updateStorage,recordConsumption,consumptionForecast};root.MotorNoteInventoryEngine=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

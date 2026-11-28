@@ -26,7 +26,7 @@ function validateDraft(draft,orders=[],legacy=[]){
   if(!description||l.quantity===""||!Number.isFinite(quantity)||quantity<=0||l.unitCost===""||l.unitCost==null||!Number.isFinite(unitCost)||unitCost<0)throw Error("Line "+(i+1)+": confirm description, positive quantity and unit cost (0 if free).");
   if(!String(l.unit||"").trim())throw Error("Line "+(i+1)+": enter the unit.");
   if(!String(l.vehicleCompatibility||"").trim())throw Error("Line "+(i+1)+": choose fitment or Not verified.");
-  return {id:"line-"+(i+1),description,partNumber:String(l.partNumber||"").trim(),retailerItemCode:String(l.retailerItemCode||"").trim(),quantity,unitCost,unit:String(l.unit).trim(),vehicleCompatibility:l.vehicleCompatibility,inventoryId:l.inventoryId||null,demandKey:l.demandKey||null,barcode:String(l.barcode||"").trim(),receivedQuantity:0};
+  return {id:"line-"+(i+1),description,partNumber:String(l.partNumber||"").trim(),retailerItemCode:String(l.retailerItemCode||"").trim(),quantity,unitCost,unit:String(l.unit).trim(),vehicleCompatibility:l.vehicleCompatibility,inventoryId:l.inventoryId||null,demandKey:l.demandKey||null,...(l.consumableReportId?{consumableReportId:String(l.consumableReportId)}:{}),barcode:String(l.barcode||"").trim(),receivedQuantity:0};
  });
  const evidence={};
  if(draft.receiptSource){

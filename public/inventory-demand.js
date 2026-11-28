@@ -116,6 +116,49 @@ function shoppingList(result={rows:[],reviews:[]},vehicles=[]){
  const items=[...groups.values()].sort((a,b)=>a.days-b.days||a.vehicleName.localeCompare(b.vehicleName)||a.name.localeCompare(b.name));
  return {items,reviews:(result.reviews||[]).slice(),horizon:result.horizon??20};
 }
+// Read-only shopping projection. Stock targets are balances, not additive jobs.
+// Preserve repair allocations; ambiguous overlapping stock demand is review-only.
+function unifiedShoppingList(result,vehicles=[],context={}){
+ const out=shoppingList(result,vehicles),inventory=context.inventory||[],reports=(context.reports||[]).filter(r=>r.status==="open"),projections=context.consumables||[],storage=context.storage||{},orders=context.orders||[];
+ const rows=storage.groups?.flatMap(g=>g.items||[])||[],targets=new Map(),reportById=new Map(reports.map(r=>[String(r.id),r]));
+ const review=(key,name,source,reason,extra={})=>out.reviews.push({key,name,source,reason,...extra});
+ const matchingStock=r=>{const p=inventory.find(p=>same(p.id,r.inventoryId)),v=vehicles.find(v=>same(v.id,r.vehicleId));return p&&r.unit&&norm(p.unit||"each")===norm(r.unit)&&(p.vehicleCompatibility==="Universal"||r.scope==="vehicle"&&v&&p.vehicleCompatibility===v.name)?p:null;};
+ const addTarget=(p,quantity,source,reportId=null)=>{
+  const id=String(p.id);if(!targets.has(id))targets.set(id,{p,target:0,sources:[],reportIds:[]});
+  const t=targets.get(id);t.target=Math.max(t.target,quantity);t.sources.push(source);if(reportId)t.reportIds.push(String(reportId));
+ };
+ for(const r of storage.reorder||[]){
+  const p=inventory.find(p=>same(p.id,r.id));
+  if(p&&Number.isFinite(Number(r.target))&&Number(r.target)>0)addTarget(p,Number(r.target),"Stock reorder target");
+ }
+ for(const r of reports){
+  const c=projections.find(c=>same(c.id,r.id)),p=matchingStock(r),source=r.scope==="garage"?"Garage supply":(vehicles.find(v=>same(v.id,r.vehicleId))?.name||"Vehicle")+" consumable";
+  if(r.scope==="garage"&&p&&typeof r.targetQuantity==="number"&&Number.isFinite(r.targetQuantity)&&r.targetQuantity>0){addTarget(p,r.targetQuantity,source,r.id);continue;}
+  if(c&&["waiting","refill","confirm-stock"].includes(c.state))continue;
+  review("consumable:"+r.id,r.name,source,p?"Confirm required amount before buying.":"Verify stock, product and quantity before buying.",{consumableId:r.id});
+ }
+ for(const [id,t] of targets){
+  const p=t.p,row=rows.find(r=>same(r.id,id)),unit=p.unit||"each",name=p.description||"Stock item",source=t.sources.join(" + ");
+  if(!row||!Number.isFinite(row.available)||row.available<0||!String(p.vehicleCompatibility||"").trim()||p.vehicleCompatibility==="Not verified"){
+   review("stock:"+id,name,source,"Verify stock balance, unit and compatibility before buying.",{stockId:id});continue;
+  }
+  const conflicts=(result.rows||[]).some(r=>same(r.inventoryId,id)||(r.allocations||[]).some(a=>same(a.itemId,id))||((norm(p.partNumber)&&norm(r.partNumber)===norm(p.partNumber))||norm(r.name)===norm(name)));
+  const vehicleUse=reports.some(r=>r.scope==="vehicle"&&(same(r.inventoryId,id)||!r.inventoryId&&norm(r.name)===norm(name)));
+  const unresolvedOther=reports.some(r=>r.scope==="garage"&&(!same(r.inventoryId,id)&&norm(r.name)===norm(name)||same(r.inventoryId,id)&&!t.reportIds.includes(String(r.id))));
+  if(conflicts||vehicleUse||unresolvedOther){
+   if(row.available<t.target)review("stock:"+id,name,source,"Overlaps repair or other consumable demand. Review combined quantities before adding another purchase.",{stockId:id,consumableId:t.reportIds[0]});continue;
+  }
+  const incoming=orders.filter(o=>["Ordered","Partially received"].includes(o.status)).flatMap(o=>o.lines||[]).filter(l=>{
+   if(!same(l.inventoryId,id)||l.demandKey||norm(l.unit)!==norm(unit)||l.vehicleCompatibility!==p.vehicleCompatibility||norm(p.partNumber)&&norm(l.partNumber)!==norm(p.partNumber))return false;
+   if(!l.consumableReportId)return true;
+   const r=reportById.get(String(l.consumableReportId));return !!r&&r.scope==="garage"&&same(r.inventoryId,id)&&t.reportIds.includes(String(r.id));
+  }).reduce((sum,l)=>{const q=Number(l.quantity),received=Number(l.receivedQuantity||0);return Number.isFinite(q)&&Number.isFinite(received)&&q>=received&&received>=0?sum+q-received:sum;},0);
+  const shortage=Math.max(0,t.target-row.available-incoming);
+  if(!shortage)continue;
+  out.items.push({key:"stock-target:"+id,name,partNumber:p.partNumber||"",unit,vehicleId:null,vehicleName:p.vehicleCompatibility==="Universal"?"Shared stock":p.vehicleCompatibility,stockId:id,vehicleCompatibility:p.vehicleCompatibility,quantity:shortage,required:t.target,stock:row.available,incoming,received:0,days:0,needsReview:!p.partNumber,sources:[{key:"stock-target:"+id,name,source,kind:"stock-target",quantity:shortage,days:0}],reportIds:t.reportIds});
+ }
+ return out;
+}
 function shoppingText(list){
  const lines=["MotorNote — shopping list ("+list.horizon+" days + active projects)"];
  for(const item of list.items||[]){
@@ -126,5 +169,5 @@ function shoppingText(list){
  if(list.reviews?.length){lines.push("","Confirm before buying:");for(const r of list.reviews)lines.push("- "+r.name+" — "+r.source+": "+r.reason);}
  return lines.join("\n");
 }
-const api={forecast,shoppingList,shoppingText};root.MotorNoteDemandEngine=api;if(typeof module!=="undefined")module.exports=api;
+const api={forecast,shoppingList,unifiedShoppingList,shoppingText};root.MotorNoteDemandEngine=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);

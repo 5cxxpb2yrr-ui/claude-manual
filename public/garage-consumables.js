@@ -38,6 +38,7 @@ function compatible(r,fitment,vehicles){
 }
 function lineMatches(r,l,inventory,vehicles){
  const stock=verifiedStock(r,inventory,vehicles);
+ if(l.demandKey||l.consumableReportId&&!same(l.consumableReportId,r.id))return false;
  if(stock)return same(l.inventoryId,stock.part.id)&&norm(l.unit)===norm(r.unit)&&l.vehicleCompatibility===stock.part.vehicleCompatibility;
  // No name-only association: an explicit report link is required.
  if(r.inventoryId||!same(l.consumableReportId,r.id)||norm(l.description)!==norm(r.name)||!str(l.unit)||r.unit&&norm(l.unit)!==norm(r.unit)||!compatible(r,l.vehicleCompatibility,vehicles))return false;

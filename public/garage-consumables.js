@@ -58,5 +58,32 @@ function resolve(reports,id,confirmation,context,now){
  if(confirmation.quantity!=null)throw Error("Quantified consumption requires the inventory transaction workflow.");
  return rows.map(x=>x===r?{...r,status:"resolved",resolvedAt:now,updatedAt:now,resolution:confirmation.kind}:x);
 }
-const api={validateReport,report,project,resolve,verifiedStock};root.MotorNoteConsumables=api;if(typeof module!=="undefined")module.exports=api;
+// Vehicle extensions survive the pinned V9 serializer. Shared supply
+// records are stored on one existing vehicle solely as a storage carrier;
+// their scope remains garage-wide, and their vehicleId must remain null.
+const field="motorNoteConsumablesV1";
+function readVehicles(vehicles){
+ const rows=[],ids=new Set(),keys=new Set();
+ for(const v of list(vehicles)){
+  const ext=v[field];if(ext===undefined)continue;
+  if(!Array.isArray(ext))throw Error("Invalid consumable collection.");
+  for(const r of ext){
+   if(!r||!str(r.id)||ids.has(str(r.id))||!["open","resolved"].includes(r.status))throw Error("Invalid or duplicate consumable record.");
+   validateReport(r,vehicles);
+   if(r.scope==="vehicle"&&!same(r.vehicleId,v.id)||r.scope==="garage"&&r.vehicleId!==null)throw Error("Consumable scope mismatch.");
+   if(r.status==="open"&&keys.has(reportKey(r)))throw Error("Duplicate open consumable report.");
+   if(r.status==="open")keys.add(reportKey(r));
+   ids.add(str(r.id));rows.push(r);
+  }
+ }
+ return rows;
+}
+function writeVehicles(vehicles,rows){
+ if(!list(vehicles).length)throw Error("At least one vehicle is required.");
+ const carrier=[...vehicles].sort((a,b)=>String(a.id).localeCompare(String(b.id)))[0].id;
+ const next=vehicles.map(v=>{const n={...v};const assigned=rows.filter(r=>r.scope==="garage"?same(v.id,carrier):same(v.id,r.vehicleId));if(assigned.length)n[field]=assigned;else delete n[field];return n;});
+ if(readVehicles(next).length!==rows.length)throw Error("Consumable record could not be assigned.");
+ return next;
+}
+const api={validateReport,report,project,resolve,verifiedStock,readVehicles,writeVehicles};root.MotorNoteConsumables=api;if(typeof module!=="undefined")module.exports=api;
 })(typeof globalThis!=="undefined"?globalThis:this);
